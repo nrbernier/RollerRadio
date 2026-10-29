@@ -13,8 +13,16 @@ shell = (ROOT / 'src/shell.html').read_text()
 js = '\n'.join((ROOT / 'src' / f).read_text() for f in ORDER)
 body = lambda three: f'{shell}\n<script src="{three}"></script>\n<script>\n"use strict";\n{js}\n</script>\n'
 head = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
+pwa = ('<link rel="manifest" href="manifest.webmanifest">\n'
+       '<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">\n'
+       '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">\n'
+       '<meta name="apple-mobile-web-app-capable" content="yes">\n'
+       '<meta name="mobile-web-app-capable" content="yes">\n'
+       '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
+       '<meta name="apple-mobile-web-app-title" content="Offbeat">\n'
+       '<meta name="theme-color" content="#2a1748">\n')
 (ROOT / 'dist').mkdir(exist_ok=True)
 (ROOT / 'dist/offbeat.html').write_text(body(CDN))
 (ROOT / 'dist/test.html').write_text(head + body('../vendor/three.min.js').replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
-(ROOT / 'index.html').write_text(head + body(CDN).replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
+(ROOT / 'index.html').write_text(head + pwa + body(CDN).replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
 print('built', len(body(CDN)) // 1024, 'KB')

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="c"><rect width="512" height="512"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="512" height="512" fill="#2a1748"/>
+    <!-- sunburst -->
+    <g transform="translate(256 270)" fill="#ff2e88" opacity="0.55">
+      <path d="M0 0 L-60 -400 L60 -400Z"/><path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(45)"/>
+      <path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(90)"/><path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(135)"/>
+      <path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(180)"/><path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(225)"/>
+      <path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(270)"/><path d="M0 0 L-60 -400 L60 -400Z" transform="rotate(315)"/>
+    </g>
+    <!-- radio waves -->
+    <g fill="none" stroke="#19d3ff" stroke-width="18" stroke-linecap="round">
+      <path d="M352 118 a70 70 0 0 1 52 52"/>
+      <path d="M356 70 a120 120 0 0 1 96 96"/>
+    </g>
+    <!-- the skate, tilted -->
+    <g transform="translate(250 268) rotate(-12)" stroke="#14101f" stroke-width="16" stroke-linejoin="round">
+      <!-- hard shadow -->
+      <path d="M-96 -150 L4 -150 Q22 -150 26 -132 L34 -40 Q98 -32 132 -2 Q150 14 146 40 L146 58 L-112 58 L-112 -134 Q-112 -150 -96 -150Z" fill="#14101f" transform="translate(14 14)"/>
+      <!-- boot -->
+      <path d="M-96 -150 L4 -150 Q22 -150 26 -132 L34 -40 Q98 -32 132 -2 Q150 14 146 40 L146 58 L-112 58 L-112 -134 Q-112 -150 -96 -150Z" fill="#ffd23f"/>
+      <!-- cuff + lace band -->
+      <path d="M-112 -112 L28 -112" fill="none" stroke-width="12"/>
+      <rect x="-112" y="-150" width="138" height="38" fill="#ff2e88"/>
+      <path d="M-30 -70 L30 -60 M-26 -40 L38 -30" fill="none" stroke-width="10"/>
+      <!-- frame -->
+      <rect x="-118" y="56" width="268" height="26" rx="8" fill="#6a3df0"/>
+      <!-- wheels -->
+      <g fill="#ff2e88">
+        <circle cx="-86" cy="104" r="30"/><circle cx="-14" cy="104" r="30"/><circle cx="58" cy="104" r="30"/><circle cx="126" cy="104" r="30"/>
+      </g>
+      <g fill="#fff" stroke-width="8">
+        <circle cx="-86" cy="104" r="9"/><circle cx="-14" cy="104" r="9"/><circle cx="58" cy="104" r="9"/><circle cx="126" cy="104" r="9"/>
+      </g>
+    </g>
+    <!-- speed lines -->
+    <g stroke="#ffffff" stroke-width="16" stroke-linecap="round">
+      <path d="M40 300 L104 288"/><path d="M28 352 L112 336"/><path d="M52 404 L112 392"/>
+    </g>
+  </g>
+</svg>
