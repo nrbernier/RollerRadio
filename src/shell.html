@@ -25,7 +25,15 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
 #flash.go { animation: flash .45s ease-out; }
 @keyframes flash { 0% { opacity: .75 } 100% { opacity: 0 } }
 #touch { position: fixed; inset: 0; z-index: 2; touch-action: none; }
-#stickbase { position: fixed; left: 0; top: 0; width: 128px; height: 128px; border-radius: 50%; border: 3px solid rgba(255,255,255,.55); background: rgba(20,16,31,.25); z-index: 3; pointer-events: none; }
+#stickbase { position: fixed; left: 0; top: 0; width: 128px; height: 128px; border-radius: 50%; border: 3px solid rgba(255,255,255,.55); background: rgba(20,16,31,.25); z-index: 3; pointer-events: none; display: none; }
+/* resting spot: shows where the thumb goes; jumps under the finger on touch */
+body.touch.playing #stickbase { display: block; left: calc(28px + var(--sal)); top: auto; bottom: calc(28px + var(--sab)); opacity: .55; }
+body.touch.playing #stickbase.live { left: 0; top: 0; bottom: auto; opacity: 1; }
+#stickbase::after { content: "SKATE"; position: absolute; left: 0; right: 0; bottom: -22px; text-align: center; font-family: var(--f-display); font-size: 11px; letter-spacing: .1em; color: var(--paper); text-shadow: 0 1px 0 var(--ink); }
+#stickbase.live::after { display: none; }
+.lookzone { position: absolute; right: calc(230px + var(--sar)); bottom: calc(40px + var(--sab)); font-family: var(--f-display); font-size: 11px; letter-spacing: .1em; color: rgba(247,244,255,.6); display: none; }
+body.touch .lookzone { display: block; }
+@media (max-width: 600px) { .lookzone { right: auto; left: 50%; transform: translateX(-50%); bottom: calc(220px + var(--sab)); } }
 #knob { position: absolute; left: 34px; top: 34px; width: 60px; height: 60px; border-radius: 50%; background: var(--sun); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
 
 /* ---------- HUD ---------- */
@@ -211,7 +219,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
 <canvas id="gl"></canvas>
 <div id="vignette"></div>
 <div id="touch"></div>
-<div id="stickbase" hidden><div id="knob"></div></div>
+<div id="stickbase"><div id="knob"></div></div>
 
 <div id="hud" hidden>
   <div class="hud-tl">
@@ -233,6 +241,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
   <div id="toast" class="toast"></div>
   <div id="hint"></div>
   <div id="desk"><div class="dial"><div id="deskRing"></div></div></div>
+  <div class="lookzone">◂ DRAG HERE TO LOOK ▸</div>
   <div id="buttons">
     <button id="btnTrick" class="pad-btn"><span class="ring" id="trickRing"></span>TRICK</button>
     <button id="btnJump" class="pad-btn"><span class="ring" id="jumpRing"></span>JUMP</button>
@@ -255,8 +264,8 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
       <button class="ghost" id="btnSkipIntro" hidden>SKIP INTRO</button>
     </div>
     <div class="controls">
-      <span class="k"><kbd>WASD</kbd> skate</span><span class="k"><kbd>SPACE</kbd> jump</span><span class="k"><kbd>K</kbd>/<kbd>SHIFT</kbd> trick &amp; push</span><span class="k"><kbd>Q</kbd><kbd>E</kbd> / drag: camera</span>
-      <span class="t">Left side: skate · right side: look around · JUMP / TRICK buttons · landscape is best</span>
+      <span class="k"><kbd>W</kbd> skate</span><span class="k"><kbd>A</kbd><kbd>D</kbd> steer</span><span class="k"><kbd>S</kbd> brake</span><span class="k"><kbd>SPACE</kbd> jump</span><span class="k"><kbd>K</kbd>/<kbd>SHIFT</kbd> trick &amp; push</span><span class="k"><kbd>Q</kbd><kbd>E</kbd> / drag: camera</span>
+      <span class="t">Thumb on the left: point where you want to go · drag on the right: look around · landscape is best</span>
       <span>Headphones on. Everything happens on the beat.</span>
     </div>
   </div>
@@ -267,7 +276,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
     <h2>Paused</h2>
     <p>The Ministry thanks you for taking a calm, compliant break.</p>
     <label for="vol">MUSIC <input id="vol" type="range" min="0" max="100" value="80"></label>
-    <div class="keys">Jump and trick ON the beat: the ring closes on each beat. On the ground TRICK is a push. Speaker pads and the beat lift only work in rhythm.</div>
+    <div class="keys">Phone: put your thumb anywhere on the left half and point where you want to go; lift it to coast. Drag on the right half to look around.<br>Keyboard: W skate, A/D steer, S brake, Space jump, K/Shift trick, Q/E camera.<br>Jump and trick ON the beat: the ring closes on each beat. On the ground TRICK is a push. Speaker pads and the beat lift only work in rhythm.</div>
     <div class="row"><button class="b" id="btnResume">RESUME</button><button class="b alt" id="btnRestart">RESTART WORLD</button><button class="b alt" id="btnReplayIntro">REPLAY INTRO</button></div>
   </div>
 </div>

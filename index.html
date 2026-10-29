@@ -27,7 +27,15 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
 #flash.go { animation: flash .45s ease-out; }
 @keyframes flash { 0% { opacity: .75 } 100% { opacity: 0 } }
 #touch { position: fixed; inset: 0; z-index: 2; touch-action: none; }
-#stickbase { position: fixed; left: 0; top: 0; width: 128px; height: 128px; border-radius: 50%; border: 3px solid rgba(255,255,255,.55); background: rgba(20,16,31,.25); z-index: 3; pointer-events: none; }
+#stickbase { position: fixed; left: 0; top: 0; width: 128px; height: 128px; border-radius: 50%; border: 3px solid rgba(255,255,255,.55); background: rgba(20,16,31,.25); z-index: 3; pointer-events: none; display: none; }
+/* resting spot: shows where the thumb goes; jumps under the finger on touch */
+body.touch.playing #stickbase { display: block; left: calc(28px + var(--sal)); top: auto; bottom: calc(28px + var(--sab)); opacity: .55; }
+body.touch.playing #stickbase.live { left: 0; top: 0; bottom: auto; opacity: 1; }
+#stickbase::after { content: "SKATE"; position: absolute; left: 0; right: 0; bottom: -22px; text-align: center; font-family: var(--f-display); font-size: 11px; letter-spacing: .1em; color: var(--paper); text-shadow: 0 1px 0 var(--ink); }
+#stickbase.live::after { display: none; }
+.lookzone { position: absolute; right: calc(230px + var(--sar)); bottom: calc(40px + var(--sab)); font-family: var(--f-display); font-size: 11px; letter-spacing: .1em; color: rgba(247,244,255,.6); display: none; }
+body.touch .lookzone { display: block; }
+@media (max-width: 600px) { .lookzone { right: auto; left: 50%; transform: translateX(-50%); bottom: calc(220px + var(--sab)); } }
 #knob { position: absolute; left: 34px; top: 34px; width: 60px; height: 60px; border-radius: 50%; background: var(--sun); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
 
 /* ---------- HUD ---------- */
@@ -213,7 +221,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
 </head><body><canvas id="gl"></canvas>
 <div id="vignette"></div>
 <div id="touch"></div>
-<div id="stickbase" hidden><div id="knob"></div></div>
+<div id="stickbase"><div id="knob"></div></div>
 
 <div id="hud" hidden>
   <div class="hud-tl">
@@ -235,6 +243,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
   <div id="toast" class="toast"></div>
   <div id="hint"></div>
   <div id="desk"><div class="dial"><div id="deskRing"></div></div></div>
+  <div class="lookzone">◂ DRAG HERE TO LOOK ▸</div>
   <div id="buttons">
     <button id="btnTrick" class="pad-btn"><span class="ring" id="trickRing"></span>TRICK</button>
     <button id="btnJump" class="pad-btn"><span class="ring" id="jumpRing"></span>JUMP</button>
@@ -257,8 +266,8 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
       <button class="ghost" id="btnSkipIntro" hidden>SKIP INTRO</button>
     </div>
     <div class="controls">
-      <span class="k"><kbd>WASD</kbd> skate</span><span class="k"><kbd>SPACE</kbd> jump</span><span class="k"><kbd>K</kbd>/<kbd>SHIFT</kbd> trick &amp; push</span><span class="k"><kbd>Q</kbd><kbd>E</kbd> / drag: camera</span>
-      <span class="t">Left side: skate · right side: look around · JUMP / TRICK buttons · landscape is best</span>
+      <span class="k"><kbd>W</kbd> skate</span><span class="k"><kbd>A</kbd><kbd>D</kbd> steer</span><span class="k"><kbd>S</kbd> brake</span><span class="k"><kbd>SPACE</kbd> jump</span><span class="k"><kbd>K</kbd>/<kbd>SHIFT</kbd> trick &amp; push</span><span class="k"><kbd>Q</kbd><kbd>E</kbd> / drag: camera</span>
+      <span class="t">Thumb on the left: point where you want to go · drag on the right: look around · landscape is best</span>
       <span>Headphones on. Everything happens on the beat.</span>
     </div>
   </div>
@@ -269,7 +278,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
     <h2>Paused</h2>
     <p>The Ministry thanks you for taking a calm, compliant break.</p>
     <label for="vol">MUSIC <input id="vol" type="range" min="0" max="100" value="80"></label>
-    <div class="keys">Jump and trick ON the beat: the ring closes on each beat. On the ground TRICK is a push. Speaker pads and the beat lift only work in rhythm.</div>
+    <div class="keys">Phone: put your thumb anywhere on the left half and point where you want to go; lift it to coast. Drag on the right half to look around.<br>Keyboard: W skate, A/D steer, S brake, Space jump, K/Shift trick, Q/E camera.<br>Jump and trick ON the beat: the ring closes on each beat. On the ground TRICK is a push. Speaker pads and the beat lift only work in rhythm.</div>
     <div class="row"><button class="b" id="btnResume">RESUME</button><button class="b alt" id="btnRestart">RESTART WORLD</button><button class="b alt" id="btnReplayIntro">REPLAY INTRO</button></div>
   </div>
 </div>
@@ -2084,6 +2093,8 @@ function railDir(r, s) {
 const Input = {
   move: { x: 0, y: 0 }, keys: {}, jumpQ: [], trickQ: [], camDX: 0, camDY: 0, lastCamInput: -10, enabled: false,
   stick: { id: null, ox: 0, oy: 0, x: 0, y: 0 }, camPtr: null,
+  frame: null,                 // stick reference yaw, frozen while the thumb is down
+  kb: { fwd: 0, turn: 0 }, kbActive: false,
   init() {
     const K = this.keys;
     window.addEventListener('keydown', e => {
@@ -2103,8 +2114,8 @@ const Input = {
       const left = e.clientX < window.innerWidth * 0.45;
       if (left && this.stick.id === null && e.pointerType !== 'mouse') {
         this.stick.id = e.pointerId; this.stick.ox = e.clientX; this.stick.oy = e.clientY;
-        base.hidden = false; base.style.transform = `translate(${e.clientX - 64}px, ${e.clientY - 64}px)`;
-        knob.style.transform = 'translate(0px,0px)';
+        base.classList.add('live'); base.style.transform = `translate(${e.clientX - 64}px, ${e.clientY - 64}px)`;
+        knob.style.transform = 'translate(0px,0px)'; this.frame = null;
       } else if (this.camPtr === null) { this.camPtr = { id: e.pointerId, x: e.clientX, y: e.clientY }; }
       zone.setPointerCapture?.(e.pointerId);
     });
@@ -2120,7 +2131,7 @@ const Input = {
       }
     });
     const up = e => {
-      if (e.pointerId === this.stick.id) { this.stick.id = null; this.stick.x = this.stick.y = 0; base.hidden = true; }
+      if (e.pointerId === this.stick.id) { this.stick.id = null; this.stick.x = this.stick.y = 0; this.frame = null; base.classList.remove('live'); base.style.transform = ''; knob.style.transform = 'translate(0px,0px)'; }
       if (this.camPtr && e.pointerId === this.camPtr.id) this.camPtr = null;
     };
     zone.addEventListener('pointerup', up); zone.addEventListener('pointercancel', up);
@@ -2134,8 +2145,13 @@ const Input = {
   },
   poll() {
     const K = this.keys;
-    let x = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
-    let y = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0);
+    // keyboard = skater steering: W push, S brake, A/D carve
+    const turn = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
+    const fwd = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0);
+    this.kbActive = this.enabled && this.stick.id === null && (turn !== 0 || fwd !== 0);
+    this.kb.fwd = this.enabled ? fwd : 0; this.kb.turn = this.enabled ? turn : 0;
+    // touch stick = go where you point
+    let x = 0, y = 0;
     if (this.stick.id !== null) { x = this.stick.x; y = this.stick.y; }
     const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
     this.move.x = this.enabled ? x : 0; this.move.y = this.enabled ? y : 0;
@@ -2337,10 +2353,14 @@ class Player {
     this.grindCD -= dt; this.coyote -= dt; this.landT = Math.max(0, this.landT - dt * 3); this.pushT = Math.max(0, this.pushT - dt * 3);
     // input
     const ix = Input.move.x, iy = Input.move.y; const im = Math.hypot(ix, iy);
-    const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-    // camera forward = (fx,fz); right = (-fz, fx)?  camera right vector in XZ is (-cos, sin) for yaw convention
+    // the stick's frame of reference is captured when the thumb lands (or re-centres),
+    // so holding "right" keeps going right instead of spiralling as the camera swings round
+    if (Input.stick.id !== null && (Input.frame === null || im < 0.2)) Input.frame = camYaw;
+    const ref = Input.stick.id !== null && Input.frame !== null ? Input.frame : camYaw;
+    const fx = Math.sin(ref), fz = Math.cos(ref);
     const rx = -fz, rz = fx;
-    const dx = fx * iy - rx * ix, dz = fz * iy - rz * ix;   // stick right → screen right
+    const dx = fx * iy + rx * ix, dz = fz * iy + rz * ix;   // stick right → screen right
+    const ctl = Input.kbActive ? { tank: true, fwd: Input.kb.fwd, turn: Input.kb.turn } : { tank: false, dx, dz, im };
     // queued buttons
     const jumps = Input.jumpQ.splice(0), tricks = Input.trickQ.splice(0);
     for (const t of jumps) {
@@ -2352,7 +2372,7 @@ class Player {
     if (this.mode === 'grind') this.updateGrind(dt);
     else {
       const sub = 2, h = dt / sub;
-      for (let i = 0; i < sub; i++) this.step(h, dx, dz, im);
+      for (let i = 0; i < sub; i++) this.step(h, ctl);
     }
     // safety net
     if (p.y < W.killY) this.hooks.fell?.();
@@ -2370,6 +2390,7 @@ class Player {
     const sp = this.speed;
     if (this.mode !== 'grind') {
       if (sp > 0.6) { const target = Math.atan2(v.x, v.z); const old = this.yaw; this.yaw = U.angDamp(this.yaw, target, 14, dt); this.turn = U.damp(this.turn, U.clamp(U.wrapAng(target - old) / dt * 0.12, -1, 1), 8, dt); }
+      else if (ctl.tank) this.yaw -= ctl.turn * 3.2 * dt;
       else if (im > 0.2) this.yaw = U.angDamp(this.yaw, Math.atan2(dx, dz), 10, dt);
     }
     this.updateRigSpin(dt);
@@ -2380,12 +2401,20 @@ class Player {
       this.fx.emit(_v1.set(p.x + (Math.random() - 0.5) * 0.6, p.y + 0.1, p.z + (Math.random() - 0.5) * 0.6), _v2.set(-v.x * 0.15, 0.6, -v.z * 0.15), '#ffffff', 0.3, 0);
     }
   }
-  step(dt, dx, dz, im) {
+  step(dt, ctl) {
     const W = this.W, p = this.pos, v = this.vel;
+    const { dx = 0, dz = 0, im = 0 } = ctl;
     if (this.mode === 'ground') {
       let sp = Math.hypot(v.x, v.z);
       let head = sp > 0.3 ? Math.atan2(v.x, v.z) : this.yaw;
-      if (im > 0.08) {
+      if (ctl.tank) {
+        // skater steering: A/D carve, W pushes, S brakes
+        const rate = U.lerp(3.4, 2.3, U.clamp(sp / 20, 0, 1));
+        head -= ctl.turn * rate * dt;            // yaw decreases = turning right
+        if (ctl.fwd > 0) { if (sp < PH.RUN) sp = Math.min(PH.RUN, sp + PH.ACC * dt); else sp = Math.max(PH.RUN, sp - 4 * dt); }
+        else if (ctl.fwd < 0) sp = Math.max(0, sp - 20 * dt);
+        else sp = Math.max(0, sp - (sp > PH.RUN ? 6 : 2.6) * dt);
+      } else if (im > 0.08) {
         const tgt = Math.atan2(dx, dz);
         const diff = U.wrapAng(tgt - head);
         if (Math.abs(diff) > 2.5 && sp > 4) sp = Math.max(0, sp - 26 * dt);       // hard brake
@@ -2421,7 +2450,11 @@ class Player {
     } else { // air
       this.airTime += dt;
       v.y = Math.max(-42, v.y - PH.GRAV * dt);
-      if (im > 0.08) {
+      if (ctl.tank) {
+        // gentle air steering: rotate the flight path
+        const a = -ctl.turn * 1.9 * dt, c = Math.cos(a), s = Math.sin(a);
+        const nx = v.x * c + v.z * s, nz = -v.x * s + v.z * c; v.x = nx; v.z = nz;
+      } else if (im > 0.08) {
         const before = Math.hypot(v.x, v.z);
         v.x += dx * PH.AIRACC * dt * im; v.z += dz * PH.AIRACC * dt * im;
         const after = Math.hypot(v.x, v.z), cap = Math.max(before, PH.RUN);
@@ -2503,13 +2536,14 @@ class CamRig {
     // manual control
     if (Input.camDX || Input.camDY) {
       this.yaw -= Input.camDX * 0.006; this.pitch = U.clamp(this.pitch + Input.camDY * 0.003, 0.05, 0.85);
+      if (Input.frame !== null) Input.frame -= Input.camDX * 0.006;
       Input.camDX = 0; Input.camDY = 0;
     }
     const manual = now - Input.lastCamInput < 1.6;
     const sp = pl.speed;
     if (!manual && (sp > 2 || pl.mode === 'grind')) {
       const vh = Math.atan2(pl.vel.x, pl.vel.z);
-      const k = pl.mode === 'grind' ? 3.2 : pl.mode === 'air' ? 0.9 : 2.0 * U.clamp(sp / 10, 0.3, 1);
+      const k = pl.mode === 'grind' ? 3.2 : pl.mode === 'air' ? 0.9 : (Input.kbActive ? 3 : 2.0) * U.clamp(sp / 10, 0.3, 1);
       this.yaw = U.angDamp(this.yaw, vh, k, dt);
     }
     if (!manual) this.pitch = U.damp(this.pitch, pl.mode === 'air' && pl.vel.y < -8 ? 0.48 : 0.33, 1.5, dt);
@@ -2785,7 +2819,8 @@ const Game = {
   freeRoam: false, dprAcc: 0, dprN: 0
 };
 const HINTS = [
-  { touch: 'MOVE — drag the left side of the screen', key: 'MOVE — WASD or arrow keys. Q / E or drag to look around.', done: g => g.firsts.moved },
+  { touch: 'Put your thumb on the SKATE circle and point where you want to go. Let go to coast.', key: 'W to skate · A / D to steer · S to brake. Q / E or mouse-drag turns the camera.', done: g => g.firsts.moved && Game.hint.t > 3 },
+  { touch: 'Drag on the right side of the screen to look around.', key: 'Tip: release A / D to roll straight. Hold W to keep your speed.', done: g => Game.hint.t > 6 },
   { touch: 'JUMP — tap ⤒ exactly ON THE BEAT to jump higher', key: 'JUMP — SPACE. Jump ON THE BEAT to jump higher.', done: g => g.firsts.beatJump },
   { touch: 'TRICK on the ground = a PUSH. Hit it on the beat for a speed boost!', key: 'TRICK (K / SHIFT) on the ground = a PUSH. On the beat = speed boost!', done: g => g.firsts.beatPush },
   { touch: 'In the air or on a rail, TRICK does a trick. Watch the ring close in — that’s the beat.', key: 'In the air or on a rail, TRICK does a trick. Watch the ring — that’s the beat.', done: g => g.firsts.trick },
@@ -2966,7 +3001,7 @@ function resetWorld() {
 }
 
 function startIntro() {
-  Game.state = 'intro';
+  Game.state = 'intro'; document.body.classList.remove('playing');
   $('hud').hidden = true; Input.enabled = false; Input.flush();
   const { juno, bolt, drone } = Game.cast;
   bolt.root.visible = true; drone.root.visible = true; juno.root.visible = true;
@@ -2989,7 +3024,7 @@ function startPlay(skipped, keepState) {
   }
   Game.restored = false;
   Game.state = 'play'; Input.enabled = true; Input.flush();
-  $('hud').hidden = false;
+  $('hud').hidden = false; document.body.classList.add('playing');
   if (Sound.song !== 'roof') Sound.play('roof');
   Sound.R.unlocks = Game.W.relaysOn();
   Game.cam.snap(p); Game.cam.yaw = p.yaw;
@@ -3043,7 +3078,7 @@ function updateCounters() {
 }
 
 function startOutro() {
-  Game.state = 'outro'; Input.enabled = false; Input.flush();
+  Game.state = 'outro'; document.body.classList.remove('playing'); Input.enabled = false; Input.flush();
   $('hud').hidden = true;
   const p = Game.player, { juno, drone } = Game.cast;
   p.vel.set(0, 0, 0); p.mode = 'ground'; juno.spin.rotation.set(0, 0, 0);
@@ -3214,7 +3249,7 @@ function loop(now) {
   if (Game.state === 'play') {
     Game.playT += dt;
     Input.poll();
-    if (Math.abs(Input.move.x) + Math.abs(Input.move.y) > 0.2) Game.firsts.moved = true;
+    if (Math.abs(Input.move.x) + Math.abs(Input.move.y) > 0.2 || Input.kbActive) Game.firsts.moved = true;
     p.update(dt, Game.cam.yaw, now);
     Game.cam.update(dt, p);
     p.syncRig(dt, bi.phase);

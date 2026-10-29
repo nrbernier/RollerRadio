@@ -12,8 +12,9 @@ Open `index.html` in a browser (or enable GitHub Pages on the `main` branch, roo
 
 | | Touch | Keyboard |
 |---|---|---|
-| Skate | drag on the left side | WASD / arrows |
-| Look around | drag on the right side | Q / E, or mouse drag |
+| Skate | thumb on the left half, point where you want to go | W (or ↑) |
+| Steer / brake | — | A / D steer, S brake |
+| Look around | drag on the right half | Q / E, or mouse drag |
 | Jump | JUMP | Space |
 | Trick / push | TRICK | K or Shift |
 | Pause | II | Esc / P |

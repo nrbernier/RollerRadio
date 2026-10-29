@@ -8,7 +8,8 @@ const Game = {
   freeRoam: false, dprAcc: 0, dprN: 0
 };
 const HINTS = [
-  { touch: 'MOVE — drag the left side of the screen', key: 'MOVE — WASD or arrow keys. Q / E or drag to look around.', done: g => g.firsts.moved },
+  { touch: 'Put your thumb on the SKATE circle and point where you want to go. Let go to coast.', key: 'W to skate · A / D to steer · S to brake. Q / E or mouse-drag turns the camera.', done: g => g.firsts.moved && Game.hint.t > 3 },
+  { touch: 'Drag on the right side of the screen to look around.', key: 'Tip: release A / D to roll straight. Hold W to keep your speed.', done: g => Game.hint.t > 6 },
   { touch: 'JUMP — tap ⤒ exactly ON THE BEAT to jump higher', key: 'JUMP — SPACE. Jump ON THE BEAT to jump higher.', done: g => g.firsts.beatJump },
   { touch: 'TRICK on the ground = a PUSH. Hit it on the beat for a speed boost!', key: 'TRICK (K / SHIFT) on the ground = a PUSH. On the beat = speed boost!', done: g => g.firsts.beatPush },
   { touch: 'In the air or on a rail, TRICK does a trick. Watch the ring close in — that’s the beat.', key: 'In the air or on a rail, TRICK does a trick. Watch the ring — that’s the beat.', done: g => g.firsts.trick },
@@ -189,7 +190,7 @@ function resetWorld() {
 }
 
 function startIntro() {
-  Game.state = 'intro';
+  Game.state = 'intro'; document.body.classList.remove('playing');
   $('hud').hidden = true; Input.enabled = false; Input.flush();
   const { juno, bolt, drone } = Game.cast;
   bolt.root.visible = true; drone.root.visible = true; juno.root.visible = true;
@@ -212,7 +213,7 @@ function startPlay(skipped, keepState) {
   }
   Game.restored = false;
   Game.state = 'play'; Input.enabled = true; Input.flush();
-  $('hud').hidden = false;
+  $('hud').hidden = false; document.body.classList.add('playing');
   if (Sound.song !== 'roof') Sound.play('roof');
   Sound.R.unlocks = Game.W.relaysOn();
   Game.cam.snap(p); Game.cam.yaw = p.yaw;
@@ -266,7 +267,7 @@ function updateCounters() {
 }
 
 function startOutro() {
-  Game.state = 'outro'; Input.enabled = false; Input.flush();
+  Game.state = 'outro'; document.body.classList.remove('playing'); Input.enabled = false; Input.flush();
   $('hud').hidden = true;
   const p = Game.player, { juno, drone } = Game.cast;
   p.vel.set(0, 0, 0); p.mode = 'ground'; juno.spin.rotation.set(0, 0, 0);
@@ -437,7 +438,7 @@ function loop(now) {
   if (Game.state === 'play') {
     Game.playT += dt;
     Input.poll();
-    if (Math.abs(Input.move.x) + Math.abs(Input.move.y) > 0.2) Game.firsts.moved = true;
+    if (Math.abs(Input.move.x) + Math.abs(Input.move.y) > 0.2 || Input.kbActive) Game.firsts.moved = true;
     p.update(dt, Game.cam.yaw, now);
     Game.cam.update(dt, p);
     p.syncRig(dt, bi.phase);

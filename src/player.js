@@ -4,6 +4,8 @@
 const Input = {
   move: { x: 0, y: 0 }, keys: {}, jumpQ: [], trickQ: [], camDX: 0, camDY: 0, lastCamInput: -10, enabled: false,
   stick: { id: null, ox: 0, oy: 0, x: 0, y: 0 }, camPtr: null,
+  frame: null,                 // stick reference yaw, frozen while the thumb is down
+  kb: { fwd: 0, turn: 0 }, kbActive: false,
   init() {
     const K = this.keys;
     window.addEventListener('keydown', e => {
@@ -23,8 +25,8 @@ const Input = {
       const left = e.clientX < window.innerWidth * 0.45;
       if (left && this.stick.id === null && e.pointerType !== 'mouse') {
         this.stick.id = e.pointerId; this.stick.ox = e.clientX; this.stick.oy = e.clientY;
-        base.hidden = false; base.style.transform = `translate(${e.clientX - 64}px, ${e.clientY - 64}px)`;
-        knob.style.transform = 'translate(0px,0px)';
+        base.classList.add('live'); base.style.transform = `translate(${e.clientX - 64}px, ${e.clientY - 64}px)`;
+        knob.style.transform = 'translate(0px,0px)'; this.frame = null;
       } else if (this.camPtr === null) { this.camPtr = { id: e.pointerId, x: e.clientX, y: e.clientY }; }
       zone.setPointerCapture?.(e.pointerId);
     });
@@ -40,7 +42,7 @@ const Input = {
       }
     });
     const up = e => {
-      if (e.pointerId === this.stick.id) { this.stick.id = null; this.stick.x = this.stick.y = 0; base.hidden = true; }
+      if (e.pointerId === this.stick.id) { this.stick.id = null; this.stick.x = this.stick.y = 0; this.frame = null; base.classList.remove('live'); base.style.transform = ''; knob.style.transform = 'translate(0px,0px)'; }
       if (this.camPtr && e.pointerId === this.camPtr.id) this.camPtr = null;
     };
     zone.addEventListener('pointerup', up); zone.addEventListener('pointercancel', up);
@@ -54,8 +56,13 @@ const Input = {
   },
   poll() {
     const K = this.keys;
-    let x = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
-    let y = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0);
+    // keyboard = skater steering: W push, S brake, A/D carve
+    const turn = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
+    const fwd = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0);
+    this.kbActive = this.enabled && this.stick.id === null && (turn !== 0 || fwd !== 0);
+    this.kb.fwd = this.enabled ? fwd : 0; this.kb.turn = this.enabled ? turn : 0;
+    // touch stick = go where you point
+    let x = 0, y = 0;
     if (this.stick.id !== null) { x = this.stick.x; y = this.stick.y; }
     const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
     this.move.x = this.enabled ? x : 0; this.move.y = this.enabled ? y : 0;
@@ -257,10 +264,14 @@ class Player {
     this.grindCD -= dt; this.coyote -= dt; this.landT = Math.max(0, this.landT - dt * 3); this.pushT = Math.max(0, this.pushT - dt * 3);
     // input
     const ix = Input.move.x, iy = Input.move.y; const im = Math.hypot(ix, iy);
-    const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-    // camera forward = (fx,fz); right = (-fz, fx)?  camera right vector in XZ is (-cos, sin) for yaw convention
+    // the stick's frame of reference is captured when the thumb lands (or re-centres),
+    // so holding "right" keeps going right instead of spiralling as the camera swings round
+    if (Input.stick.id !== null && (Input.frame === null || im < 0.2)) Input.frame = camYaw;
+    const ref = Input.stick.id !== null && Input.frame !== null ? Input.frame : camYaw;
+    const fx = Math.sin(ref), fz = Math.cos(ref);
     const rx = -fz, rz = fx;
-    const dx = fx * iy - rx * ix, dz = fz * iy - rz * ix;   // stick right → screen right
+    const dx = fx * iy + rx * ix, dz = fz * iy + rz * ix;   // stick right → screen right
+    const ctl = Input.kbActive ? { tank: true, fwd: Input.kb.fwd, turn: Input.kb.turn } : { tank: false, dx, dz, im };
     // queued buttons
     const jumps = Input.jumpQ.splice(0), tricks = Input.trickQ.splice(0);
     for (const t of jumps) {
@@ -272,7 +283,7 @@ class Player {
     if (this.mode === 'grind') this.updateGrind(dt);
     else {
       const sub = 2, h = dt / sub;
-      for (let i = 0; i < sub; i++) this.step(h, dx, dz, im);
+      for (let i = 0; i < sub; i++) this.step(h, ctl);
     }
     // safety net
     if (p.y < W.killY) this.hooks.fell?.();
@@ -290,6 +301,7 @@ class Player {
     const sp = this.speed;
     if (this.mode !== 'grind') {
       if (sp > 0.6) { const target = Math.atan2(v.x, v.z); const old = this.yaw; this.yaw = U.angDamp(this.yaw, target, 14, dt); this.turn = U.damp(this.turn, U.clamp(U.wrapAng(target - old) / dt * 0.12, -1, 1), 8, dt); }
+      else if (ctl.tank) this.yaw -= ctl.turn * 3.2 * dt;
       else if (im > 0.2) this.yaw = U.angDamp(this.yaw, Math.atan2(dx, dz), 10, dt);
     }
     this.updateRigSpin(dt);
@@ -300,12 +312,20 @@ class Player {
       this.fx.emit(_v1.set(p.x + (Math.random() - 0.5) * 0.6, p.y + 0.1, p.z + (Math.random() - 0.5) * 0.6), _v2.set(-v.x * 0.15, 0.6, -v.z * 0.15), '#ffffff', 0.3, 0);
     }
   }
-  step(dt, dx, dz, im) {
+  step(dt, ctl) {
     const W = this.W, p = this.pos, v = this.vel;
+    const { dx = 0, dz = 0, im = 0 } = ctl;
     if (this.mode === 'ground') {
       let sp = Math.hypot(v.x, v.z);
       let head = sp > 0.3 ? Math.atan2(v.x, v.z) : this.yaw;
-      if (im > 0.08) {
+      if (ctl.tank) {
+        // skater steering: A/D carve, W pushes, S brakes
+        const rate = U.lerp(3.4, 2.3, U.clamp(sp / 20, 0, 1));
+        head -= ctl.turn * rate * dt;            // yaw decreases = turning right
+        if (ctl.fwd > 0) { if (sp < PH.RUN) sp = Math.min(PH.RUN, sp + PH.ACC * dt); else sp = Math.max(PH.RUN, sp - 4 * dt); }
+        else if (ctl.fwd < 0) sp = Math.max(0, sp - 20 * dt);
+        else sp = Math.max(0, sp - (sp > PH.RUN ? 6 : 2.6) * dt);
+      } else if (im > 0.08) {
         const tgt = Math.atan2(dx, dz);
         const diff = U.wrapAng(tgt - head);
         if (Math.abs(diff) > 2.5 && sp > 4) sp = Math.max(0, sp - 26 * dt);       // hard brake
@@ -341,7 +361,11 @@ class Player {
     } else { // air
       this.airTime += dt;
       v.y = Math.max(-42, v.y - PH.GRAV * dt);
-      if (im > 0.08) {
+      if (ctl.tank) {
+        // gentle air steering: rotate the flight path
+        const a = -ctl.turn * 1.9 * dt, c = Math.cos(a), s = Math.sin(a);
+        const nx = v.x * c + v.z * s, nz = -v.x * s + v.z * c; v.x = nx; v.z = nz;
+      } else if (im > 0.08) {
         const before = Math.hypot(v.x, v.z);
         v.x += dx * PH.AIRACC * dt * im; v.z += dz * PH.AIRACC * dt * im;
         const after = Math.hypot(v.x, v.z), cap = Math.max(before, PH.RUN);
@@ -423,13 +447,14 @@ class CamRig {
     // manual control
     if (Input.camDX || Input.camDY) {
       this.yaw -= Input.camDX * 0.006; this.pitch = U.clamp(this.pitch + Input.camDY * 0.003, 0.05, 0.85);
+      if (Input.frame !== null) Input.frame -= Input.camDX * 0.006;
       Input.camDX = 0; Input.camDY = 0;
     }
     const manual = now - Input.lastCamInput < 1.6;
     const sp = pl.speed;
     if (!manual && (sp > 2 || pl.mode === 'grind')) {
       const vh = Math.atan2(pl.vel.x, pl.vel.z);
-      const k = pl.mode === 'grind' ? 3.2 : pl.mode === 'air' ? 0.9 : 2.0 * U.clamp(sp / 10, 0.3, 1);
+      const k = pl.mode === 'grind' ? 3.2 : pl.mode === 'air' ? 0.9 : (Input.kbActive ? 3 : 2.0) * U.clamp(sp / 10, 0.3, 1);
       this.yaw = U.angDamp(this.yaw, vh, k, dt);
     }
     if (!manual) this.pitch = U.damp(this.pitch, pl.mode === 'air' && pl.vel.y < -8 ? 0.48 : 0.33, 1.5, dt);
