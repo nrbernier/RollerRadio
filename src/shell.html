@@ -1,4 +1,5 @@
 <title>Offbeat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +15,10 @@
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
-html, body { height: 100%; overflow: hidden; }
+html, body { height: 100%; overflow: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html, body, canvas, #touch, #hud, #csLayer { touch-action: none; }
+.overlay { touch-action: pan-y; }
+button, input { touch-action: manipulation; }
 body { background: var(--dusk); color: var(--paper); font-family: var(--f-body); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none; }
 #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
@@ -257,11 +261,12 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
   <div>
     <h1 class="logo" aria-label="Offbeat"><span>O</span><span>F</span><span>F</span><span>B</span><span>E</span><span>A</span><span>T</span></h1>
     <p class="decree">DECREE 88 · MUSIC OVER 60 BPM IS <s>ILLEGAL</s><em>FUN</em></p>
-    <p class="lede">Gleam City is perfectly happy. It says so on every screen. Strap on your skates, find the pirate relays hidden across the rooftops, and play the city back to life — one beat at a time.</p>
+    <p class="lede">Gleam City is perfectly happy. It says so on every screen. Strap on your skates, find the pirate relays hidden in the park and across the rooftops, and play the city back to life — one beat at a time.</p>
     <div class="btnrow">
       <button class="big" id="btnPlay">▶ PLAY</button>
       <button class="ghost" id="btnContinue" hidden>CONTINUE</button>
       <button class="ghost" id="btnSkipIntro" hidden>SKIP INTRO</button>
+      <button class="ghost" id="btnTitleW2" hidden>WORLD 2 · ROOFTOPS</button>
     </div>
     <div class="controls">
       <span class="k"><kbd>W</kbd> skate</span><span class="k"><kbd>A</kbd><kbd>D</kbd> steer</span><span class="k"><kbd>S</kbd> brake</span><span class="k"><kbd>SPACE</kbd> jump</span><span class="k"><kbd>K</kbd>/<kbd>SHIFT</kbd> trick &amp; push</span><span class="k"><kbd>Q</kbd><kbd>E</kbd> / drag: camera</span>
@@ -278,15 +283,16 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
     <label for="vol">MUSIC <input id="vol" type="range" min="0" max="100" value="80"></label>
     <div class="keys">Phone: put your thumb anywhere on the left half and point where you want to go; lift it to coast. Drag on the right half to look around.<br>Keyboard: W skate, A/D steer, S brake, Space jump, K/Shift trick, Q/E camera.<br>Jump and trick ON the beat: the ring closes on each beat. On the ground TRICK is a push. Speaker pads and the beat lift only work in rhythm.</div>
     <div class="row"><button class="b" id="btnResume">RESUME</button><button class="b alt" id="btnRestart">RESTART WORLD</button><button class="b alt" id="btnReplayIntro">REPLAY INTRO</button></div>
+    <div class="row"><button class="b alt" id="btnW1">WORLD 1 · PARK</button><button class="b alt" id="btnW2" hidden>WORLD 2 · ROOFTOPS</button></div>
   </div>
 </div>
 
 <div id="end" class="overlay" hidden>
   <div class="panel">
-    <span class="end-kicker">END OF DEMO · WORLD 1 CLEAR</span>
+    <span class="end-kicker">END OF DEMO · WORLD 2 CLEAR</span>
     <h2>The rooftops are grooving. Are you sure whose side you’re on?</h2>
     <dl id="endStats"></dl>
-    <p>Next: World 2 — The Streets. Then the park, the subway and the sewers.</p>
+    <p>Next: World 3 — The Streets. Then the subway and the sewers.</p>
     <div class="row"><button class="b" id="btnKeep">KEEP SKATING</button><button class="b alt" id="btnAgain">PLAY AGAIN</button></div>
   </div>
 </div>

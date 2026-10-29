@@ -143,49 +143,87 @@ function flash(color = '#fff') {
 }
 
 // ---------------- INTRO ----------------
-function introShots() {
-  const J = (o) => ({ juno: o });
+// Shots are placed relative to the world's anchor (where Juno sits, A) and its giant screen (S),
+// so the same scene can play in any world.
+function introShots(W) {
+  const A = W.intro.A, sitY = W.intro.sitY, S = W.screen.pos;
+  const a = (x, y, z) => [A.x + x, A.y + y, A.z + z];
+  const sc = (x, y, z) => [S.x + x, S.y + y, S.z + z];
+  const r0 = W.relays[0].pos;
+  const toRelay = Math.atan2(r0.x - (A.x + 0.2), r0.z - (A.z + 1.25));
   return [
-    { cut: true, cam: [24, 7.5, 18], look: [3, 10, -40], music: 'anthem', screen: { mode: 'minister', caption: 'GOOD EVENING, GLEAM CITY!' },
-      actors: { juno: { pos: [6, 0, -11.65], yaw: Math.PI, pose: 'sit', mood: 'neutral', visible: true }, bolt: { pos: [2.6, 0, -9.0], yaw: 2.3, pose: 'armsCross', mood: 'neutral', visible: true }, drone: { pos: [40, 14, 30], visible: true, mood: 'happy' } },
-      who: 'MINISTER GLEE', text: 'Good evening, Gleam City! Today’s mood: DELIGHTED. Tomorrow’s mood: also delighted. It’s mandatory!' },
-    { cam: [7, 9.5, -24], look: [4, 14.2, -49], move: 2.2, screen: { mode: 'minister', caption: 'DECREE 88 IS IN EFFECT' },
+    { cut: true, cam: W.intro.wide.cam, look: W.intro.wide.look, music: 'anthem', screen: { mode: 'minister', caption: 'GOOD MORNING, GLEAM CITY!' },
+      actors: { juno: { pos: a(0, sitY, 0), yaw: Math.PI, pose: 'sit', mood: 'neutral', visible: true }, bolt: { pos: a(-3.4, 0, 2.65), yaw: 2.3, pose: 'armsCross', mood: 'neutral', visible: true }, drone: { pos: a(34, 14, 42), visible: true, mood: 'happy' } },
+      who: 'MINISTER GLEE', text: 'Good morning, Gleam City! Today’s mood: DELIGHTED. Tomorrow’s mood: also delighted. It’s mandatory!' },
+    { cam: sc(3, -5, 25.35), look: sc(0, -0.3, 0.35), move: 2.2, screen: { mode: 'minister', caption: 'DECREE 88 IS IN EFFECT' },
       who: 'MINISTER GLEE', text: 'A friendly reminder: under Decree 88, music faster than a resting heartbeat is illegal. Fast music causes running. Running causes thinking.' },
-    { cam: [8.2, 1.7, -8.4], look: [4, 7, -40], move: 1.6, actors: { juno: { pose: 'sit', mood: 'smug' } },
+    { cam: a(2.2, 1.7 + sitY, 3.25), look: sc(0, -7.5, 9.35), move: 1.6, actors: { juno: { pose: 'sit', mood: 'smug' } },
       who: 'JUNO', text: 'Sixty beats per minute. My grandma’s toaster has more groove than this city.' },
-    { cam: [5.2, 1.65, -11.2], look: [2.6, 1.5, -9.0], move: 1.1, actors: { bolt: { pose: 'nervous', mood: 'worried', yaw: 2.2 } },
+    { cam: a(-0.8, 1.65, 0.45), look: a(-3.4, 1.5, 2.65), move: 1.1, actors: { bolt: { pose: 'nervous', mood: 'worried', yaw: 2.2 } },
       who: 'BOLT', text: 'Shhh! The Smile Drones hear everything. Last week they re-educated Kevin for HUMMING.' },
-    { cam: [10.5, 2.2, -8.6], look: [4.5, 0.9, -10.6], move: 1.2, actors: { juno: { pose: 'sit', mood: 'smug', yaw: Math.PI - 0.5 }, bolt: { pose: 'armsCross', mood: 'neutral' } },
+    { cam: a(4.5, 2.2, 3.05), look: a(-1.5, 0.9 + sitY, 1.05), move: 1.2, actors: { juno: { pose: 'sit', mood: 'smug', yaw: Math.PI - 0.5 }, bolt: { pose: 'armsCross', mood: 'neutral' } },
       who: 'JUNO', text: 'Kevin hums like a broken fridge. Honestly? Public service.' },
-    { cam: [5.2, 0.7, -6.4], look: [4, 13, -49], move: 0.6, sfx: 'glitch', music: 'stop', screen: { mode: 'static' }, flash: '#ff2e88',
+    { cam: a(-0.8, 0.7, 5.25), look: sc(0, -1.5, 0.35), move: 0.6, sfx: 'glitch', music: 'stop', screen: { mode: 'static' }, flash: '#ff2e88',
       actors: { juno: { pose: 'sit', mood: 'shock', yaw: Math.PI }, bolt: { pose: 'lookup', mood: 'shock', yaw: Math.PI - 0.15 } },
       who: 'SCREEN', text: '▓▓▒░ KZZZRRT ░▒▓▓  — signal interrupted —', speed: 30 },
-    { cam: [5, 7.5, -27], look: [4, 14.4, -49], move: 1.4, music: 'roof', screen: { mode: 'dj' },
+    { cam: sc(1, -7, 22.35), look: sc(0, -0.1, 0.35), move: 1.4, music: W.song, screen: { mode: 'dj' },
       who: 'DJ STATIC', text: 'Yo yo YO, Gleam City! You’re tuned to Radio Static — the frequency they can’t find!' },
-    { cam: [2.5, 10.5, -34], look: [4, 14.4, -49], move: 1.0,
-      who: 'DJ STATIC', text: 'The Ministry jams our rhythm with their antennas. But my relays are still up there on the rooftops. Switched off. Hidden.' },
-    { cam: [-2, 9, -30], look: [4, 14.2, -49], move: 1.0,
+    { cam: sc(-1.5, -4, 15.35), look: sc(0, -0.1, 0.35), move: 1.0,
+      who: 'DJ STATIC', text: 'The Ministry jams our rhythm with their antennas. But my relays are still out there. Switched off. Hidden. Starting right here in the park.' },
+    { cam: sc(-6, -5.5, 18.35), look: sc(0, -0.3, 0.35), move: 1.0,
       who: 'DJ STATIC', text: 'So! Anybody with fast feet: switch ’em back on, and this whole city gets its groove back. Static out!' },
-    { cam: [8.5, 2.6, -5.5], look: [4, 6, -32], move: 1.3, sfx: 'glitch', music: 'anthem', screen: { mode: 'minister', caption: 'PLEASE DISREGARD THAT', mood: 'open' },
+    { cam: a(2.5, 2.6, 6.15), look: sc(0, -8.5, 17.35), move: 1.3, sfx: 'glitch', music: 'anthem', screen: { mode: 'minister', caption: 'PLEASE DISREGARD THAT', mood: 'open' },
       actors: { juno: { pose: 'sit', mood: 'grin' }, bolt: { pose: 'lookup', mood: 'worried' } },
       who: 'MINISTER GLEE', text: 'Please disregard that broadcast. It was weather.' },
-    { cam: [4.9, 1.7, -11.6], look: [2.6, 1.5, -9.0], move: 1.2,
-      actors: { juno: { pos: [6.2, 0, -10.4], yaw: Math.PI / 2 + 0.3, pose: 'crouch', mood: 'neutral' }, bolt: { pose: 'shrug', mood: 'worried', yaw: 2.0 } },
+    { cam: a(-1.1, 1.7, 0.05), look: a(-3.4, 1.5, 2.65), move: 1.2,
+      actors: { juno: { pos: a(0.2, 0, 1.25), yaw: Math.PI / 2 + 0.3, pose: 'crouch', mood: 'neutral' }, bolt: { pose: 'shrug', mood: 'worried', yaw: 2.0 } },
       who: 'BOLT', text: 'Okay. That was SUPER illegal. We should definitely not— wait. Why are you tightening your skates?' },
-    { cam: [4.5, 0.55, -12.3], look: [6.2, 1.45, -10.4], move: 1.2, actors: { juno: { pose: 'stretch', mood: 'grin', yaw: -2.4 } },
+    { cam: a(-1.5, 0.8, -0.3), look: a(0.2, 1.45, 1.25), move: 1.2, actors: { juno: { pose: 'stretch', mood: 'grin', yaw: -2.4 } },
       who: 'JUNO', text: 'Officially? I’m exercising. Very calm. Very legal. Exercising.' },
-    { cam: [4.6, 1.9, -11.3], look: [2.6, 1.6, -9.0], move: 1.0, actors: { bolt: { pose: 'think', mood: 'worried' }, juno: { pose: 'stand', mood: 'neutral', yaw: -2.2 } },
+    { cam: a(-1.4, 1.9, 0.35), look: a(-3.4, 1.6, 2.65), move: 1.0, actors: { bolt: { pose: 'think', mood: 'worried' }, juno: { pose: 'stand', mood: 'neutral', yaw: -2.2 } },
       who: 'BOLT', text: 'Weird though… how does a pirate DJ get onto the Ministry’s OWN screen?' },
-    { cam: [0.4, 2.4, -4.8], look: [4.6, 2, -10], move: 1.6, sfx: ['whoosh'],
-      actors: { drone: { pos: [4.4, 2.7, -9.6], yaw: Math.PI / 2 + 0.4, mood: 'sus' }, bolt: { pose: 'nervous', mood: 'shock', yaw: 1.7 }, juno: { pose: 'stand', mood: 'shock', yaw: -1.4 } },
+    { cam: a(-5.6, 2.4, 6.85), look: a(-1.4, 2, 1.65), move: 1.6, sfx: ['whoosh'],
+      actors: { drone: { pos: a(-1.6, 2.7, 2.05), yaw: Math.PI / 2 + 0.4, mood: 'sus' }, bolt: { pose: 'nervous', mood: 'shock', yaw: 1.7 }, juno: { pose: 'stand', mood: 'shock', yaw: -1.4 } },
       who: 'SMILE DRONE', text: 'CITIZEN. YOU ARE NOT SMILING.' },
-    { cam: [5.0, 1.75, -10.1], look: [6.2, 1.55, -10.4], move: 0.8, actors: { juno: { pose: 'hype', mood: 'mega' } },
+    { cam: a(-1, 1.75, 1.55), look: a(0.2, 1.55, 1.25), move: 0.8, actors: { juno: { pose: 'hype', mood: 'mega' } },
       who: 'JUNO', text: '(the single biggest smile in the history of smiles)' },
-    { cam: [1.8, 2.5, -6.3], look: [4.4, 2.5, -9.6], move: 0.9, sfx: [], actors: { drone: { mood: 'happy' }, juno: { pose: 'stand', mood: 'grin' } },
-      who: 'SMILE DRONE', text: '…SMILE VERIFIED. HAVE A COMPLIANT EVENING! ♪' },
-    { cam: [2.6, 2.3, -6.6], look: [30, 3, 2], move: 1.8, music: 'roof',
-      actors: { drone: { pos: [10, 22, -40], mood: 'happy' }, juno: { pose: 'ready', mood: 'smug', yaw: Math.PI / 2 }, bolt: { pos: [3.8, 0, -6.2], pose: 'wave', mood: 'neutral', yaw: 2.2, skate: true } },
+    { cam: a(-4.2, 2.5, 5.35), look: a(-1.6, 2.5, 2.05), move: 0.9, actors: { drone: { mood: 'happy' }, juno: { pose: 'stand', mood: 'grin' } },
+      who: 'SMILE DRONE', text: '…SMILE VERIFIED. HAVE A COMPLIANT DAY! ♪' },
+    { cam: a(-3.4 - Math.sin(toRelay) * 3, 2.3, 1.25 - Math.cos(toRelay) * 3), look: [r0.x, r0.y + 2, r0.z], move: 1.8, music: W.song,
+      actors: { drone: { pos: a(4, 22, -28), mood: 'happy' }, juno: { pose: 'ready', mood: 'smug', yaw: toRelay }, bolt: { pos: a(-2.2, 0, 5.45), pose: 'wave', mood: 'neutral', yaw: toRelay + 1.2, skate: true } },
       who: 'JUNO', text: 'Keep your radio on, Bolt. Let’s wake this city up.' },
+  ];
+}
+
+// ---------------- PARK OUTRO (end of world 1) ----------------
+function parkOutroShots(R, J) {
+  const side = V3(J.x - R.x, 0, J.z - R.z); if (side.lengthSq() < 0.01) side.set(1, 0, 0); side.normalize();
+  const jpos = V3(R.x + side.x * 2.4, R.y, R.z + side.z * 2.4);
+  const yawToR = Math.atan2(R.x - jpos.x, R.z - jpos.z);
+  const perp = V3(-side.z, 0, side.x);
+  const front = (d, h, lat = 0) => [jpos.x + side.x * d + perp.x * lat, jpos.y + h, jpos.z + side.z * d + perp.z * lat];
+  const dronePos = [jpos.x + perp.x * 2.2 + side.x * 1.2, jpos.y + 2.4, jpos.z + perp.z * 2.2 + side.z * 1.2];
+  const droneYaw = Math.atan2(jpos.x - dronePos[0], jpos.z - dronePos[2]);
+  return [
+    { cut: true, cam: front(9, 5, 6), look: [jpos.x, jpos.y + 1.5, jpos.z],
+      actors: { juno: { pos: [jpos.x, jpos.y, jpos.z], yaw: yawToR + Math.PI, pose: 'hype', mood: 'mega', visible: true }, drone: { pos: [jpos.x + 30, jpos.y + 20, jpos.z - 30], visible: true, mood: 'happy' } },
+      who: 'DJ STATIC · RADIO', text: 'Five for five! Listen to that park, kid — even the pigeons are bobbing their heads!' },
+    { cam: front(3.4, 1.7, 1.2), look: [jpos.x, jpos.y + 1.4, jpos.z], move: 1.3, actors: { juno: { pose: 'wave', mood: 'grin' } },
+      who: 'BOLT · RADIO', text: 'Juno! Mrs. Okafor is dancing with the Minister’s statue. In public. I have never been so scared and so happy.' },
+    { cam: front(5.5, 2.4, -3.5), look: [jpos.x + perp.x, jpos.y + 2, jpos.z + perp.z], move: 1.6, sfx: 'whoosh',
+      actors: { drone: { pos: dronePos, yaw: droneYaw, mood: 'happy' }, juno: { pose: 'stand', mood: 'neutral', yaw: droneYaw + Math.PI } },
+      who: 'SMILE DRONE', text: 'MUSIC DETECTED. ONE HUNDRED AND FOUR BEATS PER MINUTE. LOGGING… LOGGING…' },
+    { cam: front(4.6, 2.3, 3.6), look: [dronePos[0], dronePos[1] - 0.3, dronePos[2]], move: 0.9,
+      who: 'SMILE DRONE', text: '…THANK YOU FOR THE DATA, CITIZEN. ♪' },
+    { cam: [jpos.x + Math.sin(droneYaw + Math.PI) * 1.8, jpos.y + 1.6, jpos.z + Math.cos(droneYaw + Math.PI) * 1.8], look: [jpos.x, jpos.y + 1.55, jpos.z], move: 0.8,
+      actors: { juno: { mood: 'worried', pose: 'think' }, drone: { pos: [dronePos[0] + 6, dronePos[1] + 14, dronePos[2] - 8] } },
+      who: 'JUNO', text: '…Did a drone just thank me?' },
+    { cam: front(3.2, 2.6, 2), look: [jpos.x, jpos.y + 1.4, jpos.z], move: 1.0,
+      who: 'DJ STATIC · RADIO', text: 'Broken. Totally broken. Forget it! The BIG Ministry antennas are up on the rooftops. That’s where the real fight is.' },
+    { cam: front(6, 3.2, -1), look: [jpos.x, jpos.y + 1.6, jpos.z], move: 1.2, actors: { juno: { pose: 'ready', mood: 'smug' } },
+      who: 'JUNO', text: 'Rooftops. Finally, somewhere to fall.' },
+    { cam: front(6.5, 3.4, -1.4), look: [jpos.x, jpos.y + 1.6, jpos.z], move: 0.6,
+      who: 'BOLT · RADIO', text: 'Please don’t say it like it’s a good thing.' },
   ];
 }
 

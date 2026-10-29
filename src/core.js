@@ -104,10 +104,10 @@ class StaticBatch {
     for (let i = 0; i < p.length; i += 9) {
       // triangle normal (world)
       const ny = (n[i + 1] + n[i + 4] + n[i + 7]) / 3, nx = (n[i] + n[i + 3] + n[i + 6]) / 3, nz = (n[i + 2] + n[i + 5] + n[i + 8]) / 3;
-      let bn = 'plain';
+      let bn = kind;
       if (kind === 'building') bn = Math.abs(ny) > 0.5 ? 'roof' : 'wall';
       else if (kind === 'roofonly') bn = 'roof';
-      else if (kind === 'metal') bn = 'metal';
+      else if (kind === 'metal') bn = 'plain';
       const b = this.bucket(bn);
       // faint shade variation per face for a hand-painted feel
       const shade = ny < -0.5 ? 0.55 : 1;
@@ -159,6 +159,7 @@ class StaticBatch {
       g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
       const mesh = new THREE.Mesh(g, materials[name] || materials.plain);
+      if (name === 'water') mesh.renderOrder = 3;
       group.add(mesh);
     }
     if (this.lines.length) {

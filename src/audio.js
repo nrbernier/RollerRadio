@@ -211,6 +211,21 @@ const Sound = (() => {
       const g = gain(dest, 0); env(g, t, 0.03, 0.22 * v, dur, 0.0001, dur * 0.3);
       osc('triangle', midiF(m), t, dur * 1.4, filt('lowpass', 600, 1, g));
     },
+    whistle(t, m, dur, v = 1, dest = bus.lead) {
+      const g = gain(dest, 0); env(g, t, 0.03, 0.16 * v, dur * 0.9, 0.0001, dur * 0.25);
+      const o = osc('sine', midiF(m) * 0.985, t, dur + 0.15, g); o.frequency.exponentialRampToValueAtTime(midiF(m), t + 0.05);
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 6;
+      const lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(18, t + dur * 0.6);
+      lfo.connect(lg); lg.connect(o.detune); lfo.start(t); lfo.stop(t + dur + 0.15);
+      const br = gain(g, 0.05); noise(t, dur, filt('bandpass', midiF(m) * 2, 6, br));
+      const s = gain(dlyIn, 0.25); g.connect(s); const rv = gain(revIn, 0.5); g.connect(rv);
+    },
+    marimba(t, m, v = 1, dest = bus.arp) {
+      const g = gain(dest, 0); env(g, t, 0.001, 0.16 * v, 0.22);
+      osc('sine', midiF(m), t, 0.3, g);
+      const g2 = gain(dest, 0); env(g2, t, 0.001, 0.05 * v, 0.05); osc('sine', midiF(m) * 3.9, t, 0.08, g2);
+      const s = gain(dlyIn, 0.35); g.connect(s);
+    },
     vox(t, base = 220, vowel = 'a', v = 1, dest = sfxOut) {
       const F = { a: [800, 1150, 2900], e: [450, 1900, 2600], o: [450, 800, 2830], u: [325, 700, 2530] }[vowel];
       const g = gain(dest, 0); env(g, t, 0.01, 0.5 * v, 0.28, 0.0001, 0.05);
@@ -288,6 +303,49 @@ const Sound = (() => {
     }
   };
 
+  // Civic Park — sunny shuffle in G, whistled hook
+  const PARK = {
+    bpm: 104, swing: 0.17, bars: 4,
+    chords: [[59, 62, 66, 69], [55, 59, 62, 66], [52, 55, 59, 62], [55, 57, 60, 64]],
+    arpNotes: [[67, 71, 74, 78, 79], [64, 67, 71, 74, 76], [60, 64, 67, 71, 72], [62, 66, 69, 72, 74]],
+    roots: [43, 40, 36, 38],
+    lead: [
+      [[0, 74, 2], [2, 79, 2], [4, 81, 2], [6, 83, 4], [12, 81, 2], [14, 79, 2]],
+      [[0, 76, 4], [4, 79, 2], [6, 76, 2], [8, 74, 6]],
+      [[0, 72, 2], [2, 76, 2], [4, 79, 4], [8, 83, 2], [10, 81, 2], [12, 79, 4]],
+      [[0, 81, 3], [3, 79, 1], [4, 76, 2], [6, 74, 2], [8, 72, 2], [10, 74, 6]]
+    ],
+    tick(step, t, sd) {
+      const bar = Math.floor(step / 16) % 4, s = step % 16, u = R.unlocks, r = this.roots[bar];
+      const kicks = bar === 3 ? [0, 6, 10, 13] : [0, 7, 10];
+      if (kicks.includes(s)) I.kick(t, (s === 7 ? 0.6 : 1) * (R.air ? 0.35 : 1));
+      if (s === 4 || s === 12) { I.snare(t, 0.85); if (R.hype > 0.5) I.clap(t, 0.8); }
+      if (bar === 3 && s >= 13 && R.hype > 0.5) I.snare(t, 0.3 + (s - 13) * 0.15);
+      if (s % 2 === 0) I.hat(t, s % 4 === 0 ? 0.45 : 0.35, (bar % 2 === 1 && s === 14));
+      else if (R.speed > 11) I.hat(t, 0.18);
+      const bl = [[0, 0, 2], [3, 12, 1], [6, 7, 1], [8, 0, 2], [11, 7, 1], [13, 12, 1], [14, bar === 3 ? 14 : 10, 1]];
+      for (const [st, iv, d] of bl) if (st === s) I.bass(t, r + iv, d * sd * 0.85, R.air ? 0.5 : 0.95);
+      if (u >= 1) {
+        const ch = this.chords[bar];
+        if (s === 2 || s === 10) I.ep(t, ch, sd * 1.2, 0.85);
+        if (s === 6 || s === 14) I.ep(t, ch, sd * 0.8, 0.7);
+      } else if (s === 0) I.pad(t, this.chords[bar], sd * 15, 0.7);
+      if (u >= 2) {
+        if ([3, 5, 11, 13].includes(s)) I.conga(t, (s === 5 || s === 13) ? 520 : 380, 0.55);
+        if (s % 2 === 1) I.shaker(t, 0.55);
+        if (bar === 1 && s === 8) I.cowbell(t, 0.45);
+      }
+      if (u >= 3) {
+        const top = this.chords[bar].map(n => n + 12);
+        if ((bar === 0 || bar === 2) && s === 12) I.stab(t, top, 0.12);
+        if (bar === 3 && (s === 14 || s === 15)) I.stab(t, top, 0.08, 0.85);
+      }
+      if (u >= 4 || R.combo >= 4) for (const [st, m, d] of this.lead[bar]) if (st === s) I.whistle(t, m, d * sd, u >= 4 ? 1 : 0.8);
+      if (R.grinding) { const an = this.arpNotes[bar]; I.marimba(t, an[(step * 2 + (s % 3)) % an.length] + (s >= 8 ? 12 : 0)); }
+    },
+    mix() { return ROOF.mix(); }
+  };
+
   // Ministry anthem — 60 BPM, as mandated by Decree 88
   const ANTHEM = {
     bpm: 60, swing: 0, bars: 4,
@@ -322,7 +380,7 @@ const Sound = (() => {
     mix() { return { drums: 0.6, pad: 0.9, anthem: 0, bass: 0, keys: 0, perc: 0, stabs: 0, lead: 0, arp: 0 }; }
   };
 
-  const SONGS = { roof: ROOF, anthem: ANTHEM, unease: UNEASE };
+  const SONGS = { roof: ROOF, park: PARK, anthem: ANTHEM, unease: UNEASE };
 
   function schedule() {
     if (!S.playing || !ctx) return;
@@ -494,6 +552,11 @@ const Sound = (() => {
       const g = gain(sfxOut, 0); env(g, t, 0.15, 0.18, 0.4);
       const f = filt('bandpass', 300, 1.2, g); f.frequency.exponentialRampToValueAtTime(2500, t + 0.35); f.frequency.exponentialRampToValueAtTime(600, t + 0.6);
       noise(t, 0.65, f);
+    },
+    splash(v = 1) {
+      if (!ctx) return; const t = T();
+      const g = gain(sfxOut, 0); env(g, t, 0.005, 0.22 * v, 0.3);
+      const f = filt('bandpass', 1400, 0.8, g); f.frequency.exponentialRampToValueAtTime(500, t + 0.3); noise(t, 0.35, f);
     },
     bounce(big) {
       if (!ctx) return; const t = T();

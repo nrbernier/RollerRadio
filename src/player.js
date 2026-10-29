@@ -213,7 +213,7 @@ class Player {
     const pad = this.onPad();
     if (pad) {
       if (q !== 'miss') {
-        this.vel.set(pad.aim.x, pad.vy, pad.aim.z);
+        this.vel.set(pad.aim.x, pad.vy, pad.aim.z); this.padLand = true;
         this.hooks.padLaunch?.(pad, true, q);
       } else { this.vel.y = 13; this.hooks.padLaunch?.(pad, false, q); }
       this.mode = 'air'; this.airTime = 0; this.coyote = 0; this.grindCD = 0.4;
@@ -381,6 +381,7 @@ class Player {
           p.y = g.y; this.ground = g.hit;
           const impact = -v.y; v.y = 0;
           if (impact > 14) { const k = U.clamp(1 - (impact - 14) / 40, 0.6, 1); v.x *= k; v.z *= k; }
+          if (this.padLand) { v.x *= 0.25; v.z *= 0.25; this.padLand = false; }   // stick the landing after a launch
           this.mode = 'ground'; this.landT = U.clamp(impact / 25, 0.2, 1);
           this.hooks.land?.(impact, this.airTime, this.spinLeft());
           this.airTime = 0; this.trickQueue = 0;
@@ -467,6 +468,9 @@ class CamRig {
     const dir = _c3.subVectors(want, tgt); const len = dir.length(); dir.divideScalar(len);
     let tmin = len;
     for (const b of this.W.boxes) {
+      const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
+    }
+    for (const b of (this.W.camBoxes || [])) {
       const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
     }
     if (tmin < len) want.copy(tgt).addScaledVector(dir, Math.max(0.6, tmin - 0.35));

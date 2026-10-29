@@ -1,28 +1,40 @@
 // ============================================================
-//  GAME — state machine, HUD, scoring, triggers, main loop
+//  GAME — worlds, state machine, HUD, scoring, triggers, main loop
 // ============================================================
 const $ = (id) => document.getElementById(id);
 const Game = {
   state: 'boot', score: 0, combo: { pts: 0, mult: 1, idle: 0, best: 0 }, t: 0, playT: 0,
   hint: { i: 0, t: 0, shown: false }, firsts: {}, sus: 0, lastRelayT: 0, idleHintT: 0, outroPending: -1,
-  freeRoam: false, dprAcc: 0, dprN: 0
+  freeRoam: false, dprAcc: 0, dprN: 0, tapeLog: {}, hintsDone: false, worldKey: null, inWater: false
 };
 const HINTS = [
   { touch: 'Put your thumb on the SKATE circle and point where you want to go. Let go to coast.', key: 'W to skate · A / D to steer · S to brake. Q / E or mouse-drag turns the camera.', done: g => g.firsts.moved && Game.hint.t > 3 },
   { touch: 'Drag on the right side of the screen to look around.', key: 'Tip: release A / D to roll straight. Hold W to keep your speed.', done: g => Game.hint.t > 6 },
-  { touch: 'JUMP — tap ⤒ exactly ON THE BEAT to jump higher', key: 'JUMP — SPACE. Jump ON THE BEAT to jump higher.', done: g => g.firsts.beatJump },
+  { touch: 'JUMP — tap it exactly ON THE BEAT to jump higher. Try hopping into the fountain!', key: 'JUMP — SPACE. Jump ON THE BEAT to jump higher. Try hopping into the fountain!', done: g => g.firsts.beatJump },
   { touch: 'TRICK on the ground = a PUSH. Hit it on the beat for a speed boost!', key: 'TRICK (K / SHIFT) on the ground = a PUSH. On the beat = speed boost!', done: g => g.firsts.beatPush },
   { touch: 'In the air or on a rail, TRICK does a trick. Watch the ring close in — that’s the beat.', key: 'In the air or on a rail, TRICK does a trick. Watch the ring — that’s the beat.', done: g => g.firsts.trick },
-  { touch: 'Jump onto any rail or cable to GRIND. The music follows you.', key: 'Jump onto any rail or cable to GRIND. The music follows you.', done: g => g.firsts.grind },
+  { touch: 'Jump onto a rail, a bench or the fountain rim to GRIND. The music follows you.', key: 'Jump onto a rail, a bench or the fountain rim to GRIND. The music follows you.', done: g => g.firsts.grind },
   { touch: 'Find DJ Static’s 5 relays (the pale light beams). Secrets hide everywhere.', key: 'Find DJ Static’s 5 relays (the pale light beams). Secrets hide everywhere.', done: g => Game.hint.t > 7 },
 ];
-const RELAY_LINES = [
-  ['KEYS', 'Ohhh, there it is! Hear those keys? The Ministry calls that “unauthorized vibration.”'],
-  ['PERCUSSION', 'Congas! Shakers! They banned percussion in ’09 for being “too knock-knock.”'],
-  ['HORNS', 'HORNS! Real horns! Three down. And smile at the drones — they love that.'],
-  ['LEAD MELODY', 'The hook is back! Man, I almost forgot how it went. One more, kid!'],
-  ['EVERYTHING', 'That’s all of them…'],
-];
+const WORLDS = {
+  park: { n: 1, build: () => buildPark(), song: 'park', next: 'roof', outro: (R, J) => parkOutroShots(R, J), hints: true,
+    lines: [
+      ['KEYS', 'Ohhh, there it is! Hear those keys? The Ministry calls that “unauthorized vibration.”'],
+      ['BONGOS', 'Bongos! The Ministry banned bongos in ’09 for being “too knock-knock.”'],
+      ['HORNS', 'HORNS! Real horns! The pigeons are losing their minds.'],
+      ['THE WHISTLE', 'The whistle is back! Man, I almost forgot how that tune went. One more!'],
+      ['EVERYTHING', ''],
+    ] },
+  roof: { n: 2, build: () => buildRooftops(), song: 'roof', next: null, outro: (R, J) => outroShots(R, J), hints: false,
+    arrive: 'Welcome to the rooftops! Fall off and the Ministry’s “safety net” catches you. Somehow that’s worse.',
+    lines: [
+      ['KEYS', 'Keys up here too! The whole skyline just got a little jazzier.'],
+      ['PERCUSSION', 'Congas! Shakers! They banned percussion in ’09 for being “too knock-knock.”'],
+      ['HORNS', 'HORNS! Real horns! Three down. And smile at the drones — they love that.'],
+      ['LEAD MELODY', 'The hook is back! Man, I almost forgot how it went. One more, kid!'],
+      ['EVERYTHING', ''],
+    ] },
+};
 const DRONE_LINES = ['LOITERING IS A PRIVILEGE.', 'HAVE YOU REPORTED A NEIGHBOR TODAY?', 'SMILE CHECK IN PROGRESS.', 'YOUR POSTURE HAS BEEN NOTED.', 'FUN DETECTED. ANALYZING…'];
 
 function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
@@ -115,27 +127,81 @@ const hooks = {
 };
 function beatRing() { const r = $('beatring'); r.classList.remove('go'); void r.offsetWidth; r.classList.add('go'); }
 
+// ---------- worlds ----------
+function applyEnv(env) {
+  G.scene.fog.color.set(env.fog[0]); G.scene.fog.near = env.fog[1]; G.scene.fog.far = env.fog[2];
+  G.renderer.setClearColor(env.clear);
+  G.hemi.color.set(env.hemi[0]); G.hemi.groundColor.set(env.hemi[1]); G.hemi.intensity = env.hemi[2];
+  G.sun.color.set(env.sun[0]); G.sun.intensity = env.sun[1]; G.sun.position.set(...env.sun[2]);
+}
+function loadWorld(key) {
+  const def = WORLDS[key];
+  if (Game.W) {
+    G.scene.remove(Game.W.group);
+    Game.W.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  const W = def.build(); W.def = def; W.song = def.song;
+  G.scene.add(W.group);
+  Game.W = W; Game.worldKey = key;
+  applyEnv(W.env);
+  Game.player.W = W; Game.cam.W = W;
+  const p = Game.player;
+  p.pos.copy(W.spawn); p.vel.set(0, 0, 0); p.yaw = W.spawnYaw; p.mode = 'ground'; p.rail = null; p.ground = null;
+  p.lastSafe.copy(W.spawn); p.lastSafeYaw = W.spawnYaw; p.setCheckpoint(W.spawn, W.spawnYaw);
+  const log = Game.tapeLog[key] || (Game.tapeLog[key] = new Set());
+  for (const t of W.tapes) if (log.has(t.id)) { t.got = true; t.g.visible = false; }
+  Sound.R.unlocks = 0; Game.combo = { pts: 0, mult: 1, idle: 0, best: Game.combo.best }; Game.outroPending = -1; Game.sus = 0;
+  Game.lastRelayT = Game.playT; Game.idleHintT = 0; Game.inWater = false;
+  toastTimer = 0; $('toast').className = 'toast'; radioTimer = 0; $('radio').hidden = true; $('pops').innerHTML = '';
+  const { bolt } = Game.cast;
+  bolt.root.position.copy(W.bolt.pos); bolt.root.rotation.y = W.bolt.yaw;
+  try { const m = +(localStorage.getItem('offbeat.maxWorld') || 1); if (def.n > m) localStorage.setItem('offbeat.maxWorld', String(def.n)); } catch (e) {}
+  updateWorldButtons();
+  return W;
+}
+function maxWorld() { try { return +(localStorage.getItem('offbeat.maxWorld') || 1); } catch (e) { return 1; } }
+function updateWorldButtons() { const two = maxWorld() >= 2; $('btnW2').hidden = !two; $('btnTitleW2').hidden = !two; }
+function newGame() { Game.score = 0; Game.playT = 0; Game.tapeLog = {}; Game.combo.best = 0; Game.freeRoam = false; Game.firsts = {}; Game.hint = { i: 0, t: 0, shown: false }; Game.hintsDone = false; }
+function titleTableau() {
+  const { juno, bolt, drone } = Game.cast, W = Game.W, A = W.intro.A;
+  juno.root.visible = bolt.root.visible = drone.root.visible = true;
+  juno.root.position.set(A.x, A.y + W.intro.sitY, A.z); juno.root.rotation.y = Math.PI; juno._pose = 'sit'; juno.spin.rotation.set(0, 0, 0);
+  bolt.root.position.set(A.x - 3.4, A.y, A.z + 2.65); bolt.root.rotation.y = 2.3;
+  drone.root.position.set(A.x + 6, A.y + 6, A.z - 4);
+}
+
+// ---------- no accidental zooming (pinch, double-tap, ctrl+wheel) ----------
+function preventZoom() {
+  const stop = (e) => e.preventDefault();
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, stop, { passive: false });
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  let lastEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = e.timeStamp;
+    if (now - lastEnd < 320 && !e.target.closest('input')) e.preventDefault();
+    lastEnd = now;
+  }, { passive: false });
+  document.addEventListener('dblclick', stop, { passive: false });
+  window.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+  window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) e.preventDefault(); });
+}
+preventZoom();
+
 // ---------- boot ----------
 async function boot(data = {}) {
   try { await Promise.race([Promise.all([document.fonts.load(`40px "Dela Gothic One"`), document.fonts.load(`20px "DotGothic16"`), document.fonts.load(`20px "M PLUS Rounded 1c"`)]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
   initRenderer();
   Input.init();
-  const W = buildWorld1();
-  G.scene.add(W.group);
-  Game.W = W;
   const juno = makeJuno(), bolt = makeBolt();
   const csDrone = new Drone(droneFaces());
   G.scene.add(juno.root, juno.shadow, bolt.root, bolt.shadow, csDrone.root);
   Game.cast = { juno, bolt, drone: csDrone };
-  Game.fx = new Particles(G.scene);
-  Game.player = new Player(W, juno, Game.fx, hooks);
-  Game.cam = new CamRig(G.camera, W);
-  // title tableau
-  juno.root.position.set(6, 0, -11.65); juno.root.rotation.y = Math.PI; juno._pose = 'sit';
-  bolt.root.position.set(2.6, 0, -9); bolt.root.rotation.y = 2.3; bolt._pose = 'armsCross';
-  csDrone.root.position.set(14, 6, -16);
-  // restore progress after a live update
-  if (data.relays) Game.restore = data;
+  Game.fx = new Particles(G.scene, 600);
+  Game.player = new Player({ spawn: V3(), spawnYaw: 0, boxes: [], ramps: [], rails: [], pads: [], groundAt: () => ({ y: 0 }) }, juno, Game.fx, hooks);
+  Game.cam = new CamRig(G.camera, null);
+  if (data.relays && data.world) Game.restore = data;
+  loadWorld(data.world && WORLDS[data.world] ? data.world : 'park');
+  titleTableau();
   bindUI();
   Game.state = 'title';
   $('loading').hidden = true; $('title').hidden = false;
@@ -143,18 +209,15 @@ async function boot(data = {}) {
   if (Game.restore && Game.restore.state === 'play') { $('btnContinue').hidden = false; }
   Game.last = performance.now();
   requestAnimationFrame(loop);
-  window.claude?.hot?.snapshot?.(() => ({ state: Game.state === 'play' ? 'play' : 'title', relays: W.relays.filter(r => r.active).map(r => r.id), tapes: W.tapes.filter(t => t.got).map(t => t.id), score: Game.score, pos: Game.player.pos.toArray(), yaw: Game.player.yaw }));
+  window.claude?.hot?.snapshot?.(() => ({ world: Game.worldKey, state: Game.state === 'play' ? 'play' : 'title', relays: Game.W.relays.filter(r => r.active).map(r => r.id), tapes: Game.W.tapes.filter(t => t.got).map(t => t.id), score: Game.score, pos: Game.player.pos.toArray(), yaw: Game.player.yaw }));
 }
 
 function bindUI() {
-  const start = (skip) => {
-    Sound.init(); Sound.sfx.click();
-    $('title').hidden = true;
-    if (skip) startPlay(true); else startIntro();
-  };
-  $('btnPlay').onclick = () => start(false);
-  $('btnSkipIntro').onclick = () => start(true);
-  $('btnContinue').onclick = () => { applyRestore(Game.restore); start(true); };
+  const go = (fn) => { Sound.init(); Sound.sfx.click(); $('title').hidden = true; fn(); };
+  $('btnPlay').onclick = () => go(() => { newGame(); if (Game.worldKey !== 'park') loadWorld('park'); startIntro(); });
+  $('btnSkipIntro').onclick = () => go(() => { newGame(); if (Game.worldKey !== 'park') loadWorld('park'); startPlay(true); });
+  $('btnTitleW2').onclick = () => go(() => { newGame(); loadWorld('roof'); startPlay(true); });
+  $('btnContinue').onclick = () => go(() => { applyRestore(Game.restore); startPlay(true, true); });
   $('csLayer').addEventListener('pointerdown', (e) => { if (e.target.id === 'skipBtn') return; Game.cs && Game.cs.advance(); });
   $('skipBtn').addEventListener('pointerdown', (e) => { e.stopPropagation(); Game.cs && Game.cs.skip(); });
   window.addEventListener('keydown', (e) => {
@@ -163,30 +226,24 @@ function bindUI() {
   });
   $('btnPause').onclick = () => pause(true);
   $('btnResume').onclick = () => pause(false);
-  $('btnRestart').onclick = () => { pause(false); resetWorld(); startPlay(true); };
-  $('btnReplayIntro').onclick = () => { pause(false); resetWorld(); startIntro(); };
+  $('btnRestart').onclick = () => { pause(false); loadWorld(Game.worldKey); startPlay(true); };
+  $('btnReplayIntro').onclick = () => { pause(false); newGame(); loadWorld('park'); startIntro(); };
+  $('btnW1').onclick = () => { pause(false); loadWorld('park'); startPlay(true); };
+  $('btnW2').onclick = () => { pause(false); loadWorld('roof'); startPlay(true); };
   $('vol').oninput = (e) => Sound.setVolume(+e.target.value / 100, null);
   $('btnKeep').onclick = () => { $('end').hidden = true; Game.freeRoam = true; startPlay(true, true); };
-  $('btnAgain').onclick = () => { $('end').hidden = true; resetWorld(); startIntro(); };
+  $('btnAgain').onclick = () => { $('end').hidden = true; newGame(); loadWorld('park'); startIntro(); };
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(true); });
   if (U.isTouch) document.body.classList.add('touch');
 }
 
 function applyRestore(d) {
   if (!d) return;
+  if (d.world && d.world !== Game.worldKey) loadWorld(d.world);
   for (const r of Game.W.relays) if (d.relays.includes(r.id)) activateRelay(r, true);
-  for (const t of Game.W.tapes) if (d.tapes.includes(t.id)) { t.got = true; t.g.visible = false; }
+  for (const t of Game.W.tapes) if (d.tapes.includes(t.id)) { t.got = true; t.g.visible = false; (Game.tapeLog[Game.worldKey] ||= new Set()).add(t.id); }
   Game.score = d.score || 0;
   if (d.pos) { Game.player.pos.fromArray(d.pos); Game.player.yaw = d.yaw || 0; Game.player.lastSafe.copy(Game.player.pos); }
-  Game.restored = true;
-}
-function resetWorld() {
-  const W = Game.W;
-  for (const r of W.relays) { r.active = false; }
-  for (const t of W.tapes) { t.got = false; t.g.visible = true; }
-  Game.score = 0; Game.combo = { pts: 0, mult: 1, idle: 0, best: 0 }; Game.freeRoam = false; Game.outroPending = -1; Game.playT = 0;
-  Sound.R.unlocks = 0; Game.firsts = {}; Game.hint = { i: 0, t: 0, shown: false };
-  const p = Game.player; p.pos.copy(W.spawn); p.vel.set(0, 0, 0); p.yaw = W.spawnYaw; p.lastSafe.copy(W.spawn); p.setCheckpoint(W.spawn, W.spawnYaw);
 }
 
 function startIntro() {
@@ -196,29 +253,36 @@ function startIntro() {
   bolt.root.visible = true; drone.root.visible = true; juno.root.visible = true;
   juno.spin.rotation.set(0, 0, 0);
   $('csLayer').hidden = false;
-  Game.cs = new Cutscene(introShots(), Game.cast, Game.W, { onEnd: () => { try { localStorage.setItem('offbeat.introSeen', '1'); } catch (e) {} startPlay(false); } });
+  Game.cs = new Cutscene(introShots(Game.W), Game.cast, Game.W, { onEnd: () => { try { localStorage.setItem('offbeat.introSeen', '1'); } catch (e) {} startPlay(false); } });
   Game.cs.start();
 }
 
 function startPlay(skipped, keepState) {
-  const { juno, bolt, drone } = Game.cast;
+  const { juno, bolt, drone } = Game.cast, W = Game.W, def = W.def;
   $('csLayer').hidden = true; $('dlg').hidden = true; Game.cs = null;
   drone.root.visible = false;
-  bolt.root.visible = true; bolt.root.position.set(3.8, 0, -6.2); bolt.root.rotation.y = 2.2; bolt._pose = 'wave'; bolt.setMood('neutral'); juno.setMood('neutral');
+  bolt.root.visible = true; bolt._pose = 'wave'; bolt.setMood('neutral'); juno.setMood('neutral');
+  if (!keepState) { bolt.root.position.copy(W.bolt.pos); bolt.root.rotation.y = W.bolt.yaw; }
   const p = Game.player;
-  if (!keepState && !Game.restored) {
-    if (!skipped) { p.pos.set(6.2, 0, -10.4); p.yaw = Math.PI / 2; }
-    else { p.pos.copy(Game.W.spawn); p.yaw = Game.W.spawnYaw; }
+  if (!keepState) {
+    if (!skipped) {
+      const A = W.intro.A; p.pos.set(A.x + 0.2, A.y, A.z + 1.25);
+      const r0 = W.relays[0].pos; p.yaw = Math.atan2(r0.x - p.pos.x, r0.z - p.pos.z);
+    } else { p.pos.copy(W.spawn); p.yaw = W.spawnYaw; }
     p.vel.set(0, 0, 0); p.mode = 'ground'; p.lastSafe.copy(p.pos); p.setCheckpoint(p.pos, p.yaw);
   }
-  Game.restored = false;
   Game.state = 'play'; Input.enabled = true; Input.flush();
   $('hud').hidden = false; document.body.classList.add('playing');
-  if (Sound.song !== 'roof') Sound.play('roof');
-  Sound.R.unlocks = Game.W.relaysOn();
+  if (Sound.song !== W.song) Sound.play(W.song);
+  Sound.R.unlocks = W.relaysOn();
   Game.cam.snap(p); Game.cam.yaw = p.yaw;
   Game.lastRelayT = Game.playT;
-  if (!keepState) titleCard('WORLD 1', Game.W.name);
+  if (!def.hints) { Game.hint.i = HINTS.length; $('hint').classList.remove('show'); }
+  else if (!Game.hintsDone && Game.hint.i >= HINTS.length) Game.hint = { i: 0, t: 0, shown: false };
+  if (!keepState) {
+    titleCard('WORLD ' + def.n, W.name);
+    if (def.arrive) setTimeout(() => { if (Game.state === 'play') radio(def.arrive); }, 3200);
+  }
   updateCounters();
 }
 function titleCard(a, b) {
@@ -227,7 +291,7 @@ function titleCard(a, b) {
   setTimeout(() => { c.hidden = true; }, 3200);
 }
 function pause(on) {
-  if (on && Game.state === 'play') { Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('vol').value = Math.round(Sound.vol * 100); }
+  if (on && Game.state === 'play') { Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('vol').value = Math.round(Sound.vol * 100); updateWorldButtons(); }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }
 }
 
@@ -243,7 +307,7 @@ function activateRelay(r, silent = false) {
   flash('#ffd23f');
   Game.player.setCheckpoint(V3().copy(r.pos).add(V3(1.8, 0, 1.8)), Game.player.yaw);
   addStyle(1000, true);
-  const [inst, line] = RELAY_LINES[n - 1];
+  const [inst, line] = Game.W.def.lines[n - 1];
   toast(`<b>RELAY ${n}/5 ONLINE</b><span>${n < 5 ? 'UNLOCKED: ' + inst : 'THE WHOLE CITY CAN HEAR IT'}</span>`, 'relay');
   if (n < 5) setTimeout(() => radio(line), 1300);
   Game.lastRelayT = Game.playT;
@@ -252,11 +316,11 @@ function activateRelay(r, silent = false) {
 }
 function collectTape(t) {
   t.got = true; t.g.visible = false;
+  (Game.tapeLog[Game.worldKey] ||= new Set()).add(t.id);
   Sound.sfx.tape(); addStyle(500, true);
   Game.fx.burst(t.pos.clone(), 26, ['#ffd23f', '#fff6c8', '#ff7a2f'], 6, 0.9, 5);
   toast(`<b>GOLDEN TAPE ${Game.W.tapesGot()}/5</b><span>${t.text}</span>`, 'tape', 6.5);
-  if (t.id === 4) setTimeout(() => radio('Uh. Where’d you find THAT? That’s a… remix. Satire! Very edgy satire. Moving on.'), 6000);
-  if (t.id === 3) setTimeout(() => radio('Ministry memos? Pfft. They write those to confuse us. Don’t overthink it.'), 6000);
+  if (t.dj) setTimeout(() => { if (Game.state === 'play') radio(t.dj); }, 6000);
   updateCounters();
 }
 function updateCounters() {
@@ -271,25 +335,32 @@ function startOutro() {
   $('hud').hidden = true;
   const p = Game.player, { juno, drone } = Game.cast;
   p.vel.set(0, 0, 0); p.mode = 'ground'; juno.spin.rotation.set(0, 0, 0);
-  // nearest relay = the one just activated
   let R = Game.W.relays[0].pos, bd = 1e9;
   for (const r of Game.W.relays) { const d = r.pos.distanceTo(p.pos); if (d < bd) { bd = d; R = r.pos; } }
   drone.root.visible = true; drone.setMood('proud');
   $('csLayer').hidden = false;
-  Game.cs = new Cutscene(outroShots(R, p.pos), Game.cast, Game.W, {
-    onEnd: showEnd,
+  const def = Game.W.def;
+  Game.cs = new Cutscene(def.outro(R, p.pos), Game.cast, Game.W, {
+    onEnd: () => { if (def.next) nextWorld(def.next); else showEnd(); },
     onShot: (s) => { if (s.onEnter === 'wink') Game.W.tower.winkT = 0; }
   });
   Game.cs.start();
 }
+function nextWorld(key) {
+  flash('#ffffff');
+  Game.cast.juno.spin.rotation.set(0, 0, 0);
+  loadWorld(key);
+  startPlay(true);
+}
 function showEnd() {
   Game.state = 'end'; $('csLayer').hidden = true; $('dlg').hidden = true;
-  Sound.play('roof');
+  Sound.play(Game.W.song);
   const mins = Math.floor(Game.playT / 60), secs = Math.floor(Game.playT % 60);
   bankCombo();
+  let tapes = 0; for (const k in Game.tapeLog) tapes += Game.tapeLog[k].size;
   $('endStats').innerHTML = `
-    <div><dt>RELAYS</dt><dd>5/5</dd></div>
-    <div><dt>GOLDEN TAPES</dt><dd>${Game.W.tapesGot()}/5</dd></div>
+    <div><dt>WORLDS</dt><dd>2/2</dd></div>
+    <div><dt>GOLDEN TAPES</dt><dd>${tapes}/10</dd></div>
     <div><dt>BEST MULTIPLIER</dt><dd>×${Game.combo.best}</dd></div>
     <div><dt>STYLE</dt><dd>${fmt(Game.score)}</dd></div>
     <div><dt>TIME</dt><dd>${mins}:${String(secs).padStart(2, '0')}</dd></div>`;
@@ -387,8 +458,37 @@ function updateWorld(dt, bi) {
     if (T.winkT !== undefined) { T.winkT += dt; T.wink = T.winkT < 1.6 ? 0 : T.winkT < 2.0 ? (T.winkT - 1.6) / 0.4 : T.winkT < 2.5 ? 1 : Math.max(0, 1 - (T.winkT - 2.5) / 0.3); if (T.winkT > 3) T.winkT = undefined; }
     if (T.acc > 0.1) { T.acc = 0; const look = [Math.sin(T.t * 0.5) * 0.3, U.clamp((tgt.y - hp.y) / 300, -1, 1) * -0.8 + 0.4]; T.faceC.redraw(look, T.wink || 0, kick); }
   }
+  // fountain jets pulse with the kick
+  if (W.fountain) {
+    W.fountain.acc = (W.fountain.acc || 0) + dt;
+    const burst = bi.playing && bi.phase < 0.06 && !W.fountain.fired;
+    if (bi.phase > 0.5) W.fountain.fired = false;
+    for (const j of W.fountain.jets) {
+      if (W.fountain.acc > 0.05) Game.fx.emit(j, _wv.set(-j.x * 0.25 + (Math.random() - 0.5) * 0.4, 5.5 + Math.random(), -j.z * 0.25 + (Math.random() - 0.5) * 0.4), Math.random() < 0.5 ? '#bfe9ff' : '#ffffff', 0.9, 11);
+      if (burst) for (let k = 0; k < 4; k++) Game.fx.emit(j, _wv.set(-j.x * 0.35 + (Math.random() - 0.5), 8 + Math.random() * 2, -j.z * 0.35 + (Math.random() - 0.5)), '#ffffff', 1.1, 11);
+    }
+    if (burst) W.fountain.fired = true;
+    if (W.fountain.acc > 0.05) W.fountain.acc = 0;
+  }
+  // water: splash and drag
+  if (Game.state === 'play') {
+    let wet = false;
+    for (const w of W.waters) if (p.pos.x > w.x0 && p.pos.x < w.x1 && p.pos.z > w.z0 && p.pos.z < w.z1 && p.pos.y <= w.y + 0.05 && p.mode === 'ground') { wet = w; break; }
+    if (wet) {
+      const sp = p.speed;
+      if (sp > 9) { p.vel.x *= 9 / sp; p.vel.z *= 9 / sp; }
+      if (sp > 1 && Math.random() < 0.7) Game.fx.emit(_wv2.set(p.pos.x, wet.y + 0.05, p.pos.z), _wv.set((Math.random() - 0.5) * 3, 2 + Math.random() * 2.5, (Math.random() - 0.5) * 3), '#bfe9ff', 0.5, 12);
+      if (!Game.inWater) {
+        Sound.sfx.splash(Math.min(1.2, 0.4 + sp / 12)); pop('SPLASH!', 'good');
+        Game.fx.burst(V3(p.pos.x, wet.y + 0.1, p.pos.z), 14, ['#bfe9ff', '#ffffff'], 4, 0.6, 10);
+        if (!Game.firsts.wet) { Game.firsts.wet = true; setTimeout(() => pop('SWIMMING IS A PRIVILEGE.', 'ministry'), 700); }
+      }
+    }
+    Game.inWater = !!wet;
+  }
   W.sky.material.uniforms.uT.value += dt;
 }
+const _wv = V3(), _wv2 = V3();
 
 // ---------- HUD per frame ----------
 function updateHUD(dt, bi) {
@@ -419,6 +519,7 @@ function updateHUD(dt, bi) {
   }
   // tutorial hints
   const H = Game.hint;
+  if (H.i >= HINTS.length && Game.W.def.hints) Game.hintsDone = true;
   if (H.i < HINTS.length) {
     H.t += dt;
     const h = HINTS[H.i];
@@ -460,11 +561,11 @@ function loop(now) {
     Game.cs && Game.cs.update(dt);
     Sound.update(dt, { speed: 16, grinding: false, air: false, airTime: 0, grounded: false, combo: 0, hype: 0 });
   } else if (Game.state === 'title' || Game.state === 'end') {
-    const a = Game.t * 0.05;
-    G.camera.position.set(4 + Math.cos(a) * 34, 15 + Math.sin(Game.t * 0.2) * 2, -6 + Math.sin(a) * 34);
-    G.camera.lookAt(4, 3, -14);
+    const a = Game.t * 0.05, A = Game.W.intro.A, cx = A.x - 4, cz = A.z - 2, R = Game.worldKey === 'park' ? 40 : 34;
+    G.camera.position.set(cx + Math.cos(a) * R, A.y + 15 + Math.sin(Game.t * 0.2) * 2, cz + 8 + Math.sin(a) * R);
+    G.camera.lookAt(cx, A.y + 3, cz);
     const { juno, bolt, drone } = Game.cast;
-    if (Game.state === 'title') { juno.update(dt, juno.poseTarget('sit'), { rock: 0.03 }); bolt.update(dt, bolt.poseTarget('armsCross'), { rock: 0.03 }); drone.update(dt); drone.root.position.y = 6 + Math.sin(Game.t) * 0.3; }
+    if (Game.state === 'title') { juno.update(dt, juno.poseTarget('sit'), { rock: 0.03 }); bolt.update(dt, bolt.poseTarget('armsCross'), { rock: 0.03 }); drone.update(dt); drone.root.position.y = Game.W.intro.A.y + 6 + Math.sin(Game.t) * 0.3; }
     if (Game.state === 'end') { Sound.update(dt, { speed: 16, grinding: false, air: false, airTime: 0, grounded: false, combo: 0, hype: 0 }); }
   }
   if (Game.state !== 'paused') {
