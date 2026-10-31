@@ -254,6 +254,8 @@ function buildPark() {
     { path: [[-50, 6.5, 4], [-30, 6.5, 4], [-30, 6.5, 22], [-50, 6.5, 22]], speed: 2.4, phase: 0.7 },
     { path: [[-30, 7, 70], [30, 7, 70], [30, 7, 84], [-30, 7, 84]], speed: 2.8, phase: 0.2 },
   ]);
+  // where a path or gate crosses a handrail, the rail opens up
+  W.passages = [[-6.8, 50, 6.8, 66], [-35, -63, -25, -48], [-4.5, 136, 4.5, 147]];
   K.finish();
 
   // ---------- environment ----------

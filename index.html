@@ -2834,7 +2834,23 @@ function makeKit(meta) {
     };
     // rails
     W.railGrid = makeGrid(8);
+    // handrails and fences open up where a path goes through (W.passages: [x0, z0, x1, z1] rectangles)
+    const inPass = (p) => (W.passages || []).some(([x0, z0, x1, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1) && p.y - W.groundAt(p.x, p.z, p.y - 0.1, 0).y < 2.4;   // overhead rails (arches) stay
+    const expanded = [];
     for (const d of railDefs) {
+      const kind = d.kind || 'rail';
+      if (kind !== 'rail' || d.hidden || !W.passages || !W.passages.length) { expanded.push(d); continue; }
+      let P = fillet(d.pts, d.round ?? 2.6, d.loop);
+      const dense = []; for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1], n = Math.max(1, Math.ceil(a.distanceTo(b) / 0.3)); for (let k = 0; k < n; k++) dense.push(V3().lerpVectors(a, b, k / n)); } dense.push(P[P.length - 1].clone());
+      if (!dense.some(inPass)) { expanded.push(d); continue; }
+      // rotate a loop so it starts inside a gap, then cut it into open runs
+      let pts = dense; if (d.loop) { const k = dense.findIndex(inPass); pts = dense.slice(k).concat(dense.slice(1, k + 1)); }
+      let run = [];
+      const flush = () => { let L = 0; for (let i = 1; i < run.length; i++) L += run[i].distanceTo(run[i - 1]); if (L > 1.5) expanded.push(Object.assign({}, d, { pts: run, loop: false, round: 0 })); run = []; };
+      for (const p of pts) { if (inPass(p)) flush(); else run.push(p); }
+      flush();
+    }
+    for (const d of expanded) {
       const kind = d.kind || 'rail';
       let P = d.pts;
       if (d.sag || (kind === 'cable' && d.sag !== 0 && P.length === 2)) {
@@ -3182,6 +3198,8 @@ function buildPark() {
     { path: [[-50, 6.5, 4], [-30, 6.5, 4], [-30, 6.5, 22], [-50, 6.5, 22]], speed: 2.4, phase: 0.7 },
     { path: [[-30, 7, 70], [30, 7, 70], [30, 7, 84], [-30, 7, 84]], speed: 2.8, phase: 0.2 },
   ]);
+  // where a path or gate crosses a handrail, the rail opens up
+  W.passages = [[-6.8, 50, 6.8, 66], [-35, -63, -25, -48], [-4.5, 136, 4.5, 147]];
   K.finish();
 
   // ---------- environment ----------
@@ -3799,6 +3817,8 @@ function buildStreets() {
   ]);
   // neon glow pools on the wet ground under the market signs
   for (let z = -64; z < 66; z += 12) for (const x of [-105.5, -94.5]) B.box(x - 1.4, 0.01, z, x + 1.4, 0.02, z + 6, ['#ff2e88', '#19d3ff', '#ffd23f'][Math.abs(z / 12 | 0) % 3], 'glow', flat);
+  // gaps in the plaza's edge rail where streets lead out
+  W.passages = [[-5, -20, 25, -9], [49, -1, 59, 13], [-7, 57, 11, 67]];
   // street life: props, puddles, cars, people with umbrellas, steam, searchlights
   K.cityLife({ area: [-148, -148, 148, 124], props: 140, steam: 12, seed: 5,
     avoid: [[-30, 46, -12, 64], [84, -150, 108, 150]],
@@ -4323,6 +4343,8 @@ function buildSewers() {
     { path: [[8, 22, -126], [62, 22, -126], [62, 22, -112], [8, 22, -112]], speed: 3, phase: 0.6 },
     { path: [[100, 8, -50], [200, 8, -50], [200, 8, 50], [100, 8, 50]], speed: 4, phase: 0.1 },
   ]);
+  // openings: corridor and bridge onto the engine catwalk, and where you step off the top piston
+  W.passages = [[125, -4.5, 137, 4.5], [146.5, 14, 153.5, 24], [36, 114, 49.5, 120]];
   K.finish();
   W.engine = V3(EX, 20, EZ);
   W.sky = skyDome({ top: [0.01, 0.03, 0.02], mid: [0.03, 0.06, 0.05], hor: [0.05, 0.1, 0.08], low: [0.01, 0.02, 0.02], cloudAmt: 0, sun: [0.3, 0.9, 0.2], sunC: [0.8, 1, 0.9], stripes: false });

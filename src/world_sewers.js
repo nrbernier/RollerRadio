@@ -258,6 +258,8 @@ function buildSewers() {
     { path: [[8, 22, -126], [62, 22, -126], [62, 22, -112], [8, 22, -112]], speed: 3, phase: 0.6 },
     { path: [[100, 8, -50], [200, 8, -50], [200, 8, 50], [100, 8, 50]], speed: 4, phase: 0.1 },
   ]);
+  // openings: corridor and bridge onto the engine catwalk, and where you step off the top piston
+  W.passages = [[125, -4.5, 137, 4.5], [146.5, 14, 153.5, 24], [36, 114, 49.5, 120]];
   K.finish();
   W.engine = V3(EX, 20, EZ);
   W.sky = skyDome({ top: [0.01, 0.03, 0.02], mid: [0.03, 0.06, 0.05], hor: [0.05, 0.1, 0.08], low: [0.01, 0.02, 0.02], cloudAmt: 0, sun: [0.3, 0.9, 0.2], sunC: [0.8, 1, 0.9], stripes: false });

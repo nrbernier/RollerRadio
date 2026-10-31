@@ -250,6 +250,8 @@ function buildStreets() {
   ]);
   // neon glow pools on the wet ground under the market signs
   for (let z = -64; z < 66; z += 12) for (const x of [-105.5, -94.5]) B.box(x - 1.4, 0.01, z, x + 1.4, 0.02, z + 6, ['#ff2e88', '#19d3ff', '#ffd23f'][Math.abs(z / 12 | 0) % 3], 'glow', flat);
+  // gaps in the plaza's edge rail where streets lead out
+  W.passages = [[-5, -20, 25, -9], [49, -1, 59, 13], [-7, 57, 11, 67]];
   // street life: props, puddles, cars, people with umbrellas, steam, searchlights
   K.cityLife({ area: [-148, -148, 148, 124], props: 140, steam: 12, seed: 5,
     avoid: [[-30, 46, -12, 64], [84, -150, 108, 150]],

@@ -806,7 +806,23 @@ function makeKit(meta) {
     };
     // rails
     W.railGrid = makeGrid(8);
+    // handrails and fences open up where a path goes through (W.passages: [x0, z0, x1, z1] rectangles)
+    const inPass = (p) => (W.passages || []).some(([x0, z0, x1, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1) && p.y - W.groundAt(p.x, p.z, p.y - 0.1, 0).y < 2.4;   // overhead rails (arches) stay
+    const expanded = [];
     for (const d of railDefs) {
+      const kind = d.kind || 'rail';
+      if (kind !== 'rail' || d.hidden || !W.passages || !W.passages.length) { expanded.push(d); continue; }
+      let P = fillet(d.pts, d.round ?? 2.6, d.loop);
+      const dense = []; for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1], n = Math.max(1, Math.ceil(a.distanceTo(b) / 0.3)); for (let k = 0; k < n; k++) dense.push(V3().lerpVectors(a, b, k / n)); } dense.push(P[P.length - 1].clone());
+      if (!dense.some(inPass)) { expanded.push(d); continue; }
+      // rotate a loop so it starts inside a gap, then cut it into open runs
+      let pts = dense; if (d.loop) { const k = dense.findIndex(inPass); pts = dense.slice(k).concat(dense.slice(1, k + 1)); }
+      let run = [];
+      const flush = () => { let L = 0; for (let i = 1; i < run.length; i++) L += run[i].distanceTo(run[i - 1]); if (L > 1.5) expanded.push(Object.assign({}, d, { pts: run, loop: false, round: 0 })); run = []; };
+      for (const p of pts) { if (inPass(p)) flush(); else run.push(p); }
+      flush();
+    }
+    for (const d of expanded) {
       const kind = d.kind || 'rail';
       let P = d.pts;
       if (d.sag || (kind === 'cable' && d.sag !== 0 && P.length === 2)) {
