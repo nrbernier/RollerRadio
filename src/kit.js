@@ -134,30 +134,56 @@ function makeGrid(cell) {
 }
 
 // world-space textures (white-ish so vertex colour tints them)
+// Night windows: one 16×16-window sheet (1024 px), so the pattern only repeats every 16 windows.
+// Each window gets its own state — dark, lit warm/cool/pink, TV flicker colour, blinds half down, a plant —
+// and some floors use split or wide windows.
+const NIGHT_WIN = (() => {
+  const r = U.rng(31), cells = [];
+  for (let f = 0; f < 16; f++) {
+    const style = r() < 0.18 ? 'wide' : r() < 0.35 ? 'split' : 'std';
+    for (let c = 0; c < 16; c++) {
+      const v = r();
+      cells.push({ style, lit: v < 0.42, col: v < 0.08 ? '#ff6fb5' : v < 0.17 ? '#7fe8ff' : v < 0.21 ? '#b6ff8a' : r() < 0.5 ? '#ffd98a' : '#ffe9c4',
+        blind: r() < 0.3 ? 0.2 + r() * 0.6 : 0, plant: r() < 0.08, dim: 0.55 + r() * 0.45 });
+    }
+  }
+  return cells;
+})();
+function nightWinRect(c, col, row) {
+  const X = col * 64, Y = row * 64;
+  return c.style === 'wide' ? [X + 4, Y + 12, 56, 30] : c.style === 'split' ? [X + 14, Y + 8, 36, 38] : [X + 12, Y + 10, 40, 34];
+}
 function nightWindowTex() {
-  return canvasTex(256, 256, (x, w, h) => {
+  const t = canvasTex(1024, 1024, (x, w, h) => {
     const r = U.rng(19);
     x.fillStyle = '#9a96b8'; x.fillRect(0, 0, w, h);
-    for (let f = 0; f < 4; f++) { x.fillStyle = '#6a6690'; x.fillRect(0, f * 64 + 54, w, 10); }
-    for (let f = 0; f < 4; f++) for (let c = 0; c < 4; c++) {
-      const X = c * 64 + 12, Y = f * 64 + 10;
-      x.fillStyle = '#1d1838'; x.fillRect(X - 3, Y - 3, 46, 40);
-      x.fillStyle = '#2a2850'; x.fillRect(X, Y, 40, 34);
-      x.fillStyle = '#1d1838'; x.fillRect(X + 19, Y, 3, 34);
-    }
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(60,50,100,${r() * 0.08})`; x.fillRect(r() * w, r() * h, 3 + r() * 30, 2 + r() * 8); }
+    for (let f = 0; f < 16; f++) { x.fillStyle = '#6a6690'; x.fillRect(0, f * 64 + 54, w, 10); }
+    NIGHT_WIN.forEach((c, i) => {
+      const [X, Y, W2, H2] = nightWinRect(c, i % 16, Math.floor(i / 16));
+      x.fillStyle = '#1d1838'; x.fillRect(X - 3, Y - 3, W2 + 6, H2 + 6);
+      x.fillStyle = '#2a2850'; x.fillRect(X, Y, W2, H2);
+      x.fillStyle = '#1d1838'; if (c.style !== 'wide') x.fillRect(X + W2 / 2 - 1.5, Y, 3, H2); else { x.fillRect(X + W2 / 3, Y, 2, H2); x.fillRect(X + 2 * W2 / 3, Y, 2, H2); }
+      if (c.blind) { x.fillStyle = '#4a4670'; x.fillRect(X, Y, W2, H2 * c.blind); x.fillStyle = '#3a3660'; for (let k = 3; k < H2 * c.blind; k += 4) x.fillRect(X, Y + k, W2, 1); }
+      if (c.plant) { x.fillStyle = '#1a3a22'; x.beginPath(); x.ellipse(X + 9, Y + H2 - 7, 7, 9, 0, 0, 7); x.fill(); }
+    });
   }, { repeat: true }).tex;
+  t.repeat.set(0.25, 0.25); return t;
 }
 function nightGlowTex() {
-  return canvasTex(256, 256, (x, w, h) => {
-    const r = U.rng(23);
+  const t = canvasTex(1024, 1024, (x, w, h) => {
     x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
-    for (let f = 0; f < 4; f++) for (let c = 0; c < 4; c++) {
-      const v = r(); if (v > 0.62) continue;
-      x.fillStyle = v < 0.15 ? '#ff6fb5' : v < 0.3 ? '#7fe8ff' : '#ffd98a';
-      x.fillRect(c * 64 + 12, f * 64 + 10, 40, 34);
-      x.fillStyle = '#000'; x.fillRect(c * 64 + 31, f * 64 + 10, 3, 34);
-    }
+    NIGHT_WIN.forEach((c, i) => {
+      if (!c.lit) return;
+      const [X, Y, W2, H2] = nightWinRect(c, i % 16, Math.floor(i / 16));
+      const g = x.createLinearGradient(X, Y, X, Y + H2); g.addColorStop(0, c.col); g.addColorStop(1, '#000');
+      x.globalAlpha = c.dim; x.fillStyle = c.col; x.fillRect(X, Y, W2, H2); x.globalAlpha = 0.35 * c.dim; x.fillStyle = g; x.fillRect(X, Y, W2, H2); x.globalAlpha = 1;
+      x.fillStyle = '#000'; if (c.style !== 'wide') x.fillRect(X + W2 / 2 - 1.5, Y, 3, H2); else { x.fillRect(X + W2 / 3, Y, 2, H2); x.fillRect(X + 2 * W2 / 3, Y, 2, H2); }
+      if (c.blind) { x.fillStyle = 'rgba(0,0,0,.75)'; x.fillRect(X, Y, W2, H2 * c.blind); }
+      if (c.plant) { x.fillStyle = '#000'; x.beginPath(); x.ellipse(X + 9, Y + H2 - 7, 7, 9, 0, 0, 7); x.fill(); }
+    });
   }, { repeat: true }).tex;
+  t.repeat.set(0.25, 0.25); return t;
 }
 function worldMaterials(night) {
   if (night) {
@@ -363,7 +389,7 @@ function makeKit(meta) {
   K.ringDeck = (cx, cz, rIn, rOut, y, o = {}) => {
     const rm = (rIn + rOut) / 2, n = Math.max(24, Math.ceil(rm * 0.8)), pts = [];
     for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pts.push([cx + Math.cos(a) * rm, cz + Math.sin(a) * rm]); }
-    K.deck(pts, rOut - rIn, y, Object.assign({ loop: true, tile: 1.5 }, o));
+    K.deck(pts, rOut - rIn, y, Object.assign({ loop: true, tile: 1.0 }, o));
   };
   // a curtain of falling water, scrolling, with spray at the bottom
   K.waterfall = (x0, x1, z, yTop, yBot, color = '#9fffd0') => {
@@ -605,6 +631,108 @@ function makeKit(meta) {
     } });
   };
 
+  // ---- street life: props scattered on free pavement, cars, pedestrians with umbrellas, steam, searchlights ----
+  // Call before K.finish(). Everything is checked against existing colliders, so nothing lands inside a wall
+  // or blocks a path that's narrower than a car.
+  K.cityLife = ({ area, props = 120, cars = [], walkers = [], steam = 8, lights = [], seed = 7, avoid = [] }) => {
+    const r = U.rng(seed);
+    const solid = (x0, y0, z0, x1, y1, z1) => { for (const b of W.boxes) if (x1 > b.x0 && x0 < b.x1 && z1 > b.z0 && z0 < b.z1 && y1 > b.y0 && y0 < b.y1) return true; return false; };
+    const floorAt = (x, z) => { let best = -1e9; for (const b of W.boxes) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && b.y1 <= 0.5 && b.y1 > best) best = b.y1; return best; };
+    const nearRail = (x, z, d) => railDefs.some(rd => rd.pts.some(p => Math.abs(p.x - x) < d && Math.abs(p.z - z) < d && p.y < 4));
+    const avoided = (x, z) => avoid.some(([x0, z0, x1, z1]) => x > x0 && x < x1 && z > z0 && z < z1);
+    const free = (x, z, rad) => { const g = floorAt(x, z); if (g < -0.5) return null; if (solid(x - rad - 0.8, g + 0.05, z - rad - 0.8, x + rad + 0.8, g + 2.2, z + rad + 0.8)) return null; if (nearRail(x, z, rad + 1.2) || avoided(x, z) || (typeof onPath === 'function' && onPath(x, z))) return null; return g; };
+    // paths are only kept if a body of the given size can travel the whole way
+    const pathClear = (pts, hw, y0, y1) => { for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az); for (let t = 0; t <= L; t += 1) { const x = ax + (bx - ax) * t / L, z = az + (bz - az) * t / L; if (floorAt(x, z) < -0.5 || solid(x - hw, y0, z - hw, x + hw, y1, z + hw)) return false; } } return true; };
+    const okCars = cars.filter(p => pathClear(p, 1.4, 0.3, 1.8) || (console.warn('car path blocked', JSON.stringify(p)), false));
+    // walkers: keep every clear stretch of at least 8 m along each route
+    const okWalk = [];
+    for (const P of walkers) for (let i = 0; i < P.length - 1; i++) {
+      const [ax, az] = P[i], [bx, bz] = P[i + 1], L = Math.hypot(bx - ax, bz - az); let run = null;
+      for (let t = 0; t <= L + 0.01; t += 1) {
+        const x = ax + (bx - ax) * Math.min(t, L) / L, z = az + (bz - az) * Math.min(t, L) / L;
+        const ok = floorAt(x, z) > -0.5 && !solid(x - 0.5, 0.3, z - 0.5, x + 0.5, 1.8, z + 0.5);
+        if (ok) { if (!run) run = [[x, z], [x, z]]; else run[1] = [x, z]; }
+        if ((!ok || t >= L) && run) { if (Math.hypot(run[1][0] - run[0][0], run[1][1] - run[0][1]) >= 8) okWalk.push(run); run = null; }
+      }
+    }
+    const onPath = (x, z) => okCars.concat(okWalk).some(P => { for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, t = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); if (Math.hypot(x - ax - dx * t, z - az - dz * t) < 3) return true; } return false; });
+    // props
+    const kinds = [
+      (x, g, z, a) => { K.cyl(x, g, z, 0.35, 0.9, '#3a5a4a', { outline: 0.03, seg: 10 }); K.cyl(x, g + 0.9, z, 0.38, 0.08, '#2a3a32', { outline: 0.02, seg: 10 }); return 0.4; },                  // bin
+      (x, g, z, a) => { const c = ['#ff2e88', '#19d3ff', '#ffd23f'][Math.floor(r() * 3)]; K.box(x - 0.5, g, z - 0.4, x + 0.5, g + 1.9, z + 0.4, '#e9e4f5', 'plain', { outlineT: 0.04 }); B.box(x - 0.42, g + 0.7, z + 0.38, x + 0.42, g + 1.8, z + 0.42, c, 'glow', { outlineT: 0, edges: false }); B.box(x - 0.42, g + 0.7, z - 0.42, x + 0.42, g + 1.8, z - 0.38, c, 'glow', { outlineT: 0, edges: false }); return 0.6; },   // vending machine
+      (x, g, z, a) => { for (let k = 0; k < 3; k++) K.cyl(x + (k - 1) * 0.7, g, z, 0.26, 0.05, '#ff7a2f', { outline: 0.01, seg: 8 }) || K.cyl(x + (k - 1) * 0.7, g, z, 0.22, 0.7, '#ff7a2f', { outline: 0.02, seg: 8, r2: 0.04 }); return 1.1; },   // cones
+      (x, g, z, a) => { K.box(x - 0.3, g, z - 0.25, x + 0.3, g + 1.1, z + 0.25, ['#c2415a', '#3a6aaa', '#ffd23f'][Math.floor(r() * 3)], 'plain', { outlineT: 0.03 }); return 0.35; },   // newspaper box
+      (x, g, z, a) => { K.box(x - 0.6, g, z - 0.6, x + 0.6, g + 0.8, z + 0.6, '#8a6a4a', 'wood', { outlineT: 0.04 }); K.box(x - 0.45, g + 0.8, z - 0.4, x + 0.35, g + 1.4, z + 0.4, '#9a7a5a', 'wood', { outlineT: 0.03 }); return 0.65; },   // crates
+      (x, g, z, a) => { K.cyl(x, g, z, 0.45, 0.6, '#5a4a6a', { outline: 0.03, seg: 10 }); K.sphere(x, g + 1.1, z, 0.6, '#2f8f6e', { kind: 'leaf', outline: 0.05, seg: 8 }); return 0.5; },   // potted plant
+      (x, g, z, a) => { K.box(x - 0.55, g, z - 0.55, x + 0.55, g + 2.5, z + 0.55, '#c2415a', 'plain', { outlineT: 0.04 }); B.box(x - 0.45, g + 0.4, z + 0.5, x + 0.45, g + 2.2, z + 0.57, '#7fe8ff', 'glow', { outlineT: 0, edges: false }); return 0.6; },   // phone booth
+      (x, g, z, a) => { for (let k = 0; k < 3; k++) { const zz = z + (k - 1) * 0.6; K.rod(V3(x - 0.8, g + 0.45, zz), V3(x + 0.8, g + 0.45, zz), 0.4, '#14101f', 0.01); } B.box(x - 0.9, g, z - 0.9, x + 0.9, g + 0.1, z + 0.9, '#5b6078', 'plain', { outlineT: 0, edges: false }); W.boxes.push({ x0: x - 0.9, y0: g, z0: z - 0.9, x1: x + 0.9, y1: g + 0.8, z1: z + 0.9 }); return 0; },  // parked bikes (tyres)
+    ];
+    let placed = 0, tries = 0;
+    while (placed < props && tries++ < props * 40) {
+      const x = U.lerp(area[0], area[2], r()), z = U.lerp(area[1], area[3], r());
+      const g = free(x, z, 1); if (g === null) continue;
+      const rad = kinds[Math.floor(r() * kinds.length)](x, g, z);
+      if (rad > 0) W.boxes.push({ x0: x - rad, y0: g, z0: z - rad, x1: x + rad, y1: g + 1.2, z1: z + rad, tag: 'prop' });
+      placed++;
+    }
+    // neon puddles
+    for (let i = 0, n = 0; i < 400 && n < 40; i++) {
+      const x = U.lerp(area[0], area[2], r()), z = U.lerp(area[1], area[3], r()), g = floorAt(x, z); if (g < -0.5 || g > 0.3) continue;
+      const w = 1.5 + r() * 3, d = 1 + r() * 2;
+      B.box(x - w / 2, g + 0.01, z - d / 2, x + w / 2, g + 0.025, z + d / 2, ['#5a2450', '#1d4a66', '#4a4420', '#2a3f5a'][n % 4], 'glow', { outlineT: 0, edges: false }); n++;
+    }
+    // cars: they drive back and forth and they will knock you over
+    const carMesh = (c) => {
+      const g = new THREE.Group();
+      g.add(at(part(new THREE.BoxGeometry(2, 0.8, 4.2), c, 0.05), 0, 0.75, 0));
+      g.add(at(part(new THREE.BoxGeometry(1.8, 0.7, 2.2), c, 0.04), 0, 1.45, -0.2));
+      g.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.5, 2.0), basic('#2a2850')), 0, 1.45, -0.2));
+      for (const sx of [-0.7, 0.7]) { g.add(at(new THREE.Mesh(new THREE.CircleGeometry(0.2, 8), basic('#fff3c4')), sx, 0.8, 2.11)); const tl = new THREE.Mesh(new THREE.CircleGeometry(0.16, 8), basic('#ff2244')); tl.rotation.y = Math.PI; tl.position.set(sx, 0.8, -2.11); g.add(tl); }
+      for (const [sx, sz] of [[-1, 1.3], [1, 1.3], [-1, -1.3], [1, -1.3]]) { const w = part(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 10), '#14101f', 0.01); w.rotation.z = Math.PI / 2; w.position.set(sx, 0.35, sz); g.add(w); }
+      return g;
+    };
+    let ci = 0;
+    for (const path of okCars) {
+      K.mover({ path, size: [2.1, 1.8, 4.4], y: 0, speed: 7 + r() * 4, loop: false, phase: r(), visual: carMesh(['#ff2e88', '#19d3ff', '#ffd23f', '#c6ff3d', '#9b8cff', '#ff7a2f'][ci++ % 6]),
+        msg: '<b>HONK!</b><span>Driving is a privilege. So is not being hit. Look both ways.</span>' });
+    }
+    // pedestrians: hooded, umbrellas up, never look at you
+    const peds = [];
+    for (const path of okWalk) {
+      const g = new THREE.Group(); scene.add(g);
+      const c = ['#3a3a5a', '#5a3a4a', '#2a4a5a', '#4a4a3a'][peds.length % 4];
+      g.add(at(part(new THREE.CapsuleGeometry(0.3, 0.8, 3, 8), c, 0.03), 0, 0.9, 0));
+      g.add(at(part(new THREE.SphereGeometry(0.22, 10, 8), '#d9a98a', 0.03), 0, 1.75, 0));
+      const um = part(new THREE.ConeGeometry(0.9, 0.4, 10, 1, true), ['#ff2e88', '#19d3ff', '#ffd23f', '#e9e4f5', '#14101f'][peds.length % 5], 0.02, { side: THREE.DoubleSide }); um.position.y = 2.35; g.add(um);
+      g.add(at(part(new THREE.CylinderGeometry(0.02, 0.02, 0.7, 5), '#14101f', 0), 0, 2.0, 0));
+      const P = path.map(([x, z]) => V3(x, floorAt(x, z), z)); let L = 0; const segs = [];
+      for (let i = 0; i < P.length - 1; i++) { const len = P[i].distanceTo(P[i + 1]); segs.push({ a: P[i], b: P[i + 1], len, s0: L }); L += len; }
+      peds.push({ g, segs, L, s: r() * L, dir: 1, sp: 1.1 + r() * 0.5, t: r() * 6 });
+    }
+    if (peds.length) W.dyn.push({ update(dt) {
+      for (const p of peds) {
+        p.s += p.sp * dt * p.dir; p.t += dt;
+        if (p.s > p.L) { p.s = p.L; p.dir = -1; } else if (p.s < 0) { p.s = 0; p.dir = 1; }
+        let sg = p.segs[0]; for (const q of p.segs) if (p.s >= q.s0 && p.s <= q.s0 + q.len) sg = q;
+        const k = (p.s - sg.s0) / sg.len; p.g.position.lerpVectors(sg.a, sg.b, k); p.g.position.y += Math.abs(Math.sin(p.t * 6)) * 0.06;
+        p.g.rotation.y = Math.atan2((sg.b.x - sg.a.x) * p.dir, (sg.b.z - sg.a.z) * p.dir);
+      }
+    } });
+    // steam from manholes
+    for (let i = 0, n = 0; i < 300 && n < steam; i++) {
+      const x = U.lerp(area[0], area[2], r()), z = U.lerp(area[1], area[3], r()), g = free(x, z, 0.6); if (g === null) continue;
+      K.cyl(x, g, z, 0.55, 0.04, '#2a2840', { outline: 0.01, seg: 12 }); n++;
+      W.dyn.push({ update() { if (Game.fx && Math.random() < 0.35) Game.fx.emit(_kv.set(x + (Math.random() - 0.5) * 0.6, g + 0.1, z + (Math.random() - 0.5) * 0.6), _kv2.set((Math.random() - 0.5) * 0.4, 1.2 + Math.random(), (Math.random() - 0.5) * 0.4), '#c9c4d8', 1.6, -0.3); } });
+    }
+    // searchlights sweeping the clouds from the rooftops
+    for (const [x, y, z, ph] of lights) {
+      const g = new THREE.Group(); g.position.set(x, y, z); scene.add(g);
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 6, 120, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xbfe9ff, transparent: true, opacity: 0.09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+      beam.position.y = 60; const piv = new THREE.Group(); piv.add(beam); g.add(piv);
+      let t = ph; W.dyn.push({ update(dt) { t += dt; piv.rotation.set(0.45 + Math.sin(t * 0.21) * 0.2, 0, 0); g.rotation.y = t * 0.25; } });
+    }
+  };
+
   K.cityRing = (cx, cz, r0, r1, N, base, seed = 11, avoid = null) => {
     const r = U.rng(seed);
     const geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, 0.5, 0);
@@ -691,16 +819,16 @@ function makeKit(meta) {
       } else {
         P = fillet(P, d.round ?? (kind === 'cable' ? 0 : 2.6), d.loop);
       }
-      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0 };
+      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0, hidden: !!d.hidden };
       let L = 0;
       for (let i = 0; i < P.length - 1; i++) {
         const a = P[i], b = P[i + 1], len = a.distanceTo(b);
         if (len < 1e-4) continue;
         const sg = { a, b, len, dir: V3().subVectors(b, a).normalize(), s0: L, r };
         r.segs.push(sg); L += len;
-        W.railGrid.add(sg, Math.min(a.x, b.x) - 2.4, Math.min(a.z, b.z) - 2.4, Math.max(a.x, b.x) + 2.4, Math.max(a.z, b.z) + 2.4);
+        if (!d.deco) W.railGrid.add(sg, Math.min(a.x, b.x) - 2.4, Math.min(a.z, b.z) - 2.4, Math.max(a.x, b.x) + 2.4, Math.max(a.z, b.z) + 2.4);
       }
-      r.len = L; W.rails.push(r);
+      r.len = L; if (!d.deco) W.rails.push(r);
       if (d.hidden) continue;
       const rad = d.radius ?? (kind === 'pipe' ? 0.32 : kind === 'cable' ? 0.06 : 0.09);
       const color = d.color || (kind === 'pipe' ? '#8a8fa8' : kind === 'cable' ? '#14101f' : '#ffd23f');
@@ -708,6 +836,26 @@ function makeKit(meta) {
       const radial = kind === 'pipe' ? 10 : 6;
       B.add(tubeGeo(VP, rad, radial), null, color, d.mat || 'plain', { outlineT: 0, edges: false });
       B.addOutline(tubeGeo(VP, rad + (kind === 'pipe' ? 0.06 : 0.035), radial));
+      if (kind === 'pipe' && !d.loop && d.stubs !== false) {   // pipes never just stop in mid-air: run each end into a wall, or down into the floor
+        const solidAt = (x, y, z) => { for (const b of W.grid.query(x, z, x, z, _stubQ)) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && y > b.y0 && y < b.y1) return true; return false; };
+        for (const [e, f] of [[P[0], P[1]], [P[P.length - 1], P[P.length - 2]]]) {
+          const c = V3(e.x, e.y - rad * 0.7, e.z), dir = V3().subVectors(e, f).normalize();
+          const flat = V3(dir.x, 0, dir.z); if (flat.lengthSq() > 1e-4) flat.normalize();
+          let hit = null;
+          for (const [dd, max] of [[dir, 5], [V3(-flat.z, 0, flat.x), 2.6], [V3(flat.z, 0, -flat.x), 2.6]]) {
+            if (dd.lengthSq() < 0.5) continue;
+            for (let t = 0.25; t <= max; t += 0.2) if (solidAt(c.x + dd.x * t, c.y + dd.y * t, c.z + dd.z * t)) { hit = c.clone().addScaledVector(dd, t + 0.2); break; }
+            if (hit) break;
+          }
+          if (!hit) { const g = W.groundAt(c.x, c.z, c.y - 0.2, 0).y; if (g > -1e8 && c.y - g < 30) hit = V3(c.x, g - 0.2, c.z); }
+          if (!hit) continue;
+          B.add(tubeGeo([c, hit], rad, radial), null, color, d.mat || 'plain', { outlineT: 0, edges: false });
+          B.addOutline(tubeGeo([c, hit], rad + 0.06, radial));
+          const fd = V3().subVectors(hit, c).normalize();
+          K.rod(hit.clone().addScaledVector(fd, -0.35), hit.clone().addScaledVector(fd, -0.1), rad + 0.16, d.collar || '#5b6078', 0.03);
+          K.rod(c.clone().addScaledVector(fd, -0.12), c.clone().addScaledVector(fd, 0.12), rad + 0.07, d.collar || '#5b6078', 0.03);
+        }
+      }
       if (kind === 'pipe') {      // collars
         for (let s = 2; s < L - 1; s += 5) { const c = railPoint(r, s), dd = railDir(r, s); K.rod(V3(c.x, c.y - rad * 0.7, c.z).addScaledVector(dd, -0.15), V3(c.x, c.y - rad * 0.7, c.z).addScaledVector(dd, 0.15), rad + 0.07, d.collar || '#5b6078', 0.03); }
       }
@@ -748,4 +896,4 @@ function makeKit(meta) {
   return K;
 }
 
-const _kv = V3(), _kv2 = V3();
+const _kv = V3(), _kv2 = V3(), _stubQ = [];

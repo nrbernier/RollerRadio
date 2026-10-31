@@ -140,6 +140,27 @@ class Player {
   setCheckpoint(pos, yaw) { this.checkpoint = { pos: pos.clone(), yaw }; }
 
   // --- collision helpers
+  // railings stop you skating off an edge: a visible rail at hip height with a drop on one side
+  // acts as a wall while you're on the ground (jump to grind it, or to hop over)
+  guardRails() {
+    const W = this.W, p = this.pos, v = this.vel, R = PH.R + 0.12;
+    if (!W.railGrid) return;
+    for (const sg of W.railGrid.query(p.x - 1, p.z - 1, p.x + 1, p.z + 1, this._rq || (this._rq = []))) {
+      const r = sg.r; if (r.kind !== 'rail' || r.hidden) continue;
+      const ax = sg.a.x, az = sg.a.z, dx = sg.b.x - ax, dz = sg.b.z - az, L2 = dx * dx + dz * dz; if (L2 < 1e-6) continue;
+      const t = U.clamp(((p.x - ax) * dx + (p.z - az) * dz) / L2, 0, 1);
+      const cx = ax + dx * t, cz = az + dz * t, cy = sg.a.y + (sg.b.y - sg.a.y) * t;
+      const h = cy - p.y; if (h < 0.3 || h > 1.6) continue;
+      let ox = p.x - cx, oz = p.z - cz, d = Math.hypot(ox, oz); if (d >= R) continue;
+      const L = Math.sqrt(L2), nx = -dz / L, nz = dx / L;
+      const g1 = W.groundAt(cx + nx * 1.1, cz + nz * 1.1, cy + 0.3, 0.2).y, g2 = W.groundAt(cx - nx * 1.1, cz - nz * 1.1, cy + 0.3, 0.2).y;
+      if (Math.abs(g1 - g2) < 1.0) continue;     // flat on both sides: just a rail to grind, skate past it
+      if (d < 1e-4) { const sd = Math.sign(g1 - g2) || 1; ox = nx * sd; oz = nz * sd; d = 1; }
+      ox /= d; oz /= d;
+      p.x = cx + ox * R; p.z = cz + oz * R;
+      const vn = v.x * ox + v.z * oz; if (vn < 0) { v.x -= vn * ox; v.z -= vn * oz; }
+    }
+  }
   pushWalls() {
     const W = this.W, p = this.pos, R = PH.R;
     for (const b of W.near(p.x - R - 0.5, p.z - R - 0.5, p.x + R + 0.5, p.z + R + 0.5, this._nb || (this._nb = []))) {
@@ -365,7 +386,7 @@ class Player {
       }
       const oy = p.y;
       p.x += v.x * dt; p.z += v.z * dt;
-      this.pushWalls();
+      this.pushWalls(); this.guardRails();
       const g = W.groundAt(p.x, p.z, p.y + PH.STEP);
       if (g.y >= p.y - PH.SNAP && g.y > -1e8) {
         p.y = g.y; this.ground = g.hit;

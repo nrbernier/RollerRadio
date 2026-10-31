@@ -30,7 +30,7 @@ function buildPark() {
   hedge(-64, 60, -6, 64); hedge(6, 60, 64, 64);
   hedge(-64, -60, -60, 60); hedge(60, -60, 64, 60);
   // gate posts + arch
-  for (const x of [-6.6, 6.6]) box(x - 0.6, 0, 60.6, x + 0.6, 5, 63.4, '#e9e4f5', 'paving', { outlineT: 0.06 });
+  for (const x of [-6.6, 6.6]) box(x - 0.72, 0, 59.8, x + 0.72, 5, 64.2, '#e9e4f5', 'paving', { outlineT: 0.06 });   // wider than the hedge so no faces overlap
   rail(pArc(0, 62, 6.6, Math.PI, 0, 5.4, 5.4).map(([x, y, z]) => [x, 5 + Math.sin((x + 6.6) / 13.2 * Math.PI) * 2.2, 62]), { color: '#ff2e88', posts: false, round: 0 });
   K.poster(['GREENHOUSE GARDENS', 'BREATHE CALMLY'], 0, 7.9, 60.55, 6, 1.4, Math.PI, { bg: PAL.mint, smiley: false, w: 512, h: 120, double: true });
   const blk = (x0, z0, x1, z1, top, c, r) => K.bld(x0, z0, x1, z1, top, c, r, '#14101f', -2);

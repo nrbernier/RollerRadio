@@ -102,13 +102,12 @@ function buildSewers() {
   for (let k = 0; k < 6; k++) { const a = (k + 0.5) / 6 * Math.PI * 2; rod(V3(C.x + Math.cos(a) * 13.4, 30.5, C.z + Math.sin(a) * 13.4), V3(C.x + Math.cos(a) * 13.4, 44, C.z + Math.sin(a) * 13.4), 0.14, '#5a4e42', 0.03); }
   // the gallery ring at y 20 (it runs straight into the high corridor to the Mood Engine), and a beat lift up to it
   K.ringDeck(C.x, C.z, 39, 45.5, 20, { color: '#7a6e62', kind: 'paving', thick: 0.8 });
-  rail(pArc(C.x, C.z, 39.4, 0, Math.PI * 2, 20.9, 20.9, 1.2), { color: '#ffc87a', loop: true, round: 0, posts: false });
+  rail(pArc(C.x, C.z, 39.4, 0.72, Math.PI * 2 + 0.34, 20.9, 20.9, 1.2), { color: '#ffc87a', round: 0, posts: false });   // open by the lift
   K.lift({ x0: 59.2, z0: 16, x1: 63.2, z1: 20, y0: 0, y1: 20, postBase: 0, phase: 0 });
   // pipes radiating down from the top platform: east to the Mood Engine, north to the terraces,
   // south to the pumps, west back down into the canals
   rail([[41.8, 31.8, -1.6], [56, 27.6, -1.6], [70, 23.4, -0.8], [80, 21.2, 0], [112, 20.9, 0]], { ...PIPE, round: 6 });
-  rail([[C.x - 1.6, 31.8, -11.8], [C.x - 1.6, 27.2, -30], [C.x, 22.2, -50], [32, 19, -82], [34, 17.6, -106], [44, 16.9, -121], [58.4, 16.9, -128.6]], { ...PIPE, round: 8 });
-  rail([[C.x + 1.6, 31.8, 11.8], [C.x + 1.6, 27.2, 30], [C.x, 22.2, 50], [30, 19.6, 70], [26, 16.9, 116]], { ...PIPE, round: 8 });
+  rail([[C.x - 1.6, 31.8, -11.8], [C.x - 1.6, 27.2, -30], [C.x, 22.2, -50], [32, 14, -78], [34, 8.9, -88], [52, 8.9, -91]], { ...PIPE, round: 8 });   // ends on the middle terrace: the pads take you higher
   rail([[18.2, 31.8, 1.6], [4, 24, 1.6], [-14, 10.5, 1], [-26, 6.5, -4], [-40, 3, -10.5], [-62, 2.2, -10.5]], { ...COPPER, round: 6 });
   K.poster(['OBEY THE BEAT', 'THE BEAT IS SIXTY'], C.x, 38, -45.3, 22, 6, 0, { bg: '#ffe08a', smiley: false });
   K.poster(['RELAX.', 'THE ENGINE IS LISTENING.'], C.x, 38, 45.3, 22, 6, Math.PI, { bg: PAL.mint, smiley: false });
@@ -129,7 +128,7 @@ function buildSewers() {
   rail([[66, 16.9, -131], [40, 16.9, -127], [8, 16.9, -123], [5, 16.9, -110], [5, 11, -99], [14, 8.9, -93], [40, 8.9, -89], [62, 8.9, -86], [66, 8.9, -81], [64, 3, -74], [46, 0.9, -69], [30, 0.9, -66], [30, 0.9, -54]], { ...COPPER, round: 6 });
   // ledge railings to grind along the falls
   rail([[2, 8.9, -80.6], [33, 8.9, -80.6]], { color: '#9ff8ff' }); rail([[37, 8.9, -80.6], [68, 8.9, -80.6]], { color: '#9ff8ff' });
-  rail([[2, 16.9, -107.6], [68, 16.9, -107.6]], { color: '#9ff8ff' });
+  rail([[2, 16.9, -107.6], [32, 16.9, -107.6]], { color: '#9ff8ff' }); rail([[38, 16.9, -107.6], [68, 16.9, -107.6]], { color: '#9ff8ff' });
   K.poster(['WATER IS CALM.', 'BE LIKE WATER.'], 35, 26, -136.9, 20, 6, 0, { bg: PAL.mint });
 
   // =====================================================================
@@ -215,7 +214,7 @@ function buildSewers() {
     } });
   }
   // a long pipe that climbs all the way round the hall walls and onto the south bridge
-  rail([[95, 1.2, 40], [95, 4, -57], [205, 9, -57], [205, 14, 57], [158, 19.2, 57], [149, 20.9, 50], [149, 20.9, 26]], { ...COPPER, round: 7 });
+  rail([[95, 1.2, 40], [95, 4, -57], [205, 9, -57], [205, 14, 57], [160, 19.4, 57]], { ...COPPER, round: 7 });   // stops 8 m short of the bridge: jump the gap
   // the giant screen at the back
   K.screen(V3(207.3, 34, 0), 48, 27, -Math.PI / 2);
   W.screen.st.caption = 'PLEASE STOP OPENING VALVES';
