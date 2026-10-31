@@ -19,22 +19,51 @@ const HINTS = [
 const WORLDS = {
   park: { n: 1, build: () => buildPark(), song: 'park', next: 'roof', outro: (R, J) => parkOutroShots(R, J), hints: true,
     lines: [
-      ['KEYS', 'Ohhh, there it is! Hear those keys? The Ministry calls that “unauthorized vibration.”'],
-      ['BONGOS', 'Bongos! The Ministry banned bongos in ’09 for being “too knock-knock.”'],
-      ['HORNS', 'HORNS! Real horns! The pigeons are losing their minds.'],
-      ['THE WHISTLE', 'The whistle is back! Man, I almost forgot how that tune went. One more!'],
-      ['EVERYTHING', ''],
+      ['UNLOCKED: KEYS', 'Ohhh, there it is! Hear those keys? The Ministry calls that “unauthorized vibration.”'],
+      ['UNLOCKED: BONGOS', 'Bongos! The Ministry banned bongos in ’09 for being “too knock-knock.”'],
+      ['UNLOCKED: HORNS', 'HORNS! Real horns! The pigeons are losing their minds.'],
+      ['UNLOCKED: THE WHISTLE', 'The whistle is back! Man, I almost forgot how that tune went. One more!'],
+      ['', ''],
     ] },
-  roof: { n: 2, build: () => buildRooftops(), song: 'roof', next: null, outro: (R, J) => outroShots(R, J), hints: false,
+  roof: { n: 2, build: () => buildRooftops(), song: 'roof', next: 'streets', outro: (R, J, W) => roofOutroShots(R, J, W), hints: false,
     arrive: 'Welcome to the rooftops! Fall off and the Ministry’s “safety net” catches you. Somehow that’s worse.',
     lines: [
-      ['KEYS', 'Keys up here too! The whole skyline just got a little jazzier.'],
-      ['PERCUSSION', 'Congas! Shakers! They banned percussion in ’09 for being “too knock-knock.”'],
-      ['HORNS', 'HORNS! Real horns! Three down. And smile at the drones — they love that.'],
-      ['LEAD MELODY', 'The hook is back! Man, I almost forgot how it went. One more, kid!'],
-      ['EVERYTHING', ''],
+      ['UNLOCKED: KEYS', 'Keys up here too! The whole skyline just got a little jazzier.'],
+      ['UNLOCKED: PERCUSSION', 'Congas! Shakers! They banned percussion in ’09 for being “too knock-knock.”'],
+      ['UNLOCKED: HORNS', 'HORNS! Real horns! Three down. And smile at the drones — they love that.'],
+      ['UNLOCKED: LEAD MELODY', 'The hook is back! Man, I almost forgot how it went. One more, kid!'],
+      ['', ''],
+    ] },
+  streets: { n: 3, build: () => buildStreets(), song: 'streets', next: 'subway', intro: (W) => streetsIntroShots(W), outro: (R, J, W) => streetsOutroShots(R, J, W), hints: false,
+    done: 'THE MINISTRY NOW HEARS ONLY WHALES',
+    lines: [
+      ['MINISTRY NOW HEARS: WHALES', 'Scrambler’s in. The music still plays, but the Ministry just hears… whale noises. Nice.'],
+      ['MINISTRY NOW HEARS: MORE WHALES', 'Two down. Static’s been very quiet on the radio. Like, suspiciously quiet.'],
+      ['MINISTRY NOW HEARS: A WHALE CHOIR', 'Three! Somebody keeps pinging my phone with a single word: “WHY?” Probably spam.'],
+      ['MINISTRY NOW HEARS: WHALE JAZZ', 'Four. Juno… the scrambler code has a back door. I didn’t write it. Just… keep going.'],
+      ['', ''],
+    ] },
+  subway: { n: 4, build: () => buildSubway(), song: 'subway', next: 'sewers', intro: (W) => subwayIntroShots(W), outro: (R, J, W) => subwayOutroShots(R, J, W), hints: false,
+    done: 'SIGNAL TRACED TO OLD GLEAM CENTRAL',
+    lines: [
+      ['SIGNAL TRACED', 'Junction one. The signal goes east AND west. Somebody built this whole thing on purpose.'],
+      ['SIGNAL TRACED', 'Two. The cable gets fatter the further you go. Like it’s… feeding something.'],
+      ['SIGNAL TRACED', 'Three. Juno, these servers are full of dance videos. OUR dance videos. Labelled by face.'],
+      ['SIGNAL TRACED', 'Four. The cable leads to Old Gleam Central. That station’s been closed since 2009. Same year Static went on air.'],
+      ['', ''],
+    ] },
+  sewers: { n: 5, build: () => buildSewers(), song: 'sewers', next: null, intro: (W) => sewersIntroShots(W), outro: (R, J, W) => sewersFinaleShots(R, J, W), hints: false,
+    done: 'THE MOOD ENGINE IS SHAKING',
+    lines: [
+      ['ENGINE PRESSURE +20%', 'One valve open. Kid, the Engine’s getting cranky. You know what calms an engine down? A master tape. Just saying.'],
+      ['ENGINE PRESSURE +40%', 'Two. Hear that? The city’s heartbeat just skipped. Somewhere a Ministry accountant tapped his foot and hated it.'],
+      ['ENGINE PRESSURE +60%', 'Three. Real talk: the earmuff lady wants to break it so NOBODY controls the beat. Including you. Think about that.'],
+      ['ENGINE PRESSURE +80%', 'Four. Bolt still isn’t answering me either. If you find him, tell him I’m sorry about the… voice thing. Long story.'],
+      ['', ''],
     ] },
 };
+const WORLD_ORDER = ['park', 'roof', 'streets', 'subway', 'sewers'];
+const WORLD_LABEL = { park: 'PARK', roof: 'ROOFTOPS', streets: 'STREETS', subway: 'SUBWAY', sewers: 'SEWERS' };
 const DRONE_LINES = ['LOITERING IS A PRIVILEGE.', 'HAVE YOU REPORTED A NEIGHBOR TODAY?', 'SMILE CHECK IN PROGRESS.', 'YOUR POSTURE HAS BEEN NOTED.', 'FUN DETECTED. ANALYZING…'];
 
 function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
@@ -123,7 +152,16 @@ const hooks = {
     Sound.sfx.drone('chime'); flash('#8ff0c8');
     toast('<b>SAFETY NET DEPLOYED</b><span>Gravity is a privilege. Privilege restored. Smile!</span>', 'ministry');
   },
-  bonk() { Game.cam.shake = 0.35; Sound.sfx.land(0.8); }
+  bonk() { Game.cam.shake = 0.35; Sound.sfx.land(0.8); },
+  railHop() { Sound.sfx.hop(); pop('RAIL HOP', 'good'); addStyle(80, false); },
+  hazard(b) {
+    if (Game.state !== 'play' || Game.hazardCD > 0) return;
+    Game.hazardCD = 1.5;
+    dropCombo('COMBO DROPPED');
+    Game.cam.shake = 0.8; Sound.sfx.land(1.4); flash('#ffffff');
+    Game.player.respawn(false); Game.cam.snap(Game.player);
+    toast(b.msg || '<b>OUCH!</b><span>Mind the gap.</span>', 'ministry', 3.5);
+  }
 };
 function beatRing() { const r = $('beatring'); r.classList.remove('go'); void r.offsetWidth; r.classList.add('go'); }
 
@@ -153,14 +191,54 @@ function loadWorld(key) {
   Sound.R.unlocks = 0; Game.combo = { pts: 0, mult: 1, idle: 0, best: Game.combo.best }; Game.outroPending = -1; Game.sus = 0;
   Game.lastRelayT = Game.playT; Game.idleHintT = 0; Game.inWater = false;
   toastTimer = 0; $('toast').className = 'toast'; radioTimer = 0; $('radio').hidden = true; $('pops').innerHTML = '';
-  const { bolt } = Game.cast;
-  bolt.root.position.copy(W.bolt.pos); bolt.root.rotation.y = W.bolt.yaw;
+  placeNpcs(W);
   try { const m = +(localStorage.getItem('offbeat.maxWorld') || 1); if (def.n > m) localStorage.setItem('offbeat.maxWorld', String(def.n)); } catch (e) {}
   updateWorldButtons();
   return W;
 }
+function placeNpcs(W) {
+  const { bolt, lull, static: st } = Game.cast;
+  bolt.root.visible = !!W.bolt; if (W.bolt) { bolt.root.position.copy(W.bolt.pos); bolt.root.rotation.y = W.bolt.yaw; }
+  lull.root.visible = !!W.lull; if (W.lull) { lull.root.position.copy(W.lull.pos); lull.root.rotation.y = W.lull.yaw; lull.setSign(W.lull.sign || ''); }
+  st.root.visible = false; st.shadow.visible = false;
+  bolt.shadow.visible = bolt.root.visible; lull.shadow.visible = lull.root.visible;
+  for (const r of [bolt, lull]) if (r.root.visible) { const g = W.groundAt(r.root.position.x, r.root.position.z, r.root.position.y + 0.3, 0); r.shadow.position.set(r.root.position.x, g.y + 0.03, r.root.position.z); }
+}
 function maxWorld() { try { return +(localStorage.getItem('offbeat.maxWorld') || 1); } catch (e) { return 1; } }
-function updateWorldButtons() { const two = maxWorld() >= 2; $('btnW2').hidden = !two; $('btnTitleW2').hidden = !two; }
+function updateWorldButtons() {
+  const m = maxWorld();
+  for (const [id, cls, from] of [['titleWorlds', 'ghost', 2], ['pauseWorlds', 'b alt', 1]]) {
+    const box = $(id); if (!box) continue; box.innerHTML = '';
+    WORLD_ORDER.forEach((k, i) => {
+      if (i + 1 < from || i + 1 > m) return;
+      const b = document.createElement('button'); b.className = cls; b.textContent = `WORLD ${i + 1} · ${WORLD_LABEL[k]}`;
+      b.onclick = () => { Sound.init(); Sound.sfx.click(); $('title').hidden = true; if (Game.state === 'paused') pause(false); if (Game.state === 'title') newGame(); enterWorld(k, true); };
+      box.appendChild(b);
+    });
+  }
+}
+// load a world and play its arrival scene (if it has one), then skate
+function enterWorld(key, withIntro = true) {
+  flash('#ffffff');
+  Game.cast.juno.spin.rotation.set(0, 0, 0);
+  const W = loadWorld(key), def = W.def;
+  if (withIntro && def.intro) startScene(def.intro(W), 'intro', () => startPlay(true));
+  else startPlay(true);
+}
+// a generic cutscene runner (story scenes)
+function startScene(shots, state, onEnd, onShot) {
+  Game.state = state; document.body.classList.remove('playing');
+  $('hud').hidden = true; Input.enabled = false; Input.flush();
+  toastTimer = 0; $('toast').className = 'toast'; radioTimer = 0; $('radio').hidden = true;
+  const p = Game.player; p.vel.set(0, 0, 0); p.mode = 'ground'; p.rail = null;
+  const { juno, drone, lull, static: st, bolt } = Game.cast;
+  juno.spin.rotation.set(0, 0, 0); juno.root.visible = true;
+  drone.root.visible = false; lull.root.visible = false; st.root.visible = false; bolt.root.visible = false;
+  for (const r of [lull, st, bolt]) r.shadow.visible = false;
+  $('csLayer').hidden = false;
+  Game.cs = new Cutscene(shots, Game.cast, Game.W, { onEnd, onShot });
+  Game.cs.start();
+}
 function newGame() { Game.score = 0; Game.playT = 0; Game.tapeLog = {}; Game.combo.best = 0; Game.freeRoam = false; Game.firsts = {}; Game.hint = { i: 0, t: 0, shown: false }; Game.hintsDone = false; }
 function titleTableau() {
   const { juno, bolt, drone } = Game.cast, W = Game.W, A = W.intro.A;
@@ -192,10 +270,11 @@ async function boot(data = {}) {
   try { await Promise.race([Promise.all([document.fonts.load(`40px "Dela Gothic One"`), document.fonts.load(`20px "DotGothic16"`), document.fonts.load(`20px "M PLUS Rounded 1c"`)]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
   initRenderer();
   Input.init();
-  const juno = makeJuno(), bolt = makeBolt();
+  const juno = makeJuno(), bolt = makeBolt(), lull = makeLull(), stc = makeStatic();
   const csDrone = new Drone(droneFaces());
-  G.scene.add(juno.root, juno.shadow, bolt.root, bolt.shadow, csDrone.root);
-  Game.cast = { juno, bolt, drone: csDrone };
+  G.scene.add(juno.root, juno.shadow, bolt.root, bolt.shadow, lull.root, lull.shadow, stc.root, stc.shadow, csDrone.root);
+  lull.root.visible = stc.root.visible = false;
+  Game.cast = { juno, bolt, drone: csDrone, lull, static: stc };
   Game.fx = new Particles(G.scene, 600);
   Game.player = new Player({ spawn: V3(), spawnYaw: 0, boxes: [], ramps: [], rails: [], pads: [], groundAt: () => ({ y: 0 }) }, juno, Game.fx, hooks);
   Game.cam = new CamRig(G.camera, null);
@@ -216,7 +295,6 @@ function bindUI() {
   const go = (fn) => { Sound.init(); Sound.sfx.click(); $('title').hidden = true; fn(); };
   $('btnPlay').onclick = () => go(() => { newGame(); if (Game.worldKey !== 'park') loadWorld('park'); startIntro(); });
   $('btnSkipIntro').onclick = () => go(() => { newGame(); if (Game.worldKey !== 'park') loadWorld('park'); startPlay(true); });
-  $('btnTitleW2').onclick = () => go(() => { newGame(); loadWorld('roof'); startPlay(true); });
   $('btnContinue').onclick = () => go(() => { applyRestore(Game.restore); startPlay(true, true); });
   $('csLayer').addEventListener('pointerdown', (e) => { if (e.target.id === 'skipBtn') return; Game.cs && Game.cs.advance(); });
   $('skipBtn').addEventListener('pointerdown', (e) => { e.stopPropagation(); Game.cs && Game.cs.skip(); });
@@ -226,10 +304,8 @@ function bindUI() {
   });
   $('btnPause').onclick = () => pause(true);
   $('btnResume').onclick = () => pause(false);
-  $('btnRestart').onclick = () => { pause(false); loadWorld(Game.worldKey); startPlay(true); };
+  $('btnRestart').onclick = () => { pause(false); enterWorld(Game.worldKey, false); };
   $('btnReplayIntro').onclick = () => { pause(false); newGame(); loadWorld('park'); startIntro(); };
-  $('btnW1').onclick = () => { pause(false); loadWorld('park'); startPlay(true); };
-  $('btnW2').onclick = () => { pause(false); loadWorld('roof'); startPlay(true); };
   $('vol').oninput = (e) => Sound.setVolume(+e.target.value / 100, null);
   $('btnKeep').onclick = () => { $('end').hidden = true; Game.freeRoam = true; startPlay(true, true); };
   $('btnAgain').onclick = () => { $('end').hidden = true; newGame(); loadWorld('park'); startIntro(); };
@@ -249,8 +325,9 @@ function applyRestore(d) {
 function startIntro() {
   Game.state = 'intro'; document.body.classList.remove('playing');
   $('hud').hidden = true; Input.enabled = false; Input.flush();
-  const { juno, bolt, drone } = Game.cast;
+  const { juno, bolt, drone, lull, static: st } = Game.cast;
   bolt.root.visible = true; drone.root.visible = true; juno.root.visible = true;
+  lull.root.visible = st.root.visible = lull.shadow.visible = st.shadow.visible = false;
   juno.spin.rotation.set(0, 0, 0);
   $('csLayer').hidden = false;
   Game.cs = new Cutscene(introShots(Game.W), Game.cast, Game.W, { onEnd: () => { try { localStorage.setItem('offbeat.introSeen', '1'); } catch (e) {} startPlay(false); } });
@@ -261,8 +338,9 @@ function startPlay(skipped, keepState) {
   const { juno, bolt, drone } = Game.cast, W = Game.W, def = W.def;
   $('csLayer').hidden = true; $('dlg').hidden = true; Game.cs = null;
   drone.root.visible = false;
-  bolt.root.visible = true; bolt._pose = 'wave'; bolt.setMood('neutral'); juno.setMood('neutral');
-  if (!keepState) { bolt.root.position.copy(W.bolt.pos); bolt.root.rotation.y = W.bolt.yaw; }
+  bolt._pose = 'wave'; bolt.setMood('neutral'); juno.setMood('neutral');
+  if (!keepState) placeNpcs(W);
+  else { bolt.root.visible = bolt.shadow.visible = !!W.bolt; Game.cast.lull.root.visible = Game.cast.lull.shadow.visible = !!W.lull && !(Game.freeRoam && !def.next); Game.cast.static.root.visible = Game.cast.static.shadow.visible = false; if (W.lull) Game.cast.lull.setSign(W.lull.sign || ''); }
   const p = Game.player;
   if (!keepState) {
     if (!skipped) {
@@ -307,8 +385,8 @@ function activateRelay(r, silent = false) {
   flash('#ffd23f');
   Game.player.setCheckpoint(V3().copy(r.pos).add(V3(1.8, 0, 1.8)), Game.player.yaw);
   addStyle(1000, true);
-  const [inst, line] = Game.W.def.lines[n - 1];
-  toast(`<b>RELAY ${n}/5 ONLINE</b><span>${n < 5 ? 'UNLOCKED: ' + inst : 'THE WHOLE CITY CAN HEAR IT'}</span>`, 'relay');
+  const def = Game.W.def, [inst, line] = def.lines[n - 1], one = (Game.W.objName || 'RELAYS').replace(/S$/, '');
+  toast(`<b>${one} ${n}/5 ONLINE</b><span>${n < 5 ? inst : (def.done || 'THE WHOLE CITY CAN HEAR IT')}</span>`, 'relay');
   if (n < 5) setTimeout(() => radio(line), 1300);
   Game.lastRelayT = Game.playT;
   if (n === 5 && !Game.freeRoam) Game.outroPending = 2.6;
@@ -327,40 +405,30 @@ function updateCounters() {
   const n = Game.W.relaysOn();
   [...$('relayIcons').children].forEach((el, i) => el.classList.toggle('on', i < n));
   $('relayN').textContent = `${n}/5`;
+  $('relayLabel').textContent = Game.W.objName || 'RELAYS';
   $('tapeN').textContent = `${Game.W.tapesGot()}/5`;
 }
 
 function startOutro() {
-  Game.state = 'outro'; document.body.classList.remove('playing'); Input.enabled = false; Input.flush();
-  $('hud').hidden = true;
-  const p = Game.player, { juno, drone } = Game.cast;
-  p.vel.set(0, 0, 0); p.mode = 'ground'; juno.spin.rotation.set(0, 0, 0);
-  let R = Game.W.relays[0].pos, bd = 1e9;
-  for (const r of Game.W.relays) { const d = r.pos.distanceTo(p.pos); if (d < bd) { bd = d; R = r.pos; } }
-  drone.root.visible = true; drone.setMood('proud');
-  $('csLayer').hidden = false;
-  const def = Game.W.def;
-  Game.cs = new Cutscene(def.outro(R, p.pos), Game.cast, Game.W, {
-    onEnd: () => { if (def.next) nextWorld(def.next); else showEnd(); },
-    onShot: (s) => { if (s.onEnter === 'wink') Game.W.tower.winkT = 0; }
-  });
-  Game.cs.start();
+  const p = Game.player, W = Game.W, def = W.def;
+  let R = W.relays[0].pos, bd = 1e9;
+  for (const r of W.relays) { const d = r.pos.distanceTo(p.pos); if (d < bd) { bd = d; R = r.pos; } }
+  const J = p.pos.clone();
+  startScene(def.outro(R, J, W), 'outro', () => { if (def.next) nextWorld(def.next); else showEnd(); },
+    (s) => { if (s.onEnter === 'wink' && Game.W.tower) Game.W.tower.winkT = 0; });
+  Game.cast.drone.setMood('proud');
 }
-function nextWorld(key) {
-  flash('#ffffff');
-  Game.cast.juno.spin.rotation.set(0, 0, 0);
-  loadWorld(key);
-  startPlay(true);
-}
+function nextWorld(key) { enterWorld(key, true); }
 function showEnd() {
   Game.state = 'end'; $('csLayer').hidden = true; $('dlg').hidden = true;
-  Sound.play(Game.W.song);
+  Sound.play('reveal');
+  for (const k of ['lull', 'static', 'bolt', 'drone']) Game.cast[k].root.visible = false;
   const mins = Math.floor(Game.playT / 60), secs = Math.floor(Game.playT % 60);
   bankCombo();
   let tapes = 0; for (const k in Game.tapeLog) tapes += Game.tapeLog[k].size;
   $('endStats').innerHTML = `
-    <div><dt>WORLDS</dt><dd>2/2</dd></div>
-    <div><dt>GOLDEN TAPES</dt><dd>${tapes}/10</dd></div>
+    <div><dt>WORLDS</dt><dd>${WORLD_ORDER.indexOf(Game.worldKey) + 1}/5</dd></div>
+    <div><dt>GOLDEN TAPES</dt><dd>${tapes}/25</dd></div>
     <div><dt>BEST MULTIPLIER</dt><dd>×${Game.combo.best}</dd></div>
     <div><dt>STYLE</dt><dd>${fmt(Game.score)}</dd></div>
     <div><dt>TIME</dt><dd>${mins}:${String(secs).padStart(2, '0')}</dd></div>`;
@@ -473,7 +541,16 @@ function updateWorld(dt, bi) {
   // water: splash and drag
   if (Game.state === 'play') {
     let wet = false;
-    for (const w of W.waters) if (p.pos.x > w.x0 && p.pos.x < w.x1 && p.pos.z > w.z0 && p.pos.z < w.z1 && p.pos.y <= w.y + 0.05 && p.mode === 'ground') { wet = w; break; }
+    for (const w of W.waters) {
+      if (!(p.pos.x > w.x0 && p.pos.x < w.x1 && p.pos.z > w.z0 && p.pos.z < w.z1)) continue;
+      if (w.deep && p.pos.y < w.y - 0.4) {
+        Sound.sfx.splash(1.3); Game.fx.burst(V3(p.pos.x, w.y + 0.1, p.pos.z), 24, ['#bfe9ff', '#ffffff'], 6, 0.8, 10);
+        dropCombo('COMBO SOAKED'); p.respawn(false); Game.cam.snap(p); flash('#8ff0c8');
+        toast(W.deepMsg || '<b>FISHED OUT BY THE MINISTRY</b><span>Swimming without a permit. This has been noted.</span>', 'ministry', 3.5);
+        break;
+      }
+      if (p.pos.y <= w.y + 0.05 && p.mode === 'ground') { wet = w; break; }
+    }
     if (wet) {
       const sp = p.speed;
       if (sp > 9) { p.vel.x *= 9 / sp; p.vel.z *= 9 / sp; }
@@ -537,7 +614,7 @@ function loop(now) {
   const bi = Sound.beat();
   const p = Game.player;
   if (Game.state === 'play') {
-    Game.playT += dt;
+    Game.playT += dt; Game.hazardCD = Math.max(0, (Game.hazardCD || 0) - dt);
     Input.poll();
     if (Math.abs(Input.move.x) + Math.abs(Input.move.y) > 0.2 || Input.kbActive) Game.firsts.moved = true;
     p.update(dt, Game.cam.yaw, now);
@@ -555,15 +632,24 @@ function loop(now) {
     }
     if (Game.outroPending > 0) { Game.outroPending -= dt; if (Game.outroPending <= 0) { Game.outroPending = -1; bankCombo(); startOutro(); } }
     Sound.update(dt, { speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, combo: Game.combo.mult - 1, hype: Game.combo.mult >= 4 ? 1 : 0, grounded: p.mode === 'ground', muffle: 0 });
-    { const bo = Game.cast.bolt, near = Math.hypot(p.pos.x - bo.root.position.x, p.pos.z - bo.root.position.z) < 7; if (near) bo.root.rotation.y = U.angDamp(bo.root.rotation.y, Math.atan2(p.pos.x - bo.root.position.x, p.pos.z - bo.root.position.z), 3, dt); bo.update(dt, bo.poseTarget(near ? 'wave' : 'armsCross'), { rock: 0.03 }); }
+    for (const [k, nearPose, farPose] of [['bolt', 'wave', 'armsCross'], ['lull', 'point', 'armsCross']]) {
+      const bo = Game.cast[k]; if (!bo.root.visible) continue;
+      const near = Math.hypot(p.pos.x - bo.root.position.x, p.pos.z - bo.root.position.z) < 7;
+      if (near) bo.root.rotation.y = U.angDamp(bo.root.rotation.y, Math.atan2(p.pos.x - bo.root.position.x, p.pos.z - bo.root.position.z), 3, dt);
+      bo.update(dt, bo.poseTarget(near ? nearPose : farPose), { rock: 0.03 });
+    }
     updateHUD(dt, bi);
   } else if (Game.state === 'intro' || Game.state === 'outro') {
     Game.cs && Game.cs.update(dt);
     Sound.update(dt, { speed: 16, grinding: false, air: false, airTime: 0, grounded: false, combo: 0, hype: 0 });
   } else if (Game.state === 'title' || Game.state === 'end') {
-    const a = Game.t * 0.05, A = Game.W.intro.A, cx = A.x - 4, cz = A.z - 2, R = Game.worldKey === 'park' ? 40 : 34;
-    G.camera.position.set(cx + Math.cos(a) * R, A.y + 15 + Math.sin(Game.t * 0.2) * 2, cz + 8 + Math.sin(a) * R);
-    G.camera.lookAt(cx, A.y + 3, cz);
+    const a = Game.t * 0.05, O = Game.W.orbit;
+    if (O) { G.camera.position.set(O.x + Math.cos(a) * O.r, O.y + O.h + Math.sin(Game.t * 0.2) * 2, O.z + Math.sin(a) * O.r); G.camera.lookAt(O.x, O.y + O.look, O.z); }
+    else {
+      const A = Game.W.intro.A, cx = A.x - 4, cz = A.z - 2, R = Game.worldKey === 'park' ? 40 : 34;
+      G.camera.position.set(cx + Math.cos(a) * R, A.y + 15 + Math.sin(Game.t * 0.2) * 2, cz + 8 + Math.sin(a) * R);
+      G.camera.lookAt(cx, A.y + 3, cz);
+    }
     const { juno, bolt, drone } = Game.cast;
     if (Game.state === 'title') { juno.update(dt, juno.poseTarget('sit'), { rock: 0.03 }); bolt.update(dt, bolt.poseTarget('armsCross'), { rock: 0.03 }); drone.update(dt); drone.root.position.y = Game.W.intro.A.y + 6 + Math.sin(Game.t) * 0.3; }
     if (Game.state === 'end') { Sound.update(dt, { speed: 16, grinding: false, air: false, airTime: 0, grounded: false, combo: 0, hype: 0 }); }
@@ -586,3 +672,17 @@ function loop(now) {
 
 function start(data) { boot(data || {}).catch(e => { console.error(e); const l = $('loading'); l.hidden = false; l.textContent = 'Something broke while loading: ' + e.message; }); }
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+
+// debug helper for tests: render the current world from straight above
+window.debugTopDown = (x0, z0, x1, z1, px = 1600, clipY = null) => {
+  G.renderer.clippingPlanes = clipY !== null ? [new THREE.Plane(V3(0, -1, 0), clipY)] : [];
+  const W = Game.W, cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 1, 2000);
+  cam.position.set(0, 600, 0); cam.up.set(0, 0, -1); cam.lookAt(0, 0, 0);
+  const fog = G.scene.fog; G.scene.fog = null; if (W.sky) W.sky.visible = false;
+  const w = px, h = Math.round(px * (z1 - z0) / (x1 - x0));
+  G.renderer.setPixelRatio(1); G.renderer.setSize(w, h, false);
+  G.renderer.render(G.scene, cam);
+  const url = G.renderer.domElement.toDataURL('image/png');
+  G.scene.fog = fog; if (W.sky) W.sky.visible = true; G.renderer.clippingPlanes = []; onResize();
+  return url;
+};

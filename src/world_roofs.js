@@ -101,7 +101,7 @@ function buildRooftops() {
   cyl(54, 11, -30, 2.1, 1.8, '#ffd23f', { seg: 16, outline: 0.1 });
   W.boxes.push({ x0: 52.1, y0: 11, z0: -31.9, x1: 55.9, y1: 12.8, z1: -28.1 });
   ac(57.5, -30, 9, 2, 1.5, 2, '#e9e4f5'); ac(60, -14, 9, 3, 1.3, 2); ac(66, -20, 9);
-  box(52, 9, -35.6, 68, 15.5, -35, '#14101f', 'plain', { outlineT: 0.08 });
+  box(50, 9, -35.6, 62, 15.5, -35, '#14101f', 'plain', { outlineT: 0.08 });
 
   // ministry "jammer" antennas
   for (const [x, y, z] of [[9, 0, 9], [-10, 4, -48], [40, 1, -8], [-44, -2, -22], [28, 1, 44], [68, 9, -10], [62, 7, 20], [-33, 14, -37]]) {
@@ -110,33 +110,70 @@ function buildRooftops() {
     for (let i = 0; i < 3; i++) rod(V3(x - 0.6 + i * 0.05, y + 2 + i * 0.9, z), V3(x + 0.6 - i * 0.05, y + 2 + i * 0.9, z), 0.03, '#d9d4ea', 0.02);
   }
 
-  // ---------- rails ----------
-  rail([[11.5, 1.15, 8], [18.5, 2.1, 8]], { kind: 'cable', color: '#14101f' });
-  rail([[-11.5, 1.05, 4], [-20.5, -0.85, 4]], { kind: 'cable', color: '#14101f' });
-  rail([[2.7, 0.95, 12.5], [2.7, 1.95, 21.5]], { color: '#ffd23f' });
-  rail([[-2.85, 0.95, -12.5], [-2.85, 4.95, -21.5]], { color: '#ffd23f' });
-  rail([[-11, 0.9, 11.4], [-1, 0.9, 11.4]], { color: '#19d3ff' });
-  rail([[11.4, 0.9, -10], [11.4, 0.9, -4]], { color: '#19d3ff' });
-  rail([[-13.5, 4.95, -28], [-24, -1.05, -18]], { kind: 'cable', color: '#14101f' });
-  rail([[-28.6, 15.6, -28.6], [-2, 1.3, -4]], { kind: 'cable', color: '#14101f', zip: true });
-  rail([[-44, -0.55, 8], [-22, -0.55, 8]], { kind: 'cable', color: '#f4f1ff', laundry: true });
-  rail([[-44, -0.55, -12], [-36, -0.55, -12]], { kind: 'cable', color: '#f4f1ff', laundry: true });
-  rail([[19, 1.9, 13.4], [41, 1.9, 13.4]], { color: '#ff2e88' });
-  rail([[19, 1.9, -9.4], [36, 1.9, -9.4]], { color: '#ff2e88' });
-  rail([[-13, 5.0, -22.6], [-3.6, 5.0, -22.6]], { color: '#19d3ff' });
-  rail([[3.6, 5.0, -22.6], [15, 5.0, -22.6]], { color: '#19d3ff' });
-  rail([[15.4, 5.0, -24], [15.4, 5.0, -48]], { color: '#19d3ff' });
-  rail([[-8, 2.8, 45.4], [26, 2.8, 45.4]], { color: '#ff2e88' });
-  rail([[-9.4, 1.9, 24], [-9.4, 1.9, 44]], { color: '#ffd23f' });
-  rail([[49, 10, -9.4], [69, 10, -9.4]], { color: '#c6ff3d' });
-  rail([[69.4, 10, -10], [69.4, 10, -34]], { color: '#c6ff3d' });
-  rail([[-45.4, -1, -22], [-45.4, -1, 8]], { color: '#ff7a2f' });
-  rail([[-37.5, 15, -29], [-37.5, 15, -37]], { color: '#ffd23f' });
+  // ---------- rails: long ledge runs that wrap around building corners ----------
+  const RL = { round: 2.2 };
+  // roof A: two runs around the edges (a gap at the kicker), the north one aims at the plank to C
+  rail([[-11.4, 0.9, -4], [-11.4, 0.9, 11.4], [11.4, 0.9, 11.4], [11.4, 0.9, 4]], { color: '#19d3ff', ...RL });
+  rail([[11.5, 1.15, 7], [18.5, 2.1, 7]], { kind: 'cable', color: '#14101f', sag: 0.4 });           // A → B power line
+  rail([[-11.5, 1.05, 2], [-20.5, -0.85, 2]], { kind: 'cable', color: '#14101f', sag: 0.4 });       // A → D
+  rail([[2.7, 0.95, 12.5], [2.7, 1.95, 21.5]], { color: '#ffd23f' });                                 // plank A → F
+  rail([[-2.85, 0.95, -12.5], [-2.85, 4.95, -21.5]], { color: '#ffd23f' });                           // plank A → C
+  // roof B: a U around three sides, then a bridge over the street onto A's north edge, aimed at the plank to C
+  rail([[19, 1.9, 13.4], [41.4, 1.9, 13.4], [41.4, 1.9, -9.4], [19, 1.9, -9.4], [11.4, 0.9, -11.4], [3.4, 0.9, -11.4]], { color: '#ff2e88', ...RL });
+  // roof C: along the south ledge, round the corner and up the east side, then in front of the screen
+  rail([[-13.4, 5.0, -22.6], [15.4, 5.0, -22.6], [15.4, 5.0, -46.6], [8, 5.0, -46.6]], { color: '#19d3ff', ...RL });
+  rail([[-13.5, 4.95, -28], [-24, -1.05, -18]], { kind: 'cable', color: '#14101f', sag: 0.5 });      // C → D long slide
+  // roof D: west edge, round the corner along the south edge; laundry lines in the middle
+  rail([[-21.6, -1, -23.4], [-45.4, -1, -23.4], [-45.4, -1, 9.4], [-30, -1, 9.4]], { color: '#ff7a2f', ...RL });
+  rail([[-44, -0.55, 5.5], [-24, -0.55, 5.5]], { kind: 'cable', color: '#f4f1ff', laundry: true, sag: 0.3 });
+  rail([[-44, -0.55, -12], [-36, -0.55, -12]], { kind: 'cable', color: '#f4f1ff', laundry: true, sag: 0.3 });
+  // tower E: a loop around the top, and the zipline down to A
+  rail([[-37.4, 14.9, -37.4], [-28.6, 14.9, -37.4], [-28.6, 14.9, -29.4], [-37.4, 14.9, -29.4]], { color: '#ffd23f', loop: true, round: 1.4 });
+  rail([[-28.6, 15.8, -28.2], [-2, 1.3, -4]], { kind: 'cable', color: '#14101f', sag: 0.25 });
+  // roof F: neon run along the south edge, round the corner, along the west and back east
+  rail([[26, 2.8, 45.4], [-9.4, 2.8, 45.4], [-9.4, 1.9, 22.6], [2, 1.9, 22.6]], { color: '#ff2e88', ...RL });
+  // the courtyard rim: a square loop on top of the walls
+  rail([[46.6, 7.9, 24.6], [63.4, 7.9, 24.6], [63.4, 7.9, 49.4], [46.6, 7.9, 49.4]], { color: '#ffd23f', loop: true, round: 2 });
+  // roof H: along the south and east edges, then the "dive" — a rail bridge down to Billboard Row
+  rail([[49, 10, -9.4], [69.4, 10, -9.4], [69.4, 10, -33], [70.2, 8.4, -42], [71, 6.9, -50.5]], { color: '#c6ff3d', round: 4 });
+  rail([[-37.5, 15, -29], [-37.5, 15, -37]], { hidden: true });
 
   // ---------- the BEAT LIFT (B → H) ----------
   K.lift({ x0: 42, z0: -13, x1: 48, z1: -7, y0: 1, y1: 9, postBase: STREET });
   K.poster(['BEAT LIFT', 'HOP ON — IT RIDES THE BEAT'], 40, 3.2, -9.9, 4.2, 1.3, 0, { bg: PAL.yellow, smiley: false, w: 512, h: 160 });
   cyl(38.4, 1, -10.1, 0.08, 2.6, '#5b4a6b', { outline: 0.02 }); cyl(41.6, 1, -10.1, 0.08, 2.6, '#5b4a6b', { outline: 0.02 });
+
+  // =====================================================================
+  //  BILLBOARD ROW (north-east): giant ads on scaffolds, reached by the dive from H
+  // =====================================================================
+  bld(52, -66, 80, -48, 6, '#9b8cff', '#a9a2c9', '#ffd23f');        // BR1
+  bld(86, -78, 110, -52, 3, '#4fc9c0', '#9fc2c8', '#ff2e88');       // BR2 (lower)
+  bld(58, -106, 84, -82, 12, '#ff7a2f', '#d6b3a0', '#14101f');      // BR3 (tall, the antenna roof)
+  bld(22, -122, 50, -84, 8, '#ffcf3a', '#c9b8a4', '#6a3df0');       // BR4 (billboard alley)
+  // BR1: an east ledge rail that becomes a bridge down to BR2
+  rail([[53, 6.9, -48.6], [79.4, 6.9, -48.6], [79.4, 6.9, -64], [84.5, 5.0, -66], [88.5, 3.9, -66]], { color: '#ff2e88', round: 3 });
+  // BR2: a ring rail and the launch pad up to BR3
+  rail([[86.6, 3.9, -77.4], [109.4, 3.9, -77.4], [109.4, 3.9, -52.6], [92, 3.9, -52.6]], { color: '#19d3ff', ...RL });
+  ac(98, -60, 3); ac(104, -70, 3, 3, 1.4, 2, '#ffd23f');
+  // BR3: antenna mast, catwalk ring, and a long zipline home to H
+  box(68, 12, -96, 74, 14.5, -90, '#14101f', 'plain', { outlineT: 0.06 });
+  cyl(71, 14.5, -93, 0.3, 14, '#d9d4ea', { outline: 0.04, r2: 0.12 });
+  for (let i = 0; i < 4; i++) rod(V3(69 + i * 0.1, 18 + i * 3, -93), V3(73 - i * 0.1, 18 + i * 3, -93), 0.05, '#d9d4ea', 0.02);
+  rail([[58.6, 12.9, -82.6], [83.4, 12.9, -82.6], [83.4, 12.9, -105.4], [58.6, 12.9, -105.4]], { color: '#c6ff3d', loop: true, round: 2.5 });
+  rail([[71, 15.4, -89.4], [66, 10.9, -29]], { kind: 'cable', color: '#14101f', sag: 0.3 });   // zipline home to H
+  // BR4: three giant billboards on scaffolds with a catwalk running along their tops
+  for (const [x0, x1, lines, bg] of [[24, 30, ['YOUR FEED', 'LOVES YOU'], PAL.mint], [33, 39, ['DANCING IS', 'A GATEWAY'], PAL.pink], [42, 48, ['THE HUSH', 'WANTS YOUR EARS'], '#ffe08a']]) {
+    for (const x of [x0, x1]) for (const z of [-104, -102]) cyl(x, 8, z, 0.15, 10, '#5b4a6b', { outline: 0.03, seg: 6 });
+    box(x0 - 1, 12, -103.6, x1 + 1, 18, -103.2, '#14101f', 'plain', { outlineT: 0.06 });
+    K.poster(lines, (x0 + x1) / 2, 15, -103.15, x1 - x0 + 1.6, 5.6, 0, { bg, double: true });
+  }
+  box(23, 17.9, -103.8, 49, 18.2, -102.6, '#3a3550', 'plain', { outlineT: 0.04 });
+  rail([[23.2, 18.9, -103.2], [48.8, 18.9, -103.2]], { color: '#ffd23f', posts: false });
+  rail([[49.5, 18.6, -103.2], [58.6, 13.6, -95]], { kind: 'cable', color: '#14101f', sag: 0.3 });   // catwalk → BR3
+  rail([[58.4, 13.4, -105.2], [49, 8.9, -112]], { kind: 'cable', color: '#14101f', sag: 0.3 });        // BR3 → BR4 roof
+  ramp(24, -88, 34, -84, 'z', 8, 9.6, '#ff2e88', false, 8);
+  ac(30, -114, 8); ac(44, -116, 8, 3, 1.4, 2);
+  K.lift({ x0: 36, z0: -100, x1: 40, z1: -96, y0: 8, y1: 17.9, postBase: 8, phase: 4 });
 
   // ---------- relays, tapes, pads, drones ----------
   K.relays([
@@ -144,7 +181,7 @@ function buildRooftops() {
     { id: 2, pos: V3(-37.5, -2, -1), hint: 'The Ministry locked one in their storage shed on the purple roof. That door moves to the beat. Count it…' },
     { id: 3, pos: V3(-33, 14, -32.5), hint: 'Top of the orange tower. Those speaker pads launch you higher if you jump ON the beat.' },
     { id: 4, pos: V3(57, -5, 43), hint: 'My signal says one is boxed in somewhere south-east. No doors. Maybe… a vent?' },
-    { id: 5, pos: V3(64, 9, -29), hint: 'Last one is on the blue Ministry roof. That lift on the teal roof rides the beat. Drones everywhere, smile big.' },
+    { id: 5, pos: V3(76, 12, -100), hint: 'The last one is way out on Billboard Row, on the antenna roof. Ride the beat lift up to the blue Ministry roof, then take the green dive rail off its corner.' },
   ]);
   K.tapes([
     { id: 1, pos: V3(-10, 4.9, -42), text: 'TAPE — “Grandma’s Jazz Hour, 1987.” Confiscated for excessive saxophone.' },
@@ -157,19 +194,21 @@ function buildRooftops() {
     { pos: V3(-33, -2, -19.5), aim: V3(0, 0, -6.6), vy: 30.5 },
     { pos: V3(44, -4, 6), aim: V3(-5.2, 0, 0), vy: 20.5 },
     { pos: V3(51, -5, 32), aim: V3(-5.4, 0, 0), vy: 26.8 },
+    { pos: V3(94, 3, -72), aim: V3(-10.2, 0, -10.2), vy: 25.5 },
   ]);
   K.drones([
     { path: [[52, 13, -13], [66, 13, -13], [66, 13, -33], [52, 13, -33]], speed: 3.2, phase: 0 },
     { path: [[66, 13, -24], [52, 13, -24], [52, 13, -16], [66, 13, -16]], speed: 2.6, phase: 0.5 },
     { path: [[-4, 10, -27], [12, 10, -27], [12, 10, -44], [-4, 10, -44]], speed: 3, phase: 0.2 },
     { path: [[-6, 5.5, 26], [24, 5.5, 26], [24, 5.5, 42], [-6, 5.5, 42]], speed: 2.6, phase: 0.7 },
+    { path: [[60, 17, -84], [82, 17, -84], [82, 17, -104], [60, 17, -104]], speed: 3.4, phase: 0.1 },
   ]);
   K.finish();
 
   // ---------- environment ----------
   W.sky = skyDome({}); scene.add(W.sky);
-  K.cityRing(10, -5, 105, 365, 240, STREET, 11);
-  K.smileTower(V3(150, STREET, -250));
+  K.cityRing(30, -40, 150, 420, 260, STREET, 11);
+  K.smileTower(V3(220, STREET, -300));
   K.blimp(15, -10, 95, 34);
   {
     const st = canvasTex(512, 512, (x, w, h) => {
@@ -201,7 +240,7 @@ function buildRooftops() {
   K.poster(['CURIOSITY:', 'NOT EVEN ONCE'], -19.9, -6, -6, 12, 6, Math.PI / 2, { bg: '#ffe08a' });
   K.poster(['NAP FOR', 'THE NATION'], 10, -3, 21.9, 12, 6, Math.PI, { bg: PAL.mint });
   K.poster(['TRUST THE NEWS.', 'THE NEWS TRUSTS YOU.'], 47.9, 4, -22, 14, 7, -Math.PI / 2, { bg: PAL.pink });
-  K.poster(['DECREE 88', 'KEEP IT SLOW ♪=60'], 60, 12.4, -34.9, 15, 6.2, 0, { bg: '#ffe08a', accent: PAL.mint });
+  K.poster(['DECREE 88', 'KEEP IT SLOW ♪=60'], 56, 12.4, -34.9, 11.4, 6, 0, { bg: '#ffe08a', accent: PAL.mint });
   K.poster(['MINISTRY STORAGE', 'ABSOLUTELY NO DANCING'], -31.95, 1.55, -0.25, 3.4, 0.75, Math.PI / 2, { bg: PAL.mint, smiley: false, w: 512, h: 112 });
   K.sticker('DROP IN', 41.9, 0.2, 6, Math.PI / 2, 2.2);
   K.sticker('1-2!', -31.9, 0.5, 2.6, Math.PI / 2, 1.4);

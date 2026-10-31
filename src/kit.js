@@ -54,18 +54,118 @@ function rampH(rp, x, z) {
   const t = rp.axis === 'x' ? (x - rp.x0) / (rp.x1 - rp.x0) : (z - rp.z0) / (rp.z1 - rp.z0);
   return U.lerp(rp.h0, rp.h1, U.clamp(t, 0, 1));
 }
-function railPoint(r, s) {
-  s = U.clamp(s, 0, r.len);
-  for (const g of r.segs) if (s <= g.s0 + g.len + 1e-6) return V3().copy(g.a).addScaledVector(g.dir, s - g.s0);
-  return r.pts[r.pts.length - 1].clone();
+function railSeg(r, s) {
+  const S = r.segs; let lo = 0, hi = S.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S[m].s0 <= s) lo = m; else hi = m - 1; }
+  return S[lo];
+}
+function railPoint(r, s, out = V3()) {
+  s = r.loop ? ((s % r.len) + r.len) % r.len : U.clamp(s, 0, r.len);
+  const g = railSeg(r, s);
+  return out.copy(g.a).addScaledVector(g.dir, Math.min(g.len, s - g.s0));
 }
 function railDir(r, s) {
-  for (const g of r.segs) if (s <= g.s0 + g.len + 1e-6) return g.dir;
-  return r.segs[r.segs.length - 1].dir;
+  s = r.loop ? ((s % r.len) + r.len) % r.len : U.clamp(s, 0, r.len);
+  return railSeg(r, s).dir;
+}
+
+// ---- rail path helpers (return arrays of [x,y,z]) ----
+// arc around (cx,cz), angles in radians (x = cx + cos a * r, z = cz + sin a * r)
+function pArc(cx, cz, r, a0, a1, y0, y1 = y0, step = 0.8) {
+  const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) * r / step)), out = [];
+  for (let i = 0; i <= n; i++) { const t = i / n, a = U.lerp(a0, a1, t); out.push([cx + Math.cos(a) * r, U.lerp(y0, y1, U.smooth(t)), cz + Math.sin(a) * r]); }
+  return out;
+}
+function pHelix(cx, cz, r, a0, turns, y0, y1) {
+  const a1 = a0 + turns * Math.PI * 2, n = Math.ceil(Math.abs(a1 - a0) * r / 0.8), out = [];
+  for (let i = 0; i <= n; i++) { const t = i / n, a = U.lerp(a0, a1, t); out.push([cx + Math.cos(a) * r, U.lerp(y0, y1, t), cz + Math.sin(a) * r]); }
+  return out;
+}
+// straight run from a to b with a sine ripple in height (roller-coaster humps)
+function pWave(a, b, amp, waves, step = 0.8) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), n = Math.max(2, Math.ceil(L / step)), out = [];
+  for (let i = 0; i <= n; i++) { const t = i / n; out.push([U.lerp(a[0], b[0], t), U.lerp(a[1], b[1], t) + Math.sin(t * Math.PI * waves) * amp, U.lerp(a[2], b[2], t)]); }
+  return out;
+}
+// round the corners of a polyline with arcs of radius R
+function fillet(P, R, loop) {
+  const n = P.length, out = [];
+  if (n < 3 || R <= 0) { const o = P.map(p => p.clone()); if (loop) o.push(P[0].clone()); return o; }
+  for (let i = 0; i < n; i++) {
+    const p = P[i];
+    if (!loop && (i === 0 || i === n - 1)) { out.push(p.clone()); continue; }
+    const a = P[(i - 1 + n) % n], b = P[(i + 1) % n];
+    const d1 = V3().subVectors(p, a), d2 = V3().subVectors(b, p);
+    const l1 = d1.length(), l2 = d2.length(); d1.normalize(); d2.normalize();
+    const dot = d1.dot(d2);
+    if (dot > 0.9995 || l1 < 1e-4 || l2 < 1e-4) { out.push(p.clone()); continue; }
+    const t = Math.min(R, l1 * 0.48, l2 * 0.48);
+    const s0 = V3().copy(p).addScaledVector(d1, -t), e0 = V3().copy(p).addScaledVector(d2, t);
+    const ang = Math.acos(U.clamp(dot, -1, 1)), steps = Math.max(2, Math.ceil(ang * t / 0.45));
+    for (let k = 0; k <= steps; k++) {
+      const u = k / steps, w0 = (1 - u) * (1 - u), w1 = 2 * u * (1 - u), w2 = u * u;
+      out.push(V3(s0.x * w0 + p.x * w1 + e0.x * w2, s0.y * w0 + p.y * w1 + e0.y * w2, s0.z * w0 + p.z * w1 + e0.z * w2));
+    }
+  }
+  if (loop) out.push(out[0].clone());
+  return out;
+}
+
+// simple uniform grid for broad-phase queries
+function makeGrid(cell) {
+  const map = new Map(); let stamp = 1;
+  return {
+    add(o, x0, z0, x1, z1) {
+      for (let ix = Math.floor(x0 / cell); ix <= Math.floor(x1 / cell); ix++)
+        for (let iz = Math.floor(z0 / cell); iz <= Math.floor(z1 / cell); iz++) {
+          const k = ix * 100003 + iz; let a = map.get(k); if (!a) map.set(k, a = []); a.push(o);
+        }
+    },
+    query(x0, z0, x1, z1, out) {
+      stamp++; out.length = 0;
+      for (let ix = Math.floor(x0 / cell); ix <= Math.floor(x1 / cell); ix++)
+        for (let iz = Math.floor(z0 / cell); iz <= Math.floor(z1 / cell); iz++) {
+          const a = map.get(ix * 100003 + iz); if (!a) continue;
+          for (const o of a) if (o._g !== stamp) { o._g = stamp; out.push(o); }
+        }
+      return out;
+    }
+  };
 }
 
 // world-space textures (white-ish so vertex colour tints them)
-function worldMaterials() {
+function nightWindowTex() {
+  return canvasTex(256, 256, (x, w, h) => {
+    const r = U.rng(19);
+    x.fillStyle = '#9a96b8'; x.fillRect(0, 0, w, h);
+    for (let f = 0; f < 4; f++) { x.fillStyle = '#6a6690'; x.fillRect(0, f * 64 + 54, w, 10); }
+    for (let f = 0; f < 4; f++) for (let c = 0; c < 4; c++) {
+      const X = c * 64 + 12, Y = f * 64 + 10;
+      x.fillStyle = '#1d1838'; x.fillRect(X - 3, Y - 3, 46, 40);
+      x.fillStyle = '#2a2850'; x.fillRect(X, Y, 40, 34);
+      x.fillStyle = '#1d1838'; x.fillRect(X + 19, Y, 3, 34);
+    }
+  }, { repeat: true }).tex;
+}
+function nightGlowTex() {
+  return canvasTex(256, 256, (x, w, h) => {
+    const r = U.rng(23);
+    x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+    for (let f = 0; f < 4; f++) for (let c = 0; c < 4; c++) {
+      const v = r(); if (v > 0.62) continue;
+      x.fillStyle = v < 0.15 ? '#ff6fb5' : v < 0.3 ? '#7fe8ff' : '#ffd98a';
+      x.fillRect(c * 64 + 12, f * 64 + 10, 40, 34);
+      x.fillStyle = '#000'; x.fillRect(c * 64 + 31, f * 64 + 10, 3, 34);
+    }
+  }, { repeat: true }).tex;
+}
+function worldMaterials(night) {
+  if (night) {
+    if (G.worldMatsNight) return G.worldMatsNight;
+    const base = worldMaterials(false), M2 = Object.assign({}, base);
+    M2.wall = new THREE.MeshToonMaterial({ vertexColors: true, map: nightWindowTex(), emissiveMap: nightGlowTex(), emissive: 0xffffff, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    G.worldMatsNight = M2; return M2;
+  }
   if (G.worldMats) return G.worldMats;
   const T = (draw) => canvasTex(256, 256, draw, { repeat: true }).tex;
   const grass = T((x, w, h) => {
@@ -93,10 +193,29 @@ function worldMaterials() {
     x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 4; x.fillStyle = 'rgba(30,120,200,.25)'; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 10; i++) { x.beginPath(); const y = i * 26 + 8; x.moveTo(10 + (i % 3) * 40, y); x.quadraticCurveTo(40 + (i % 3) * 40, y - 8, 70 + (i % 3) * 40, y); x.stroke(); }
   });
+  const tile = T((x, w, h) => {
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
+    for (let j = 0; j < 16; j++) for (let i = 0; i < 8; i++) { x.fillStyle = (i + j) % 7 === 0 ? 'rgba(80,90,140,.12)' : 'rgba(255,255,255,1)'; x.fillRect(i * 32 + 2, j * 16 + 2, 28, 12); }
+    x.strokeStyle = 'rgba(40,40,70,.25)'; x.lineWidth = 2; for (let j = 0; j <= 16; j++) { x.beginPath(); x.moveTo(0, j * 16); x.lineTo(w, j * 16); x.stroke(); }
+    for (let j = 0; j < 16; j++) for (let i = 0; i <= 8; i++) { x.beginPath(); x.moveTo(i * 32 + (j % 2) * 16, j * 16); x.lineTo(i * 32 + (j % 2) * 16, j * 16 + 16); x.stroke(); }
+  });
+  const brick = T((x, w, h) => {
+    const r = U.rng(13); x.fillStyle = '#d8d0c8'; x.fillRect(0, 0, w, h);
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 4; i++) { x.fillStyle = `rgba(${120 + r() * 40},${60 + r() * 30},${50 + r() * 20},.35)`; x.fillRect(i * 64 + (j % 2) * 32 + 3, j * 32 + 3, 58, 26); }
+    for (let i = 0; i < 300; i++) { x.fillStyle = 'rgba(20,40,20,.08)'; x.fillRect(r() * w, r() * h, 3, 3); }
+  });
+  const asphalt = T((x, w, h) => {
+    const r = U.rng(17); x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(0,0,0,${r() * 0.12})`; x.fillRect(r() * w, r() * h, 2, 2); }
+    for (let i = 0; i < 6; i++) { x.strokeStyle = 'rgba(0,0,0,.12)'; x.lineWidth = 2; x.beginPath(); const a = r() * w, b = r() * h; x.moveTo(a, b); x.lineTo(a + r() * 60 - 30, b + r() * 60 - 30); x.stroke(); }
+  });
   const tWin = makeWindowTex().tex, tRoof = makeRoofTex().tex;
   const M = (map, extra = {}) => new THREE.MeshToonMaterial(Object.assign({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }, extra));
   G.worldMats = {
     wall: M(tWin), roof: M(tRoof), plain: M(null), grass: M(grass), leaf: M(leaf), paving: M(paving), wood: M(wood), sand: M(sand),
+    tile: M(tile), brick: M(brick), asphalt: M(asphalt),
+    glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
+    glass: new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
     water: new THREE.MeshBasicMaterial({ vertexColors: true, map: water, transparent: true, opacity: 0.72, depthWrite: false }),
     waterTex: water
   };
@@ -110,10 +229,11 @@ function makeKit(meta) {
   const scene = W.group;
   const railDefs = [];
   const K = { W, B, scene };
+  W.addDyn = (b) => { b.dyn = true; W.boxes.push(b); return b; };
 
   K.box = (x0, y0, z0, x1, y1, z1, color, kind = 'plain', o = {}) => {
     B.box(x0, y0, z0, x1, y1, z1, color, kind, o);
-    if (o.collide !== false) W.boxes.push({ x0, y0, z0, x1, y1, z1, tag: o.tag });
+    if (o.collide !== false) W.boxes.push({ x0, y0, z0, x1, y1, z1, tag: o.tag, nocam: o.nocam });
   };
   K.bld = (x0, z0, x1, z1, top, color, roof, trim = '#14101f', base = STREET) => {
     K.box(x0, base, z0, x1, top, z1, color, 'building', { roofColor: roof, outlineT: 0.16 });
@@ -140,7 +260,10 @@ function makeKit(meta) {
     const m = new THREE.Matrix4().compose(V3().addVectors(a, b).multiplyScalar(0.5), q, V3(1, 1, 1));
     B.add(g, m, color, 'plain', { outlineT, edges: false });
   };
-  K.rail = (pts, o = {}) => railDefs.push({ pts: pts.map(p => V3(...p)), ...o });
+  // rails: pts are the riding line (where the skates sit).
+  // o: { color, kind: 'rail'|'cable'|'pipe', round (corner radius), sag (cable dip per 20 m), loop,
+  //      posts (false = none), postMax, radius, endBoost (extra lift when you fly off an end), hidden }
+  K.rail = (pts, o = {}) => { railDefs.push({ pts: pts.map(p => Array.isArray(p) ? V3(...p) : p.clone()), ...o }); };
   K.ac = (x, z, base, w = 2, h = 1.2, d = 2, col = '#e9e4f5') => {
     K.box(x - w / 2, base, z - d / 2, x + w / 2, base + h, z + d / 2, col, 'plain', { outlineT: 0.07 });
     K.cyl(x, base + h, z, Math.min(w, d) * 0.32, 0.12, '#14101f', { outline: 0 });
@@ -171,11 +294,151 @@ function makeKit(meta) {
     K.sphere(x, base + 4.25, z, 0.4, '#fff3c4', { outline: 0.04, seg: 10 });
     W.boxes.push({ x0: x - 0.15, y0: base, z0: z - 0.15, x1: x + 0.15, y1: base + 4, z1: z + 0.15, tag: 'lamp' });
   };
-  K.water = (x0, z0, x1, z1, y, color = '#7fd3ff') => {
+  K.water = (x0, z0, x1, z1, y, color = '#7fd3ff', deep = false) => {
     B.box(x0, y - 0.02, z0, x1, y, z1, color, 'water', { outlineT: 0, edges: false });
-    W.waters.push({ x0, z0, x1, z1, y });
+    W.waters.push({ x0, z0, x1, z1, y, deep });
   };
 
+  // invisible collision box
+  K.collider = (x0, y0, z0, x1, y1, z1, o = {}) => { W.boxes.push({ x0, y0, z0, x1, y1, z1, tag: o.tag, nocam: o.nocam }); };
+  // a deck (road, walkway) following a path: solid ribbon + tile colliders on top
+  K.deck = (path, width, y, o = {}) => {
+    const P = path.map(p => Array.isArray(p) ? V3(p[0], y, p[1]) : V3(p.x, y, p.z));
+    if (o.loop) P.push(P[0].clone());
+    const th = o.thick ?? 1, hw = width / 2, pos = [], idx = [];
+    const n = P.length, side = [];
+    for (let i = 0; i < n; i++) {
+      const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)];
+      let tx = b.x - a.x, tz = b.z - a.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      side.push([-tz, tx]);
+    }
+    const ring = [];
+    for (let i = 0; i < n; i++) {
+      const p = P[i], [sx, sz] = side[i];
+      ring.push([p.x + sx * hw, y, p.z + sz * hw], [p.x - sx * hw, y, p.z - sz * hw], [p.x - sx * hw, y - th, p.z - sz * hw], [p.x + sx * hw, y - th, p.z + sz * hw]);
+    }
+    for (const v of ring) pos.push(...v);
+    for (let i = 0; i < n - 1; i++) for (let k = 0; k < 4; k++) {
+      const a = i * 4 + k, b = i * 4 + (k + 1) % 4, c = a + 4, d = b + 4;
+      idx.push(a, c, b, b, c, d);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+    const ng = g.toNonIndexed(); ng.computeVertexNormals();
+    B.add(ng, null, o.color || '#4a4560', o.kind || 'asphalt', { outlineT: 0, edges: false });
+    // outline: a slightly fatter copy, back-faced
+    const op = [];
+    for (let i = 0; i < n; i++) { const p = P[i], [sx, sz] = side[i], hw2 = hw + 0.12;
+      op.push([p.x + sx * hw2, y + 0.06, p.z + sz * hw2], [p.x - sx * hw2, y + 0.06, p.z - sz * hw2], [p.x - sx * hw2, y - th - 0.06, p.z - sz * hw2], [p.x + sx * hw2, y - th - 0.06, p.z + sz * hw2]); }
+    const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.Float32BufferAttribute(op.flat(), 3)); og.setIndex(idx);
+    B.addOutline(og.toNonIndexed());
+    // tile colliders
+    const T = o.tile || 2;
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const p of P) { x0 = Math.min(x0, p.x - hw); x1 = Math.max(x1, p.x + hw); z0 = Math.min(z0, p.z - hw); z1 = Math.max(z1, p.z + hw); }
+    const distTo = (x, z) => { let best = 1e9; for (let i = 0; i < n - 1; i++) { const a = P[i], b = P[i + 1], dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1; const t = U.clamp(((x - a.x) * dx + (z - a.z) * dz) / L2, 0, 1); best = Math.min(best, Math.hypot(x - a.x - dx * t, z - a.z - dz * t)); } return best; };
+    for (let x = Math.floor(x0 / T) * T; x < x1; x += T) for (let z = Math.floor(z0 / T) * T; z < z1; z += T)
+      if (distTo(x + T / 2, z + T / 2) <= hw - T * 0.25) W.boxes.push({ x0: x, y0: y - th, z0: z, x1: x + T, y1: y, z1: z + T, tag: o.tag, nocam: true });
+  };
+  // round wall seen from the inside (cisterns, halls), with gaps (angle ranges) for doorways
+  K.cylWall = (cx, cz, r, y0, y1, color, gaps = [], kind = 'brick', outward = false) => {
+    const inGap = (a) => gaps.some(([g0, g1]) => { let x = ((a - g0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); return x <= ((g1 - g0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); });
+    const seg = Math.ceil(r * 1.2), pos = [];
+    for (let i = 0; i < seg; i++) {
+      const a0 = i / seg * Math.PI * 2, a1 = (i + 1) / seg * Math.PI * 2;
+      if (inGap((a0 + a1) / 2)) continue;
+      const p0 = [cx + Math.cos(a0) * r, cz + Math.sin(a0) * r], p1 = [cx + Math.cos(a1) * r, cz + Math.sin(a1) * r];
+      // inward facing quad (or outward, for a parapet seen from outside)
+      if (outward) pos.push(p0[0], y0, p0[1], p1[0], y1, p1[1], p1[0], y0, p1[1], p0[0], y0, p0[1], p0[0], y1, p0[1], p1[0], y1, p1[1]);
+      else pos.push(p0[0], y0, p0[1], p1[0], y0, p1[1], p1[0], y1, p1[1], p0[0], y0, p0[1], p1[0], y1, p1[1], p0[0], y1, p0[1]);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    B.add(g, null, color, kind, { outlineT: 0, edges: false });
+    const step = 1.6 / r;
+    for (let a = 0; a < Math.PI * 2; a += step) {
+      if (inGap(a)) continue;
+      const rr = outward ? r - 0.6 : r + 0.6, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
+      W.boxes.push({ x0: x - 1, y0, z0: z - 1, x1: x + 1, y1, z1: z + 1, nocam: true });
+    }
+  };
+  // a ring or disc floor (ring of tiles) around (cx, cz)
+  K.ringDeck = (cx, cz, rIn, rOut, y, o = {}) => {
+    const rm = (rIn + rOut) / 2, n = Math.max(24, Math.ceil(rm * 0.8)), pts = [];
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pts.push([cx + Math.cos(a) * rm, cz + Math.sin(a) * rm]); }
+    K.deck(pts, rOut - rIn, y, Object.assign({ loop: true, tile: 1.5 }, o));
+  };
+  // a curtain of falling water, scrolling, with spray at the bottom
+  K.waterfall = (x0, x1, z, yTop, yBot, color = '#9fffd0') => {
+    const tex = canvasTex(64, 256, (c, w, h) => { c.clearRect(0, 0, w, h); for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(255,255,255,${0.15 + Math.random() * 0.35})`; c.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 20 + Math.random() * 60); } }, { repeat: true }).tex;
+    tex.repeat.set((x1 - x0) / 4, (yTop - yBot) / 10);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, yTop - yBot), new THREE.MeshBasicMaterial({ color, map: tex, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.set((x0 + x1) / 2, (yTop + yBot) / 2, z); scene.add(m);
+    W.dyn.push({ update(dt) { tex.offset.y += dt * 1.6; if (Game.fx && Math.random() < 0.5) Game.fx.emit(_kv.set(U.lerp(x0, x1, Math.random()), yBot + 0.2, z + (Math.random() - 0.5)), _kv2.set((Math.random() - 0.5) * 3, 2 + Math.random() * 3, (Math.random() - 0.5) * 3), '#d8ffe8', 0.6, 9); } });
+  };
+  // glowing neon sign; flickers off on the downbeat now and then
+  K.neon = (lines, x, y, z, w, h, rotY, o = {}) => {
+    const cols = o.colors || [PAL.magenta, PAL.cyan, PAL.yellow];
+    const nc = canvasTex(512, Math.round(512 * h / w), (c, cw, ch, on = 1) => {
+      c.fillStyle = o.bg || '#140a26'; c.fillRect(0, 0, cw, ch);
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      const n = lines.length;
+      lines.forEach((ln, i) => {
+        let size = Math.min(ch / (n + 0.4) * 0.8, 90); c.font = `${size}px ${i === 0 ? FONT.display : FONT.dot}`;
+        while (c.measureText(ln).width > cw - 30 && size > 12) { size -= 2; c.font = `${size}px ${i === 0 ? FONT.display : FONT.dot}`; }
+        const col = cols[i % cols.length];
+        c.shadowColor = on ? col : 'transparent'; c.shadowBlur = 22;
+        c.fillStyle = on ? '#ffffff' : '#3a2a4a'; c.fillText(ln, cw / 2, ch / 2 + (i - (n - 1) / 2) * ch / (n + 0.2));
+        c.shadowBlur = 0; c.strokeStyle = on ? col : '#2a1a3a'; c.lineWidth = 3; c.strokeText(ln, cw / 2, ch / 2 + (i - (n - 1) / 2) * ch / (n + 0.2));
+      });
+      c.strokeStyle = on ? cols[0] : '#2a1a3a'; c.lineWidth = 8; c.shadowColor = on ? cols[0] : 'transparent'; c.shadowBlur = 16; c.strokeRect(8, 8, cw - 16, ch - 16); c.shadowBlur = 0;
+    });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: nc.tex, side: o.double ? THREE.DoubleSide : THREE.FrontSide }));
+    m.position.set(x, y, z); m.rotation.y = rotY; scene.add(m);
+    if (o.flicker !== false) { let last = 1; const seed = Math.random() * 4 | 0; W.dyn.push({ update(dt, bi) { const on = (bi.inBar === seed && bi.phase < 0.1 && (bi.bar % 2 === 0)) ? 0 : 1; if (on !== last) { last = on; nc.redraw(on); } } }); }
+    return m;
+  };
+  // something that travels a path and carries/knocks the player (trams, trains, barges)
+  K.mover = ({ path, size, y, speed, loop = true, visual, hazard = true, msg, phase = 0, onPass }) => {
+    const P = path.map(p => V3(p[0], y, p[1])); if (loop) P.push(P[0].clone());
+    const segs = []; let L = 0; for (let i = 0; i < P.length - 1; i++) { const len = P[i].distanceTo(P[i + 1]); segs.push({ a: P[i], b: P[i + 1], len, s0: L }); L += len; }
+    const [sx, sy, sz] = size;
+    const col = { x0: 0, y0: y, z0: 0, x1: 0, y1: y + sy, z1: 0, tag: 'mover', vx: 0, vz: 0, hazard, msg, dyn: true };
+    W.addDyn ? W.addDyn(col) : W.boxes.push(Object.assign(col, { dyn: true }));
+    scene.add(visual);
+    const M = { col, visual, s: phase * L, dir: 1, L };
+    W.dyn.push({ update(dt) {
+      let s = M.s + speed * dt * M.dir;
+      if (loop) s = ((s % L) + L) % L; else if (s > L || s < 0) { M.dir *= -1; s = U.clamp(s, 0, L); }
+      M.s = s;
+      let g = segs[0]; for (const sg of segs) if (s >= sg.s0 && s <= sg.s0 + sg.len) g = sg;
+      const t = (s - g.s0) / g.len, x = U.lerp(g.a.x, g.b.x, t), z = U.lerp(g.a.z, g.b.z, t);
+      const dx = (g.b.x - g.a.x) / g.len * M.dir, dz = (g.b.z - g.a.z) / g.len * M.dir;
+      const along = Math.abs(dx) > Math.abs(dz);
+      const hx = (along ? sz : sx) / 2, hz = (along ? sx : sz) / 2;
+      col.vx = dx * speed; col.vz = dz * speed;
+      col.x0 = x - hx; col.x1 = x + hx; col.z0 = z - hz; col.z1 = z + hz;
+      visual.position.set(x, y, z); visual.rotation.y = Math.atan2(dx, dz);
+      if (onPass) onPass(M, x, z);
+    } });
+    (W.movers || (W.movers = [])).push(M);
+    return M;
+  };
+  // rain streaks that follow the camera around
+  K.rain = (n = 420, color = 0xa9b8ff) => {
+    const pos = new Float32Array(n * 6), drops = [];
+    for (let i = 0; i < n; i++) drops.push({ x: (Math.random() - 0.5) * 60, y: Math.random() * 30, z: (Math.random() - 0.5) * 60, v: 26 + Math.random() * 10 });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const ls = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.45, fog: true }));
+    ls.frustumCulled = false; scene.add(ls);
+    W.dyn.push({ update(dt) {
+      const c = G.camera.position;
+      for (let i = 0; i < n; i++) {
+        const d = drops[i]; d.y -= d.v * dt;
+        if (d.y < -12) { d.y = 18 + Math.random() * 8; d.x = (Math.random() - 0.5) * 60; d.z = (Math.random() - 0.5) * 60; }
+        const x = c.x + d.x, y = c.y + d.y, z = c.z + d.z;
+        pos[i * 6] = x; pos[i * 6 + 1] = y; pos[i * 6 + 2] = z; pos[i * 6 + 3] = x - 0.05; pos[i * 6 + 4] = y - 0.9; pos[i * 6 + 5] = z;
+      }
+      g.attributes.position.needsUpdate = true;
+    } });
+  };
   K.poster = (lines, x, y, z, w, h, rotY, opts = {}) => {
     const t = posterTex(lines, opts).tex;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshToonMaterial({ map: t, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: opts.double ? THREE.DoubleSide : THREE.FrontSide }));
@@ -199,17 +462,22 @@ function makeKit(meta) {
   };
 
   // giant broadcast screen (Minister / DJ Static / static)
-  K.screen = (pos, w, h, rotY = 0) => {
+  K.screen = (pos, w, h, rotY = 0, name = null) => {
     const st = { mode: 'minister', talking: false, wink: false, mood: 'happy', caption: 'GOOD EVENING, GLEAM CITY!', t: 0, acc: 0 };
     const sc = canvasTex(640, 360, (x, cw, ch) => {
       if (st.mode === 'dj') drawDJ(x, cw, ch, st.t, st);
+      else if (st.mode === 'news') drawNews(x, cw, ch, st.t, st);
+      else if (st.mode === 'project') drawDossier(x, cw, ch, st.t, st);
+      else if (st.mode === 'off') { x.fillStyle = '#0b0b14'; x.fillRect(0, 0, cw, ch); }
       else if (st.mode === 'static') { drawStatic(x, cw, ch); x.fillStyle = 'rgba(255,46,136,.25)'; x.fillRect(0, 0, cw, ch); x.fillStyle = '#fff'; x.font = `40px ${FONT.dot}`; x.textAlign = 'center'; x.fillText('SIGNAL INTERRUPTED', cw / 2, ch / 2); x.textAlign = 'left'; }
       else drawMinister(x, cw, ch, st.t, st);
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: sc.tex, fog: false }));
     mesh.position.copy(pos); mesh.rotation.y = rotY; scene.add(mesh);
-    W.screen = { st, sc, mesh, pos: pos.clone() };
-    W.dyn.push({ update(dt) { st.t += dt; st.acc += dt; if (st.acc > 1 / 15) { st.acc = 0; sc.redraw(); } } });
+    const S = { st, sc, mesh, pos: pos.clone(), rotY };
+    if (name) (W.screens || (W.screens = {}))[name] = S; else W.screen = S;
+    W.dyn.push({ update(dt) { if (!mesh.visible) return; st.t += dt; st.acc += dt; if (st.acc > 1 / 15) { st.acc = 0; sc.redraw(); } } });
+    return S;
   };
 
   K.relays = (defs) => {
@@ -228,6 +496,18 @@ function makeKit(meta) {
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.9, 80, 10, 1, true), beamMat); beam.position.y = 42; g.add(beam);
       const rings = [];
       for (let i = 0; i < 2; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 6, 28), new THREE.MeshBasicMaterial({ color: 0xff2e88, transparent: true, opacity: 0 })); r.rotation.x = Math.PI / 2; r.position.y = 0.2; g.add(r); rings.push(r); }
+      if (d.style === 'scrambler') {   // Bolt's scrambler, clamped onto the relay
+        const sc = part(new THREE.BoxGeometry(0.7, 0.5, 0.5), '#8ff0c8', 0.03); sc.position.set(0.55, 1.9, 0.1); g.add(sc);
+        const led = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.02), basic('#14101f')); led.position.set(0.55, 1.95, 0.36); g.add(led); d.led = led;
+        spk.material = toon('#2b2d42');
+      } else if (d.style === 'junction') {
+        spk.scale.set(1.3, 1.6, 1.1); spk.position.y = 1.4; spk.material = toon('#5b6078');
+      } else if (d.style === 'valve') {
+        dishG.visible = false; mast.visible = false; bulb.position.y = 2.6;
+        const wheel = part(new THREE.TorusGeometry(0.7, 0.09, 6, 18), '#ff2e88', 0.03); wheel.position.set(0, 1.9, 0.45); g.add(wheel); d.wheel = wheel;
+        for (let i = 0; i < 3; i++) { const sp = part(new THREE.BoxGeometry(1.3, 0.07, 0.07), '#ff2e88', 0); sp.rotation.z = i * Math.PI / 3; wheel.add(sp); }
+        const pipe = part(new THREE.CylinderGeometry(0.35, 0.35, 2.6, 12), '#8a8fa8', 0.03); pipe.position.y = 1.3; g.add(pipe);
+      }
       W.relays.push({ ...d, g, dishG, bulb, beam, rings, cone, active: false, t: Math.random() * 3 });
     }
   };
@@ -300,24 +580,26 @@ function makeKit(meta) {
     } });
   };
   // a platform that rides an 8-beat cycle between y0 and y1
-  K.lift = ({ x0, z0, x1, z1, y0, y1, postBase = y0 - 1 }) => {
+  // piston: true hangs a rod under the plate (sinks into a base block the world draws) and drops the guide posts
+  K.lift = ({ x0, z0, x1, z1, y0, y1, postBase = y0 - 1, phase = 0, piston = false, color = '#3a3550' }) => {
     const plat = new THREE.Group(); scene.add(plat);
     const hz = canvasTex(128, 128, (x, w, h) => { x.fillStyle = PAL.yellow; x.fillRect(0, 0, w, h); x.fillStyle = PAL.ink; for (let i = -4; i < 8; i++) { x.beginPath(); x.moveTo(i * 32, 0); x.lineTo(i * 32 + 16, 0); x.lineTo(i * 32 + 16 + 128, h); x.lineTo(i * 32 + 128, h); x.fill(); } }, { repeat: true }).tex;
     const w = x1 - x0, d = z1 - z0;
-    const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), [toon('#3a3550'), toon('#3a3550'), toon('#ffffff', { map: hz, noCache: true }), toon('#3a3550'), toon('#3a3550'), toon('#3a3550')]);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), [toon(color), toon(color), toon('#ffffff', { map: hz, noCache: true }), toon(color), toon(color), toon(color)]);
     outline(top, 0.06); top.position.y = -0.25; plat.add(top);
     const spk = part(new THREE.CylinderGeometry(Math.min(w, d) * 0.25, Math.min(w, d) * 0.28, 0.6, 16), '#14101f', 0.04); spk.position.y = -0.8; plat.add(spk);
-    for (const [x, z] of [[x0 + 0.3, z0 - 0.3], [x1 - 0.3, z0 - 0.3], [x0 + 0.3, z1 + 0.3], [x1 - 0.3, z1 + 0.3]]) K.cyl(x, postBase, z, 0.15, y1 + 2 - postBase, '#5b4a6b', { outline: 0.03 });
+    if (piston) { const len = y1 - y0 + 0.6, rod = part(new THREE.CylinderGeometry(Math.min(w, d) * 0.18, Math.min(w, d) * 0.18, len, 12), '#d9d4ea', 0.04); rod.position.y = -0.5 - len / 2; plat.add(rod); }
+    else for (const [x, z] of [[x0 + 0.3, z0 - 0.3], [x1 - 0.3, z0 - 0.3], [x0 + 0.3, z1 + 0.3], [x1 - 0.3, z1 + 0.3]]) K.cyl(x, postBase, z, 0.15, y1 + 2 - postBase, '#5b4a6b', { outline: 0.03 });
     const col = { x0, y0: y0 - 0.5, z0, x1, y1: y0, z1, tag: 'lift' };
     W.boxes.push(col);
-    W.lift = { plat, col, y: y0 };
+    const L = { plat, col, y: y0 }; W.lift = L; (W.lifts || (W.lifts = [])).push(L);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     W.dyn.push({ update(dt, bi) {
-      const p = ((bi.b % 8) + 8) % 8;
+      const p = (((bi.b + phase) % 8) + 8) % 8;
       let s = p < 2 ? 0 : p < 4 ? U.smooth((p - 2) / 2) : p < 6 ? 1 : 1 - U.smooth((p - 6) / 2);
       if (!bi.playing) s = 0;
       const y = U.lerp(y0, y1, s);
-      col.y1 = y; col.y0 = y - 0.5; W.lift.y = y;
+      col.y1 = y; col.y0 = y - 0.5; L.y = y;
       plat.position.set(cx, y, cz);
       spk.scale.setScalar(1 + Math.exp(-bi.phase * 7) * 0.08);
     } });
@@ -372,52 +654,98 @@ function makeKit(meta) {
 
   // ---- finish: ground queries, rail visuals, batch ----
   K.finish = () => {
+    // broad-phase grids
+    W.grid = makeGrid(16); W.rampGrid = makeGrid(16); W.dynBoxes = [];
+    for (const b of W.boxes) { if (b.dyn) W.dynBoxes.push(b); else W.grid.add(b, b.x0, b.z0, b.x1, b.z1); }
+    for (const rp of W.ramps) W.rampGrid.add(rp, rp.x0, rp.z0, rp.x1, rp.z1);
+    const _q = [], _qr = [];
+    W.near = (x0, z0, x1, z1, out = []) => { W.grid.query(x0, z0, x1, z1, out); for (const b of W.dynBoxes) out.push(b); return out; };
+    W.addDyn = (b) => { b.dyn = true; W.boxes.push(b); W.dynBoxes.push(b); return b; };
     W.groundAt = (x, z, yMax = 1e9, r = 0.18) => {
       let best = -1e9, hit = null;
-      for (const b of W.boxes) {
+      W.near(x - r, z - r, x + r, z + r, _q);
+      for (const b of _q) {
         if (x < b.x0 - r || x > b.x1 + r || z < b.z0 - r || z > b.z1 + r) continue;
         if (b.y1 <= yMax && b.y1 > best) { best = b.y1; hit = b; }
       }
-      for (const rp of W.ramps) {
+      W.rampGrid.query(x, z, x, z, _qr);
+      for (const rp of _qr) {
         if (x < rp.x0 || x > rp.x1 || z < rp.z0 || z > rp.z1) continue;
         const h = rampH(rp, x, z);
         if (h <= yMax && h > best) { best = h; hit = rp; }
       }
       return { y: best, hit };
     };
+    // rails
+    W.railGrid = makeGrid(8);
     for (const d of railDefs) {
-      const r = { pts: d.pts, zip: !!d.zip };
-      r.segs = []; let L = 0;
-      for (let i = 0; i < d.pts.length - 1; i++) { const a = d.pts[i], b = d.pts[i + 1]; const len = a.distanceTo(b); r.segs.push({ a, b, len, dir: V3().subVectors(b, a).normalize(), s0: L }); L += len; }
-      r.len = L; W.rails.push(r);
-      if (d.hidden) continue;             // e.g. bench edges: the bench itself is the visual
-      for (const s of r.segs) K.rod(s.a, s.b, d.kind === 'cable' ? 0.06 : 0.085, d.color || '#ffd23f', 0.035);
-      if (d.kind !== 'cable' && d.posts !== false) {
-        const n = Math.max(2, Math.ceil(r.len / 3));
-        for (let i = 0; i <= n; i++) {
-          const p = railPoint(r, r.len * i / n);
-          const g = W.groundAt(p.x, p.z, p.y - 0.2, 0).y;
-          if (g > -1e8 && p.y - g < 6) K.cyl(p.x, g, p.z, 0.06, p.y - g, '#3a3550', { outline: 0.025 });
+      const kind = d.kind || 'rail';
+      let P = d.pts;
+      if (d.sag || (kind === 'cable' && d.sag !== 0 && P.length === 2)) {
+        const sag = d.sag ?? 0.6, Q = [];
+        for (let i = 0; i < P.length - 1; i++) {
+          const a = P[i], b = P[i + 1], L = a.distanceTo(b), n = Math.max(6, Math.ceil(L / 1.2)), dip = sag * L / 20;
+          for (let k = (i ? 1 : 0); k <= n; k++) { const t = k / n; Q.push(V3().lerpVectors(a, b, t).add(V3(0, -4 * dip * t * (1 - t), 0))); }
         }
-      } else if (d.kind === 'cable') {
-        for (const p of [r.pts[0], r.pts[r.pts.length - 1]]) {
-          const g = W.groundAt(p.x, p.z, p.y - 0.2, 0.3).y;
-          if (g > -1e8 && p.y - g < 18) K.cyl(p.x, g, p.z, 0.11, p.y - g + 0.3, '#5b4a6b', { outline: 0.03 });
+        P = Q;
+      } else {
+        P = fillet(P, d.round ?? (kind === 'cable' ? 0 : 2.6), d.loop);
+      }
+      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0 };
+      let L = 0;
+      for (let i = 0; i < P.length - 1; i++) {
+        const a = P[i], b = P[i + 1], len = a.distanceTo(b);
+        if (len < 1e-4) continue;
+        const sg = { a, b, len, dir: V3().subVectors(b, a).normalize(), s0: L, r };
+        r.segs.push(sg); L += len;
+        W.railGrid.add(sg, Math.min(a.x, b.x) - 2.4, Math.min(a.z, b.z) - 2.4, Math.max(a.x, b.x) + 2.4, Math.max(a.z, b.z) + 2.4);
+      }
+      r.len = L; W.rails.push(r);
+      if (d.hidden) continue;
+      const rad = d.radius ?? (kind === 'pipe' ? 0.32 : kind === 'cable' ? 0.06 : 0.09);
+      const color = d.color || (kind === 'pipe' ? '#8a8fa8' : kind === 'cable' ? '#14101f' : '#ffd23f');
+      const VP = P.map(p => V3(p.x, p.y - rad * 0.7, p.z));
+      const radial = kind === 'pipe' ? 10 : 6;
+      B.add(tubeGeo(VP, rad, radial), null, color, d.mat || 'plain', { outlineT: 0, edges: false });
+      B.addOutline(tubeGeo(VP, rad + (kind === 'pipe' ? 0.06 : 0.035), radial));
+      if (kind === 'pipe') {      // collars
+        for (let s = 2; s < L - 1; s += 5) { const c = railPoint(r, s), dd = railDir(r, s); K.rod(V3(c.x, c.y - rad * 0.7, c.z).addScaledVector(dd, -0.15), V3(c.x, c.y - rad * 0.7, c.z).addScaledVector(dd, 0.15), rad + 0.07, d.collar || '#5b6078', 0.03); }
+      }
+      if (kind === 'rail' && d.posts !== false) {
+        const n = Math.max(2, Math.ceil(L / 3.6)), pm = d.postMax ?? 7;
+        for (let i = 0; i <= n; i++) {
+          const pp = railPoint(r, L * i / n);
+          const g = W.groundAt(pp.x, pp.z, pp.y - 0.25, 0).y;
+          if (g > -1e8 && pp.y - g < pm && pp.y - g > 0.15) K.cyl(pp.x, g, pp.z, 0.06, pp.y - g - 0.05, d.postColor || '#3a3550', { outline: 0.025, seg: 6 });
+        }
+      } else if (kind === 'cable' && d.posts !== false) {
+        for (const pp of [P[0], P[P.length - 1]]) {
+          const g = W.groundAt(pp.x, pp.z, pp.y - 0.2, 0.3).y;
+          if (g > -1e8 && pp.y - g < 22) K.cyl(pp.x, g, pp.z, 0.11, pp.y - g + 0.35, '#5b4a6b', { outline: 0.03, seg: 8 });
         }
       }
       if (d.laundry) {
         const cols = ['#e9e4f5', '#c9c4d8', '#e9e4f5', '#ff2e88', '#c9c4d8', '#e9e4f5', '#c9c4d8'];
         let k = 0;
-        for (let t = 2; t < r.len - 1; t += 2.6) {
-          const p = railPoint(r, t);
-          B.add(new THREE.BoxGeometry(1.1, 1.3, 0.05), new THREE.Matrix4().makeTranslation(p.x, p.y - 0.7, p.z), cols[k++ % cols.length], 'plain', { outlineT: 0.03, edges: false });
+        for (let t = 2; t < L - 1; t += 2.6) {
+          const pp = railPoint(r, t);
+          B.add(new THREE.BoxGeometry(1.1, 1.3, 0.05), new THREE.Matrix4().makeTranslation(pp.x, pp.y - 0.7, pp.z), cols[k++ % cols.length], 'plain', { outlineT: 0.03, edges: false });
+        }
+      }
+      if (d.lanterns) {
+        const cols = d.lanterns === true ? ['#ff2e88', '#ffd23f', '#ff7a2f'] : d.lanterns; let k = 0;
+        for (let t = 1.5; t < L - 1; t += 2.2) {
+          const pp = railPoint(r, t);
+          K.sphere(pp.x, pp.y - 0.75, pp.z, 0.32, cols[k++ % cols.length], { kind: 'glow', outline: 0.03, seg: 8, sy: 1.25 });
         }
       }
     }
-    scene.add(B.build(worldMaterials()));
+    scene.add(B.build(worldMaterials(W.night)));
     W.relaysOn = () => W.relays.filter(r => r.active).length;
     W.tapesGot = () => W.tapes.filter(t => t.got).length;
     return W;
   };
   return K;
 }
+
+const _kv = V3(), _kv2 = V3();

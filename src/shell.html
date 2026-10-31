@@ -145,6 +145,10 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
 .dlg.screen { background: var(--ink); color: var(--paper); border-color: var(--paper); box-shadow: 8px 8px 0 var(--hot); }
 .dlg.screen .tag { background: var(--paper); color: var(--ink); font-family: var(--f-dot); }
 .dlg.screen p { font-family: var(--f-dot); font-weight: 400; }
+.dlg.lull { background: #140a08; color: #ffc46b; border-color: #ff7a2f; box-shadow: 8px 8px 0 #8ff0c8; }
+.dlg.lull .tag { background: #8ff0c8; color: var(--ink); font-family: var(--f-dot); }
+.dlg.lull p { font-family: var(--f-dot); font-weight: 400; letter-spacing: .03em; text-shadow: 0 0 8px rgba(255,122,47,.8); }
+.dlg.gnn .tag { background: #c8102e; color: #fff; }
 .dlg.radio .tag::after { content: "ON AIR"; margin-left: 8px; padding: 0 6px; border-radius: 4px; background: var(--hot); color: var(--paper); font-size: 10px; vertical-align: 2px; }
 .dlg.bolt.radio .tag::after { background: var(--lime); color: var(--ink); }
 
@@ -162,6 +166,8 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
 .decree em { font-style: normal; font-family: var(--f-display); color: var(--hot); margin-left: 4px; }
 .lede { max-width: 46ch; margin: 18px 0 0; font-size: 15px; line-height: 1.55; color: var(--paper); text-shadow: 0 2px 0 var(--ink); }
 .btnrow { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 22px; align-items: center; }
+.btnrow.worlds { margin-top: 10px; gap: 8px; } .btnrow.worlds:empty, .row.worlds:empty { display: none; }
+.btnrow.worlds .ghost { font-size: 13px; padding: 7px 12px; }
 .big { font-family: var(--f-display); font-size: 24px; padding: 12px 34px; border-radius: 40px; background: var(--sun); color: var(--ink); border: 4px solid var(--ink); box-shadow: 6px 6px 0 var(--hot); transform: rotate(-2deg); }
 .big:active { transform: rotate(-2deg) translate(3px, 3px); box-shadow: 3px 3px 0 var(--hot); }
 .ghost { font-family: var(--f-display); font-size: 13px; padding: 8px 16px; border-radius: 30px; background: rgba(20,16,31,.6); color: var(--paper); border: 2px solid var(--paper); letter-spacing: .05em; }
@@ -227,7 +233,7 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
 
 <div id="hud" hidden>
   <div class="hud-tl">
-    <div class="counter sticker"><b>RELAYS</b><span id="relayIcons"><i></i><i></i><i></i><i></i><i></i></span><span class="n" id="relayN">0/5</span></div>
+    <div class="counter sticker"><b id="relayLabel">RELAYS</b><span id="relayIcons"><i></i><i></i><i></i><i></i><i></i></span><span class="n" id="relayN">0/5</span></div>
     <div class="counter tapes sticker"><span class="tape"></span><span class="n" id="tapeN">0/5</span></div>
   </div>
   <div class="topmid">
@@ -261,13 +267,13 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
   <div>
     <h1 class="logo" aria-label="Offbeat"><span>O</span><span>F</span><span>F</span><span>B</span><span>E</span><span>A</span><span>T</span></h1>
     <p class="decree">DECREE 88 · MUSIC OVER 60 BPM IS <s>ILLEGAL</s><em>FUN</em></p>
-    <p class="lede">Gleam City is perfectly happy. It says so on every screen. Strap on your skates, find the pirate relays hidden in the park and across the rooftops, and play the city back to life — one beat at a time.</p>
+    <p class="lede">Gleam City is perfectly happy. It says so on every screen. Strap on your skates, switch on the pirate relays, and play the city back to life — park, rooftops, streets, subway, sewers — one beat at a time. Just don’t ask who’s listening.</p>
     <div class="btnrow">
       <button class="big" id="btnPlay">▶ PLAY</button>
       <button class="ghost" id="btnContinue" hidden>CONTINUE</button>
       <button class="ghost" id="btnSkipIntro" hidden>SKIP INTRO</button>
-      <button class="ghost" id="btnTitleW2" hidden>WORLD 2 · ROOFTOPS</button>
     </div>
+    <div class="btnrow worlds" id="titleWorlds"></div>
     <div class="controls">
       <span class="k"><kbd>W</kbd> skate</span><span class="k"><kbd>A</kbd><kbd>D</kbd> steer</span><span class="k"><kbd>S</kbd> brake</span><span class="k"><kbd>SPACE</kbd> jump</span><span class="k"><kbd>K</kbd>/<kbd>SHIFT</kbd> trick &amp; push</span><span class="k"><kbd>Q</kbd><kbd>E</kbd> / drag: camera</span>
       <span class="t">Thumb on the left: point where you want to go · drag on the right: look around · landscape is best</span>
@@ -283,16 +289,16 @@ body:not(.touch) #hint { bottom: calc(80px + var(--sab)); }
     <label for="vol">MUSIC <input id="vol" type="range" min="0" max="100" value="80"></label>
     <div class="keys">Phone: put your thumb anywhere on the left half and point where you want to go; lift it to coast. Drag on the right half to look around.<br>Keyboard: W skate, A/D steer, S brake, Space jump, K/Shift trick, Q/E camera.<br>Jump and trick ON the beat: the ring closes on each beat. On the ground TRICK is a push. Speaker pads and the beat lift only work in rhythm.</div>
     <div class="row"><button class="b" id="btnResume">RESUME</button><button class="b alt" id="btnRestart">RESTART WORLD</button><button class="b alt" id="btnReplayIntro">REPLAY INTRO</button></div>
-    <div class="row"><button class="b alt" id="btnW1">WORLD 1 · PARK</button><button class="b alt" id="btnW2" hidden>WORLD 2 · ROOFTOPS</button></div>
+    <div class="row worlds" id="pauseWorlds"></div>
   </div>
 </div>
 
 <div id="end" class="overlay" hidden>
   <div class="panel">
-    <span class="end-kicker">END OF DEMO · WORLD 2 CLEAR</span>
-    <h2>The rooftops are grooving. Are you sure whose side you’re on?</h2>
+    <span class="end-kicker">ALL FIVE WORLDS CLEAR · THE END?</span>
+    <h2>Gleam City is free. Freedom is mandatory. Whose side were you on, again?</h2>
     <dl id="endStats"></dl>
-    <p>Next: World 3 — The Streets. Then the subway and the sewers.</p>
+    <p>Keep skating to hunt the golden tapes you missed, or start over and listen to the story again — knowing what you know now.</p>
     <div class="row"><button class="b" id="btnKeep">KEEP SKATING</button><button class="b alt" id="btnAgain">PLAY AGAIN</button></div>
   </div>
 </div>

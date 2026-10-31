@@ -4,7 +4,7 @@ A mobile-friendly rollerblading game in three.js, inspired by Jet Set Radio: cel
 
 Gleam City is perfectly happy — it says so on every screen. The Ministry of Good Vibes has outlawed music faster than a resting heartbeat (Decree 88). A pirate DJ called **Static** hijacks the city's giant screen and asks anyone with fast feet to switch his hidden relays back on. Juno laces up her skates. What could go wrong?
 
-This repo contains the **demo**: the intro cutscene, **World 1 — Gleam Civic Park** (walled in, nowhere to fall: the place to learn the controls) and **World 2 — Upper Gleam Rooftops** (long drops, unlocked by finishing the park).
+The full story runs across **five worlds**. It starts sunny and silly, then gets darker and much less trustworthy: who is Static really, who is the masked Hush, and why do the drones keep thanking Juno for the data?
 
 ## Play
 
@@ -37,11 +37,19 @@ The soundtrack is generated live with WebAudio (no audio files) and reacts both 
 
 ## Worlds
 
-**World 1 — Gleam Civic Park.** Daytime, sunny shuffle soundtrack in G with a whistled hook. A fountain with a statue of Minister Glee, a skate zone with a big quarter pipe, a pond with an island, a bandstand, a playground and a grassy hill. Secrets: a hedge that dances on the beat (it's a hologram), a tunnel behind the bushes, a catwalk behind the giant screen, the statue's hat and the tallest tree.
+Every world is big and split into districts with their own mood, linked by long rails that bend round corners, climb, dive and hand you on to the next rail. Rail ends point somewhere worth going.
 
-**World 2 — Upper Gleam Rooftops.** Sunset, funk in D dorian. Hidden passages include a holographic kiosk, a vent duct into a sealed courtyard, a balcony below a roof edge, a beat-locked shed, a beat lift and a zipline.
+**World 1 — Gleam Civic Park, “Wake Up”.** Sunny shuffle in G with a whistled hook. Walled in, nowhere to fall: the place to learn the controls. Plaza and fountain, skate zone, pond with the Pond Snake rail, bandstand loop, beat-locked shed, a hill-ridge rail, the Hedge Rail lap and the Greenhouse Gardens with a spiral rail round the old tree.
 
-Each world has five relays and five golden tapes. The tapes, and the endings, carry the first hints that the story isn't quite what Static says it is.
+**World 2 — Upper Gleam Rooftops, “Higher Ground”.** Sunset funk in D dorian. Rails that wrap round building corners, Billboard Row, a zipline, a vent duct into a sealed courtyard, a beat lift. Ending: Agent Juno — and the news has a police sketch with very familiar headphones.
+
+**World 3 — The Neon Mile, “Wanted”.** Night, rain, boom bap in F minor. Lantern Market, the Loop Overpass round the Media Tower, Broadcast Avenue with trams to ride, the canal quay and a port crane. Meet **Lull**, leader of the Hush, who talks through an LED sign. Clip Bolt's scramblers onto the relays.
+
+**World 4 — Undergleam, “Underground”.** Drum & bass in D minor. Grand Central, the East Tunnel, the Ministry server hall and abandoned Old Gleam Central. Trains run on both lines (and hit you on the rails, too). Follow the glowing cable through five junctions to a tiny office with an ON AIR sign.
+
+**World 5 — The Deep Beat, “The Beat Below”.** Dub techno in C minor. The Overflow Canals, the Pipe Cathedral with its 3½-turn spiral pipe, the Waterfall Terraces, a Pumping Station whose pistons rise on the beat, and the Mood Engine: a colossal metronome with a pendulum and steam vents that fire on beats 3 and 4. Open five valves on the beat. Then everyone wants to tell you what to play.
+
+Each world has five objectives (relays, scramblers, junctions, valves) and five golden tapes. The tapes are where the real story hides.
 
 ## Code
 
@@ -52,17 +60,17 @@ src/core.js        renderer, toon materials, inverted-hull outlines, static geom
 src/audio.js       sequencer, synthesized instruments, reactive mix, beat clock & timing judge, SFX
 src/characters.js  procedural rigs with IK legs, poses, faces; Smile Drone
 src/kit.js         shared level building blocks: colliders, rails, pads, shutter, lift, relays, tapes, drones, sky
-src/world_park.js  World 1, the park
-src/world_roofs.js World 2, the rooftops
+src/world_park.js    World 1, the park
+src/world_roofs.js   World 2, the rooftops
+src/world_streets.js World 3, the streets
+src/world_subway.js  World 4, the subway
+src/world_sewers.js  World 5, the sewers
 src/player.js      input (touch joystick + buttons, keyboard), physics, grinding, tricks, chase camera
-src/cutscene.js    click-to-advance 3D cutscenes: intro, park ending, rooftop ending
+src/cutscene.js    click-to-advance 3D cutscenes, the intro and the first ending
+src/story.js       arrival scenes and endings for worlds 2–5, and the finale
 src/game.js        state machine, HUD, scoring, triggers, main loop
 src/shell.html     page markup and styles
 build.py           assembles everything into index.html
 ```
 
 Rebuild after editing: `python3 build.py`. three.js r149 loads from jsDelivr.
-
-## Roadmap
-
-World 3 The Streets, then the subway and the sewers — each with its own soundtrack, and a story that gets darker and less trustworthy as it goes.

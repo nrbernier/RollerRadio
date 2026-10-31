@@ -10,6 +10,10 @@ const SPEAKERS = {
   'DJ STATIC · RADIO': { cls: 'dj radio', pitch: 300 },
   'MINISTER GLEE': { cls: 'ministry', pitch: 520, screen: true },
   'SMILE DRONE': { cls: 'drone', pitch: 980, actor: 'drone' },
+  'DJ STATIC · LIVE': { cls: 'dj', pitch: 300, actor: 'static' },
+  LULL: { cls: 'lull', pitch: 1500, actor: 'lull', sign: true },
+  'LED SIGN': { cls: 'lull', pitch: 1500 },
+  GNN: { cls: 'ministry gnn', pitch: 560, screen: true },
   SCREEN: { cls: 'screen', pitch: 160 },
   '': { cls: 'narr', pitch: 600 }
 };
@@ -19,7 +23,7 @@ class Cutscene {
     this.shots = shots; this.cast = cast; this.W = world; this.onEnd = onEnd; this.onShot = onShot;
     this.i = -1; this.phase = 'idle'; this.t = 0; this.typed = 0; this.done = false;
     this.camFrom = V3(); this.camTo = V3(); this.lookFrom = V3(); this.lookTo = V3(); this.look = V3();
-    this.actorFrom = {};
+    this.actorFrom = {}; this.scr = world.screen; this.shakeT = 0;
     this.dlg = document.getElementById('dlg'); this.who = document.getElementById('dlgWho'); this.txt = document.getElementById('dlgText');
   }
   start() {
@@ -44,7 +48,12 @@ class Cutscene {
     // side effects at the start of the transition
     if (s.music) { if (s.music === 'stop') Sound.stop(); else if (Sound.song !== s.music) Sound.play(s.music); }
     if (s.sfx) [].concat(s.sfx).forEach(k => Sound.sfx[k] && Sound.sfx[k]());
-    if (s.screen) Object.assign(this.W.screen.st, { talking: false, wink: false }, s.screen);
+    if (s.scr !== undefined) this.scr = (s.scr && this.W.screens && this.W.screens[s.scr]) || this.W.screen;
+    if (s.screen && this.scr) Object.assign(this.scr.st, { talking: false, wink: false }, s.screen);
+    if (s.screens) for (const k in s.screens) { const S = k === 'main' ? this.W.screen : this.W.screens && this.W.screens[k]; if (S) Object.assign(S.st, { talking: false, wink: false }, s.screens[k]); }
+    if (s.props) for (const k in s.props) { const P = this.W.props && this.W.props[k]; if (P) P.visible = s.props[k]; }
+    if (s.signs) for (const k in s.signs) this.cast[k] && this.cast[k].setSign && this.cast[k].setSign(s.signs[k]);
+    if (s.shake) this.shakeT = s.shake;
     if (s.flash) flash(s.flash);
     for (const n in (s.actors || {})) {
       const a = s.actors[n], A = this.cast[n];
@@ -67,14 +76,15 @@ class Cutscene {
     this.phase = 'type'; this.blipAcc = 0;
     this.pitch = sp.pitch;
     this.speaker = sp;
+    if (sp.sign && this.cast[sp.actor]) this.cast[sp.actor].setSign(s.sign ?? '…');
   }
   hideBox() { this.dlg.className = 'dlg'; this.setTalking(false); }
   setTalking(on) {
     for (const n in this.cast) if ('talking' in this.cast[n]) this.cast[n].talking = false;
-    this.W.screen.st.talking = false;
+    if (this.scr) this.scr.st.talking = false;
     if (!on || !this.speaker) return;
     if (this.speaker.actor && this.cast[this.speaker.actor]) this.cast[this.speaker.actor].talking = true;
-    if (this.speaker.screen) this.W.screen.st.talking = true;
+    if (this.speaker.screen && this.scr) this.scr.st.talking = true;
   }
   advance() {
     if (this.done) return;
@@ -117,6 +127,7 @@ class Cutscene {
         if (n >= this.full.length) { this.phase = 'read'; this.setTalking(false); }
       }
     }
+    if (this.shakeT > 0) { this.shakeT = Math.max(0, this.shakeT - dt * 1.5); const a = this.shakeT * 0.25; cam.position.x += (Math.random() - 0.5) * a; cam.position.y += (Math.random() - 0.5) * a; }
     cam.up.set(0, 1, 0);
     cam.lookAt(this.look);
     if (s.roll) cam.rotateZ(s.roll);

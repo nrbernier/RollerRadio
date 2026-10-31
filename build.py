@@ -6,7 +6,7 @@ index.html             -> standalone page (GitHub Pages serves this)
 """
 import pathlib
 ROOT = pathlib.Path(__file__).parent
-ORDER = ['core.js', 'audio.js', 'characters.js', 'kit.js', 'world_park.js', 'world_roofs.js', 'player.js', 'cutscene.js', 'game.js']
+ORDER = ['core.js', 'audio.js', 'characters.js', 'kit.js', 'world_park.js', 'world_roofs.js', 'world_streets.js', 'world_subway.js', 'world_sewers.js', 'player.js', 'cutscene.js', 'story.js', 'game.js']
 CDN = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js'
 
 shell = (ROOT / 'src/shell.html').read_text()

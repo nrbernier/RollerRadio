@@ -2,7 +2,7 @@
 //  INPUT, PARTICLES, PLAYER CONTROLLER, CAMERA
 // ============================================================
 const Input = {
-  move: { x: 0, y: 0 }, keys: {}, jumpQ: [], trickQ: [], camDX: 0, camDY: 0, lastCamInput: -10, enabled: false,
+  move: { x: 0, y: 0 }, keys: {}, jumpQ: [], trickQ: [], camDX: 0, camDY: 0, lastCamInput: -10, enabled: false, jumpHeld: false,
   stick: { id: null, ox: 0, oy: 0, x: 0, y: 0 }, camPtr: null,
   frame: null,                 // stick reference yaw, frozen while the thumb is down
   kb: { fwd: 0, turn: 0 }, kbActive: false,
@@ -12,10 +12,10 @@ const Input = {
       if (e.repeat) return;
       K[e.code] = true;
       if (!this.enabled) return;
-      if (e.code === 'Space') { this.jumpQ.push(e.timeStamp); e.preventDefault(); }
+      if (e.code === 'Space') { this.jumpQ.push(e.timeStamp); this.jumpHeld = true; e.preventDefault(); }
       if (e.code === 'KeyJ' || e.code === 'KeyK' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'Enter') this.trickQ.push(e.timeStamp);
     });
-    window.addEventListener('keyup', e => { K[e.code] = false; });
+    window.addEventListener('keyup', e => { K[e.code] = false; if (e.code === 'Space') this.jumpHeld = false; });
     window.addEventListener('blur', () => { for (const k in K) K[k] = false; this.stick.id = null; this.move.x = this.move.y = 0; });
     const zone = document.getElementById('touch');
     const knob = document.getElementById('knob'), base = document.getElementById('stickbase');
@@ -48,8 +48,8 @@ const Input = {
     zone.addEventListener('pointerup', up); zone.addEventListener('pointercancel', up);
     const btn = (id, q) => {
       const el = document.getElementById(id);
-      el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (this.enabled) q.push(e.timeStamp); el.classList.add('down'); });
-      const rel = () => el.classList.remove('down');
+      el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (this.enabled) q.push(e.timeStamp); if (id === 'btnJump') this.jumpHeld = true; el.classList.add('down'); });
+      const rel = () => { el.classList.remove('down'); if (id === 'btnJump') this.jumpHeld = false; };
       el.addEventListener('pointerup', rel); el.addEventListener('pointercancel', rel); el.addEventListener('pointerleave', rel);
     };
     btn('btnJump', this.jumpQ); btn('btnTrick', this.trickQ);
@@ -114,7 +114,7 @@ class Particles {
 const _pc = new THREE.Color(), _pv = V3();
 
 // ---------- player ----------
-const PH = { GRAV: 26, JUMP: 10, BEATJUMP: 12.6, RUN: 13, MAXSP: 25, ACC: 13, AIRACC: 8, STEP: 0.45, R: 0.42, H: 1.7, SNAP: 0.4 };
+const PH = { GRAV: 26, JUMP: 9, BEATJUMP: 10.6, HOLD: 0.24, HOLDG: 0.36, RUN: 13, MAXSP: 25, ACC: 13, AIRACC: 8, STEP: 0.45, R: 0.42, H: 1.7, SNAP: 0.4 };
 const TRICKS_AIR = [
   { name: '360 SPIN', axis: 'y', amt: 1 }, { name: 'BACKFLIP', axis: 'x', amt: -1 }, { name: 'FLATSPIN 540', axis: 'y', amt: 1.5 },
   { name: 'CORKSCREW', axis: 'z', amt: 1 }, { name: 'FRONTFLIP', axis: 'x', amt: 1 }, { name: 'MISTY 720', axis: 'y', amt: 2 }
@@ -142,8 +142,9 @@ class Player {
   // --- collision helpers
   pushWalls() {
     const W = this.W, p = this.pos, R = PH.R;
-    for (const b of W.boxes) {
+    for (const b of W.near(p.x - R - 0.5, p.z - R - 0.5, p.x + R + 0.5, p.z + R + 0.5, this._nb || (this._nb = []))) {
       if (b.y1 <= p.y + PH.STEP || b.y0 >= p.y + PH.H) continue;
+      if (b.hazard && p.x > b.x0 - R && p.x < b.x1 + R && p.z > b.z0 - R && p.z < b.z1 + R && p.y < b.y1 - 0.25) { this.hooks.hazard?.(b); return; }
       if (p.x < b.x0 - R || p.x > b.x1 + R || p.z < b.z0 - R || p.z > b.z1 + R) continue;
       const cx = U.clamp(p.x, b.x0, b.x1), cz = U.clamp(p.z, b.z0, b.z1);
       let dx = p.x - cx, dz = p.z - cz; const d2 = dx * dx + dz * dz;
@@ -157,7 +158,7 @@ class Player {
       const vn = this.vel.x * nx + this.vel.z * nz;
       if (vn < 0) { this.vel.x -= nx * vn * 1.05; this.vel.z -= nz * vn * 1.05; if (vn < -9) this.hooks.bonk?.(); }
     }
-    for (const rp of W.ramps) {
+    for (const rp of W.rampGrid.query(p.x - R, p.z - R, p.x + R, p.z + R, this._nr || (this._nr = []))) {
       if (p.x < rp.x0 - R || p.x > rp.x1 + R || p.z < rp.z0 - R || p.z > rp.z1 + R) continue;
       if (p.x >= rp.x0 && p.x <= rp.x1 && p.z >= rp.z0 && p.z <= rp.z1) continue;
       const cx = U.clamp(p.x, rp.x0, rp.x1), cz = U.clamp(p.z, rp.z0, rp.z1);
@@ -171,40 +172,58 @@ class Player {
   ceiling() {
     if (this.vel.y <= 0) return;
     const p = this.pos;
-    for (const b of this.W.boxes) {
+    for (const b of this.W.near(p.x - 0.3, p.z - 0.3, p.x + 0.3, p.z + 0.3, this._nc || (this._nc = []))) {
       if (p.x < b.x0 - 0.2 || p.x > b.x1 + 0.2 || p.z < b.z0 - 0.2 || p.z > b.z1 + 0.2) continue;
       if (b.y0 > p.y + 0.6 && b.y0 < p.y + PH.H) { p.y = b.y0 - PH.H; this.vel.y = 0; }
     }
   }
-  tryGrind() {
-    if (this.grindCD > 0 || this.vel.y > 6) return false;
+  tryGrind(dt) {
+    if (this.grindCD > 0) return false;
     const p = this.pos;
-    let best = null, bd = 1e9;
-    for (const r of this.W.rails) for (const s of r.segs) {
+    let best = null, bd = 1e9, near = null, nd = 1e9;
+    const segs = this.W.railGrid.query(p.x - 2.3, p.z - 2.3, p.x + 2.3, p.z + 2.3, this._ns || (this._ns = []));
+    for (const s of segs) {
+      if (s.r === this.lastRail && this.lastRailT < 0.45) continue;
       const t = U.clamp(_v1.subVectors(p, s.a).dot(s.dir), 0, s.len);
       _v2.copy(s.a).addScaledVector(s.dir, t);
       const dxz = Math.hypot(p.x - _v2.x, p.z - _v2.z), dy = p.y - _v2.y;
-      if (dxz < 1.05 && dy > -0.6 && dy < 1.1 && dxz < bd) { bd = dxz; best = { r, s: s.s0 + t, seg: s }; }
+      // latch window: rail anywhere from knee height below the skates to just under them,
+      // on the way up as well as on the way down
+      if (dxz < 1.12 && dy > -0.8 && dy < 1.35 && dxz < bd) { bd = dxz; best = { r: s.r, s: s.s0 + t, seg: s }; }
+      else if (dxz < 2.2 && dy > -0.2 && dy < 2.4 && this.vel.y < 4 && dxz < nd) { nd = dxz; near = _v3.copy(_v2); }
     }
-    if (!best) return false;
-    const seg = best.seg;
-    const along = this.vel.x * seg.dir.x + this.vel.z * seg.dir.z + this.vel.y * seg.dir.y;
+    if (!best) {
+      // gentle magnet: falling close beside a rail drifts you onto it
+      if (near && dt) { const k = Math.min(1, 3.2 * dt); p.x += (near.x - p.x) * k; p.z += (near.z - p.z) * k; }
+      return false;
+    }
+    const seg = best.seg, r = best.r;
+    const along = this.vel.x * seg.dir.x + this.vel.z * seg.dir.z + this.vel.y * seg.dir.y * 0.3;
     let sd = Math.sign(along);
-    if (Math.abs(along) < 1) sd = (Math.sin(this.yaw) * seg.dir.x + Math.cos(this.yaw) * seg.dir.z) >= 0 ? 1 : -1;
-    // don't latch at the very end of the rail heading off
-    if ((sd > 0 && best.s > best.r.len - 0.4) || (sd < 0 && best.s < 0.4)) return false;
-    this.rail = best.r; this.railS = best.s; this.railSD = sd || 1;
-    this.gs = Math.max(9, Math.hypot(this.vel.x, this.vel.z) * 0.95 + 1);
-    this.mode = 'grind'; this.grindT = 0; this.trick = null; this.spinX = this.spinZ = 0;
+    if (Math.abs(along) < 1.5) sd = (Math.sin(this.yaw) * seg.dir.x + Math.cos(this.yaw) * seg.dir.z) >= 0 ? 1 : -1;
+    sd = sd || 1;
+    if (!r.loop && ((sd > 0 && best.s > r.len - 0.5) || (sd < 0 && best.s < 0.5))) return false;
+    this.rail = r; this.railS = best.s; this.railSD = sd;
+    this.gs = U.clamp(Math.abs(along) * 0.9 + 3, 9, 30);
+    this.mode = 'grind'; this.grindT = 0; this.trick = null; this.spinX = this.spinZ = 0; this.jumpHold = false;
     this.hooks.grindStart?.(this.rail);
     return true;
   }
-  leaveRail(jump, beatQ) {
-    const d = railDir(this.rail, this.railS);
+  leaveRail(jump, beatQ, ctl) {
+    const r = this.rail, d = railDir(r, this.railS);
+    const tx = d.x * this.railSD, tz = d.z * this.railSD;
     this.vel.copy(d).multiplyScalar(this.railSD * this.gs);
-    if (jump) { this.vel.y = Math.max(this.vel.y, 0) + (beatQ !== 'miss' ? PH.BEATJUMP : PH.JUMP); }
-    else this.vel.y = Math.max(this.vel.y, 0) + 2.5;
-    this.mode = 'air'; this.airTime = 0; this.rail = null; this.grindCD = 0.32;
+    if (jump) {
+      this.vel.y = Math.max(this.vel.y, 0) + (beatQ !== 'miss' ? PH.BEATJUMP : PH.JUMP);
+      this.jumpHold = true;
+      // rail hop: lean sideways while jumping to transfer to a neighbouring rail
+      const hl = Math.hypot(tx, tz) || 1, rx = -tz / hl, rz = tx / hl;
+      let lat = 0;
+      if (ctl) lat = ctl.tank ? ctl.turn : (ctl.im > 0.3 ? (ctl.dx * rx + ctl.dz * rz) / Math.max(ctl.im, 1e-3) : 0);
+      if (Math.abs(lat) > 0.35) { const k = Math.sign(lat) * 6.6; this.vel.x += rx * k; this.vel.z += rz * k; this.vel.y = 6.8; this.jumpHold = false; this.hooks.railHop?.(); }
+    } else this.vel.y = Math.max(this.vel.y, 0) + 2.5 + (r.endBoost || 0);
+    this.lastRail = r; this.lastRailT = 0;
+    this.mode = 'air'; this.airTime = 0; this.rail = null; this.grindCD = 0.06;
     this.hooks.grindEnd?.();
   }
   doJump(tStamp) {
@@ -220,7 +239,7 @@ class Player {
       return;
     }
     this.vel.y = q !== 'miss' ? PH.BEATJUMP : PH.JUMP;
-    this.mode = 'air'; this.airTime = 0; this.coyote = 0;
+    this.mode = 'air'; this.airTime = 0; this.coyote = 0; this.jumpHold = true;
     this.hooks.jump?.(q);
   }
   onPad() {
@@ -261,7 +280,7 @@ class Player {
 
   update(dt, camYaw, now) {
     const W = this.W, p = this.pos, v = this.vel;
-    this.grindCD -= dt; this.coyote -= dt; this.landT = Math.max(0, this.landT - dt * 3); this.pushT = Math.max(0, this.pushT - dt * 3);
+    this.grindCD -= dt; this.coyote -= dt; this.lastRailT = (this.lastRailT || 0) + dt; this.landT = Math.max(0, this.landT - dt * 3); this.pushT = Math.max(0, this.pushT - dt * 3);
     // input
     const ix = Input.move.x, iy = Input.move.y; const im = Math.hypot(ix, iy);
     // the stick's frame of reference is captured when the thumb lands (or re-centres),
@@ -275,7 +294,7 @@ class Player {
     // queued buttons
     const jumps = Input.jumpQ.splice(0), tricks = Input.trickQ.splice(0);
     for (const t of jumps) {
-      if (this.mode === 'grind') { const q = Sound.judge(t); this.leaveRail(true, q); this.hooks.jump?.(q, true); }
+      if (this.mode === 'grind') { const q = Sound.judge(t); this.leaveRail(true, q, ctl); this.hooks.jump?.(q, true); }
       else if (this.mode === 'ground' || this.coyote > 0) this.doJump(t);
     }
     for (const t of tricks) this.doTrick(t);
@@ -350,6 +369,7 @@ class Player {
       const g = W.groundAt(p.x, p.z, p.y + PH.STEP);
       if (g.y >= p.y - PH.SNAP && g.y > -1e8) {
         p.y = g.y; this.ground = g.hit;
+        if (g.hit && g.hit.vx !== undefined) { p.x += g.hit.vx * dt; p.z += g.hit.vz * dt; }   // ride moving platforms
         // vertical speed only from slopes (launch off kickers) or the moving lift
         if (g.hit && g.hit.axis) { const rp = g.hit, gr = (rp.h1 - rp.h0) / (rp.axis === 'x' ? rp.x1 - rp.x0 : rp.z1 - rp.z0); v.y = gr * (rp.axis === 'x' ? v.x : v.z); }
         else if (g.hit && g.hit.tag === 'lift') v.y = U.clamp((p.y - oy) / dt, 0, 10) * 0.6;
@@ -360,7 +380,8 @@ class Player {
       }
     } else { // air
       this.airTime += dt;
-      v.y = Math.max(-42, v.y - PH.GRAV * dt);
+      if (this.jumpHold && (!Input.jumpHeld || this.airTime > PH.HOLD || v.y <= 0)) this.jumpHold = false;
+      v.y = Math.max(-42, v.y - PH.GRAV * (this.jumpHold ? PH.HOLDG : 1) * dt);
       if (ctl.tank) {
         // gentle air steering: rotate the flight path
         const a = -ctl.turn * 1.9 * dt, c = Math.cos(a), s = Math.sin(a);
@@ -374,7 +395,7 @@ class Player {
       const oy = p.y;
       p.x += v.x * dt; p.y += v.y * dt; p.z += v.z * dt;
       this.pushWalls(); this.ceiling();
-      if (this.tryGrind()) return;
+      if (this.tryGrind(dt)) return;
       if (v.y <= 0) {
         const g = W.groundAt(p.x, p.z, oy + 0.05);
         if (g.y > -1e8 && p.y <= g.y) {
@@ -382,7 +403,7 @@ class Player {
           const impact = -v.y; v.y = 0;
           if (impact > 14) { const k = U.clamp(1 - (impact - 14) / 40, 0.6, 1); v.x *= k; v.z *= k; }
           if (this.padLand) { v.x *= 0.25; v.z *= 0.25; this.padLand = false; }   // stick the landing after a launch
-          this.mode = 'ground'; this.landT = U.clamp(impact / 25, 0.2, 1);
+          this.mode = 'ground'; this.landT = U.clamp(impact / 25, 0.2, 1); this.jumpHold = false;
           this.hooks.land?.(impact, this.airTime, this.spinLeft());
           this.airTime = 0; this.trickQueue = 0;
         }
@@ -394,11 +415,19 @@ class Player {
     const r = this.rail; const p = this.pos;
     this.grindT += dt;
     const d = railDir(r, this.railS);
-    this.gs += -PH.GRAV * d.y * this.railSD * 0.6 * dt;
-    this.gs = U.clamp(this.gs, 5, 29);
+    const climb = d.y * this.railSD;
+    this.gs += -PH.GRAV * climb * 0.6 * dt;
+    if (climb < 0.06 && this.gs < 12) this.gs += (12 - this.gs) * 1.1 * dt;   // rails carry you: ease up to cruising speed
+    this.gs = U.clamp(this.gs, Math.max(6, r.minSpeed || 0), 32);
     this.railS += this.railSD * this.gs * dt;
-    if (this.railS <= 0 || this.railS >= r.len) { this.railS = U.clamp(this.railS, 0, r.len); p.copy(railPoint(r, this.railS)); this.leaveRail(false); return; }
+    if (r.loop) this.railS = ((this.railS % r.len) + r.len) % r.len;
+    else if (this.railS <= 0 || this.railS >= r.len) { this.railS = U.clamp(this.railS, 0, r.len); p.copy(railPoint(r, this.railS)); this.leaveRail(false); return; }
     p.copy(railPoint(r, this.railS));
+    // moving hazards (trains, pendulums, steam) still hit you on a rail
+    for (const b of this.W.dynBoxes || []) {
+      if (!b.hazard) continue;
+      if (p.x > b.x0 - PH.R && p.x < b.x1 + PH.R && p.z > b.z0 - PH.R && p.z < b.z1 + PH.R && p.y < b.y1 - 0.25 && p.y + PH.H > b.y0) { this.rail = null; this.mode = 'air'; this.hooks.hazard?.(b); return; }
+    }
     const dd = railDir(r, this.railS);
     this.yaw = U.angDamp(this.yaw, Math.atan2(dd.x * this.railSD, dd.z * this.railSD), 18, dt);
     this.vel.copy(dd).multiplyScalar(this.railSD * this.gs);
@@ -467,7 +496,8 @@ class CamRig {
     // occlusion: pull the camera in front of walls
     const dir = _c3.subVectors(want, tgt); const len = dir.length(); dir.divideScalar(len);
     let tmin = len;
-    for (const b of this.W.boxes) {
+    for (const b of this.W.near(Math.min(tgt.x, want.x) - 0.5, Math.min(tgt.z, want.z) - 0.5, Math.max(tgt.x, want.x) + 0.5, Math.max(tgt.z, want.z) + 0.5, this._q || (this._q = []))) {
+      if (b.nocam || b.hazard) continue;
       const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
     }
     for (const b of (this.W.camBoxes || [])) {

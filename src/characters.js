@@ -17,9 +17,13 @@ function faceTextures(skin, style) {
     eye(64 - ex, e); eye(64 + ex, e);
     if (mood === 'worried') { x.lineWidth = 4; x.beginPath(); x.moveTo(64 - ex - 10, eyeY - 18); x.lineTo(64 - ex + 8, eyeY - 22); x.moveTo(64 + ex + 10, eyeY - 18); x.lineTo(64 + ex - 8, eyeY - 22); x.stroke(); x.lineWidth = 6; }
     if (style.blush) { x.fillStyle = 'rgba(255,60,120,.35)'; x.beginPath(); x.arc(64 - 38, 74, 9, 0, 7); x.arc(64 + 38, 74, 9, 0, 7); x.fill(); x.fillStyle = PAL.ink; }
-    // mouths
+    // mouths (or a zipped mask over them)
     x.lineWidth = 5;
-    if (mood === 'grin' || mood === 'mega') {
+    if (style.mask) {
+      x.fillStyle = style.mask; x.beginPath(); x.moveTo(6, 68); x.quadraticCurveTo(64, 60, 122, 68); x.lineTo(122, 128); x.lineTo(6, 128); x.closePath(); x.fill();
+      x.strokeStyle = '#8ff0c8'; x.lineWidth = 3; x.beginPath(); x.moveTo(44, 90); x.quadraticCurveTo(64, 93, 84, 90); x.stroke();
+      x.fillStyle = '#8ff0c8'; x.beginPath(); x.arc(84, 90, 4, 0, 7); x.fill(); x.fillRect(82, 92, 4, 9); x.strokeStyle = PAL.ink;
+    } else if (mood === 'grin' || mood === 'mega') {
       const s = mood === 'mega' ? 1.5 : 1;
       x.fillStyle = '#fff'; x.beginPath(); x.moveTo(64 - 22 * s, 80); x.quadraticCurveTo(64, 80 + 30 * s, 64 + 22 * s, 80); x.closePath(); x.fill(); x.stroke();
       x.beginPath(); x.moveTo(64 - 20 * s, 81); x.lineTo(64 + 20 * s, 81); x.stroke();
@@ -37,6 +41,30 @@ function faceTextures(skin, style) {
   });
   const moods = ['neutral', 'talk', 'grin', 'mega', 'shock', 'smug', 'worried', 'blink'];
   const out = {}; for (const m of moods) out[m] = draw(m).tex; return out;
+}
+
+function crtFaces() {
+  const draw = (mood) => canvasTex(128, 96, (x, w, h) => {
+    x.fillStyle = '#0e2a3a'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 380; i++) { x.fillStyle = `rgba(255,255,255,${Math.random() * 0.12})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    x.fillStyle = PAL.cyan; const p = 9;
+    const eyes = { neutral: 'sq', talk: 'sq', grin: 'up', mega: 'up', shock: 'big', smug: 'flat', worried: 'tilt', blink: 'flat' }[mood] || 'sq';
+    for (const cx of [38, 90]) {
+      if (eyes === 'sq') x.fillRect(cx - p, 28, p * 2, p * 2);
+      else if (eyes === 'big') x.fillRect(cx - p * 1.4, 22, p * 2.8, p * 2.8);
+      else if (eyes === 'flat') x.fillRect(cx - p, 36, p * 2, p * 0.7);
+      else if (eyes === 'up') { x.fillRect(cx - p, 36, p * 0.7, p * 0.7); x.fillRect(cx - p * 0.35, 30, p * 0.7, p * 0.7); x.fillRect(cx + p * 0.3, 36, p * 0.7, p * 0.7); }
+      else if (eyes === 'tilt') { x.fillRect(cx - p, 30, p * 2, p * 1.6); x.fillStyle = '#0e2a3a'; x.fillRect(cx - p, 28, p * 2, p * 0.6); x.fillStyle = PAL.cyan; }
+    }
+    if (mood === 'grin' || mood === 'mega') { x.fillRect(36, 62, 56, 6); x.fillRect(30, 56, 8, 8); x.fillRect(90, 56, 8, 8); }
+    else if (mood === 'talk') x.fillRect(46, 58, 36, 16);
+    else if (mood === 'shock') x.fillRect(54, 56, 20, 22);
+    else if (mood === 'worried') { x.fillRect(40, 66, 14, 6); x.fillRect(52, 62, 24, 6); x.fillRect(74, 66, 14, 6); }
+    else if (mood === 'smug') { x.fillRect(48, 64, 36, 6); x.fillRect(82, 58, 8, 8); }
+    else x.fillRect(46, 64, 36, 6);
+    for (let y = 0; y < h; y += 4) { x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(0, y, w, 2); }
+  }, { nearest: true });
+  const out = {}; for (const m of ['neutral', 'talk', 'grin', 'mega', 'shock', 'smug', 'worried', 'blink']) out[m] = draw(m).tex; return out;
 }
 
 class Rig {
@@ -66,11 +94,18 @@ class Rig {
     // head
     this.head = new THREE.Group(); this.head.position.y = 0.78 * s; this.torso.add(this.head);
     const R = 0.21 * s;
-    const skull = part(new THREE.SphereGeometry(R, 18, 14), c.skin, T); skull.scale.set(1, 1.05, 0.98); this.head.add(skull);
-    this.faces = faceTextures(c.skin, spec);
-    this.faceMat = new THREE.MeshBasicMaterial({ map: this.faces.neutral, transparent: true, depthWrite: false });
-    const face = new THREE.Mesh(new THREE.SphereGeometry(R * 1.015, 20, 14, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6), this.faceMat);
-    face.scale.set(1, 1.05, 0.98); face.renderOrder = 2; this.head.add(face);
+    if (spec.crt) {   // a CRT television for a head
+      const tv = part(new THREE.BoxGeometry(R * 2.7, R * 2.15, R * 2.1), '#d9d2c3', T); tv.position.y = R * 0.2; this.head.add(tv);
+      this.faces = crtFaces();
+      this.faceMat = new THREE.MeshBasicMaterial({ map: this.faces.neutral });
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(R * 2.2, R * 1.65), this.faceMat); face.position.set(0, R * 0.2, R * 1.06); this.head.add(face);
+    } else {
+      const skull = part(new THREE.SphereGeometry(R, 18, 14), c.skin, T); skull.scale.set(1, 1.05, 0.98); this.head.add(skull);
+      this.faces = faceTextures(c.skin, spec);
+      this.faceMat = new THREE.MeshBasicMaterial({ map: this.faces.neutral, transparent: true, depthWrite: false });
+      const face = new THREE.Mesh(new THREE.SphereGeometry(R * 1.015, 20, 14, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6), this.faceMat);
+      face.scale.set(1, 1.05, 0.98); face.renderOrder = 2; this.head.add(face);
+    }
     spec.hair && spec.hair(this.head, R, T, s);
     // neck
     const neck = part(new THREE.CylinderGeometry(0.07 * s, 0.08 * s, 0.14 * s, 8), c.skin, 0); neck.position.y = 0.66 * s; this.torso.add(neck);
@@ -84,6 +119,23 @@ class Rig {
       return { g, fore };
     };
     this.armL = mkArm(1); this.armR = mkArm(-1);
+    if (spec.sign) {   // an LED sign hung on the chest: what Lull "says"
+      const frame = part(new THREE.BoxGeometry(0.7 * s, 0.27 * s, 0.04 * s), '#14101f', 0.015); frame.position.set(0, 0.24 * s, 0.24 * s); this.torso.add(frame);
+      this.signTex = canvasTex(320, 96, (x, w, h, txt = '', off = 0, on = true) => {
+        x.fillStyle = '#120808'; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#2a1410'; for (let yy = 4; yy < h; yy += 8) for (let xx = 4; xx < w; xx += 8) x.fillRect(xx, yy, 4, 4);
+        if (!on) return;
+        x.font = `46px ${FONT.dot}`; x.textBaseline = 'middle'; x.fillStyle = '#ffd27a'; x.shadowColor = '#ff7a2f'; x.shadowBlur = 14;
+        const tw = x.measureText(txt).width;
+        if (tw <= w - 16) { x.textAlign = 'center'; x.fillText(txt, w / 2, h / 2 + 3); x.textAlign = 'left'; }
+        else { const span = tw + 120, o = off % span; x.fillText(txt, w - o, h / 2 + 3); x.fillText(txt, w - o + span, h / 2 + 3); }
+        x.shadowBlur = 0;
+      }, { nearest: true });
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.64 * s, 0.21 * s), new THREE.MeshBasicMaterial({ map: this.signTex.tex, fog: false }));
+      face.position.set(0, 0.24 * s, 0.262 * s); this.torso.add(face);
+      this.signTxt = ''; this.signOff = 0; this.signAcc = 0;
+    }
+    if (spec.prop) { this.prop = spec.prop(s); this.prop.position.set(0, -0.36 * s, 0.06 * s); this.armR.fore.add(this.prop); }
     // legs
     const mkLeg = (side) => {
       const g = new THREE.Group(); g.position.set(side * this.hipW, -0.05 * s, 0); this.hips.add(g);
@@ -134,6 +186,9 @@ class Rig {
       wave: Object.assign(b, { aR: [-2.6, 0, -0.5, 0.6], head: [0, 0, -0.1] }),
       stretch: Object.assign(b, { hipY: 1.0 * s, lean: 0.3, fL: [0.35 * s, 0, 0.3], fR: [-0.3 * s, 0, -0.2], aL: [-1.4, 0, 0.2, 0.1], aR: [-1.4, 0, -0.2, 0.1] }),
       ready: Object.assign(b, { hipY: 0.97 * s, lean: 0.3, fL: [0.2 * s, 0, 0.22], fR: [-0.2 * s, 0, -0.2], aL: [0.4, 0, 0.35, 0.9], aR: [-0.6, 0, -0.35, 1.1] }),
+      offer: Object.assign(b, { aR: [-1.35, 0, -0.1, 0.35], aL: [0.1, 0, 0.2, 0.3], lean: 0.02 }),
+      lookdown: Object.assign(b, { lean: 0.12, head: [0.45, 0, 0], aL: [0.05, 0, 0.18, 0.3], aR: [0.05, 0, -0.18, 0.3] }),
+      dance: Object.assign(b, { hipY: 1.0 * s, lean: 0.08, aL: [-2.4, 0, 0.6, 0.8], aR: [-0.4, 0, -0.9, 1.4], head: [0.1, 0, 0.25] }),
       tuck: Object.assign(b, { hipY: 0.98 * s, lean: 0.4, fL: [0.18 * s, 0.38 * s, 0.25], fR: [-0.18 * s, 0.32 * s, 0.05], aL: [-1.0, 0, 0.6, 0.6], aR: [-1.0, 0, -0.6, 0.6] }),
     };
     return P[name] || b;
@@ -212,7 +267,9 @@ class Rig {
     const tex = this.faces[m] || this.faces.neutral;
     if (this.faceMat.map !== tex) { this.faceMat.map = tex; this.faceMat.needsUpdate = true; }
     if (this.antTip) this.antTip.material.color.setHSL((this.t * 0.5) % 1, 1, 0.6);
+    if (this.signTex) { this.signAcc += dt; if (this.signAcc > 1 / 20) { this.signOff += this.signAcc * 150; this.signAcc = 0; this.signTex.redraw(this.signTxt, this.signOff, Math.floor(this.t * 2.5) % 8 !== 0 || this.signTxt.length > 0); } }
   }
+  setSign(txt) { if (!this.signTex) return; this.signTxt = (txt || '').toUpperCase(); this.signOff = 0; this.signTex.redraw(this.signTxt, 0, true); }
 }
 
 // --- cast ---
@@ -246,6 +303,44 @@ function makeBolt() {
       const rim = part(new THREE.TorusGeometry(R * 1.0, R * 0.13, 6, 18), '#9fd12a', 0.02); rim.rotation.x = Math.PI / 2; rim.position.y = R * 0.5; head.add(rim);
       const pom = part(new THREE.SphereGeometry(R * 0.25, 8, 6), PAL.magenta, 0.02); pom.position.y = R * 1.55; head.add(pom);
       for (const sd of [-1, 1]) { const tuft = part(new THREE.ConeGeometry(R * 0.2, R * 0.5, 4), PAL.orange, 0.015); tuft.position.set(sd * R * 0.95, 0, -R * 0.2); tuft.rotation.z = sd * -2.2; head.add(tuft); }
+    }
+  });
+}
+
+function makeLull() {
+  return new Rig({
+    scale: 1.02,
+    colors: { skin: '#e8b48f', jacket: '#3d4068', pants: '#55587e', boot: '#e9e4f5', bootCuff: '#8ff0c8', wheels: '#8ff0c8' },
+    stripe: '#8ff0c8', sleeve: '#3d4068', gloves: '#8ff0c8', collar: '#8ff0c8', mask: '#22233a', sign: true,
+    hair(head, R, T) {
+      const hood = part(new THREE.SphereGeometry(R * 1.18, 18, 12, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI * 0.62), '#5a5f96', T); hood.position.set(0, R * 0.04, -R * 0.06); hood.scale.set(1.04, 1.06, 1.08); head.add(hood);
+      const fringe = part(new THREE.BoxGeometry(R * 1.45, R * 0.34, R * 0.3), '#8a6bd6', 0.015); fringe.position.set(0, R * 0.66, R * 0.74); fringe.rotation.x = 0.45; head.add(fringe);
+      const band = part(new THREE.TorusGeometry(R * 1.22, R * 0.07, 6, 20, Math.PI), '#e9e4f5', T); band.position.y = R * 0.1; head.add(band);
+      for (const sd of [-1, 1]) {
+        const muff = part(new THREE.SphereGeometry(R * 0.55, 12, 10), '#ffffff', T); muff.position.set(sd * R * 1.12, -R * 0.02, 0); muff.scale.set(0.8, 1, 1); head.add(muff);
+        const tag = part(new THREE.BoxGeometry(R * 0.06, R * 0.22, R * 0.36), '#ffd23f', 0.01); tag.position.set(sd * R * 1.56, -R * 0.02, 0); head.add(tag);
+      }
+    }
+  });
+}
+function makeStatic() {
+  return new Rig({
+    scale: 1.05, crt: true, skates: false,
+    colors: { skin: '#c99a7a', jacket: '#5b2bd6', pants: '#2a1748', boot: '#ff2e88', bootCuff: '#14101f', wheels: '#14101f' },
+    sleeve: '#5b2bd6', gloves: '#ffd23f', collar: '#ffd23f', stripe: '#ff2e88',
+    hair(head, R, T) {
+      const band = part(new THREE.TorusGeometry(R * 1.5, R * 0.1, 6, 20, Math.PI), PAL.ink, T); band.position.y = R * 0.35; head.add(band);
+      for (const sd of [-1, 1]) {
+        const cup = part(new THREE.BoxGeometry(R * 0.36, R * 0.9, R * 0.8), PAL.yellow, T); cup.position.set(sd * R * 1.5, R * 0.15, 0); head.add(cup);
+        const ant = part(new THREE.CylinderGeometry(R * 0.04, R * 0.04, R * 1.4, 5), PAL.ink, 0); ant.position.set(sd * R * 0.45, R * 1.75, -R * 0.2); ant.rotation.z = -sd * 0.5; head.add(ant);
+        const tip = part(new THREE.SphereGeometry(R * 0.13, 8, 6), PAL.magenta, 0.01); tip.position.set(sd * R * 0.8, R * 2.35, -R * 0.2); head.add(tip);
+      }
+    },
+    prop(s) {
+      const g = new THREE.Group();
+      g.add(part(new THREE.BoxGeometry(0.2 * s, 0.13 * s, 0.04 * s), '#ffd23f', 0.012));
+      const lbl = part(new THREE.BoxGeometry(0.15 * s, 0.05 * s, 0.045 * s), '#ff2e88', 0); lbl.position.y = 0.03 * s; g.add(lbl);
+      return g;
     }
   });
 }
