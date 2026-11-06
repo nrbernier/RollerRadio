@@ -46,11 +46,11 @@ body.playing #btnPause { display: block; }
 body.touch 
 /* title */
 .overlay { position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; text-align: center; padding: 24px; }
-#title { cursor: pointer; background: radial-gradient(ellipse at 50% 60%, rgba(14,26,36,.0), rgba(14,26,36,.35)); }
+#title { cursor: pointer; background: radial-gradient(ellipse 52% 40% at 50% 50%, rgba(14,26,36,.42), rgba(14,26,36,0) 100%), radial-gradient(ellipse at 50% 60%, rgba(14,26,36,.0), rgba(14,26,36,.35)); }
 #title h1 { margin: 0; font-family: var(--f-title); font-weight: 300; font-size: clamp(54px, 11vw, 120px); letter-spacing: .02em; line-height: 1; text-shadow: 0 2px 30px rgba(0,0,0,.3); }
 #title p { margin: 14px 0 0; font-family: var(--f-title); font-weight: 300; font-size: clamp(16px, 2.6vw, 21px); opacity: .9; text-shadow: 0 1px 14px rgba(0,0,0,.4); }
-#title .go { margin-top: 38px; font-family: var(--f-ui); font-size: 13px; letter-spacing: .22em; text-transform: uppercase; opacity: .8; animation: breathe 3.2s ease-in-out infinite; }
-#title .small { margin-top: 10px; font-size: 12px; letter-spacing: .1em; opacity: .6; font-family: var(--f-ui); }
+#title .go { margin-top: 38px; font-family: var(--f-ui); font-size: 13px; letter-spacing: .22em; text-transform: uppercase; opacity: .9; text-shadow: 0 1px 10px rgba(0,0,0,.6); animation: breathe 3.2s ease-in-out infinite; }
+#title .small { margin-top: 10px; font-size: 12px; letter-spacing: .1em; opacity: .75; font-family: var(--f-ui); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
 @keyframes breathe { 50% { opacity: .35 } }
 #loading { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: #b0cce0; font-family: var(--f-title); font-weight: 300; font-size: 20px; color: #24323e; letter-spacing: .06em; }
 
