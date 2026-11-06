@@ -138,20 +138,20 @@ const Life = (() => {
       const road = W.roads[key]; if (!road) continue;
       const P = road.pts; const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
       for (let i = 0; i < n2; i++) {
-        const g = carMesh(carCols[(i * 3 + key.length) % carCols.length]); W.group.add(g);
+        const g = carMesh(carCols[(i * 3 + key.length) % carCols.length]);
         cars.push({ g, segs, len, s: (i / n2) * len * 2, v: key === 'hill' ? 7 : 10 + r() * 3, lane: key === 'hill' ? 2.6 : 3.2, x: 0, z: 0, y: 0, fx: 0, fz: 1, vx: 0, vz: 0, slope: 0 });
       }
     }
     // long boats on the canal: slow, low, you can ride on them (and fall off)
     const C = PLAN.canal;
     for (let i = 0; i < 4; i++) {
-      const g = boatMesh(['#2f5f6a', '#8a3a2a', '#3a4a6a', '#5a6a3a'][i]); W.group.add(g);
+      const g = boatMesh(['#2f5f6a', '#8a3a2a', '#3a4a6a', '#5a6a3a'][i]);
       const route = i < 3 ? { a: [C.x0 + 40, C.z + (i % 2 ? 4 : -4)], b: [C.bendX - 30, C.z + (i % 2 ? 4 : -4)] } : { a: [C.bendX + (i % 2 ? 4 : -4), C.z + 40], b: [C.bendX + (i % 2 ? 4 : -4), shoreZ(C.bendX) - 30] };
       const len = Math.hypot(route.b[0] - route.a[0], route.b[1] - route.a[1]);
       boats.push({ g, route, len, s: (i * 0.37 % 1) * len, dir: i % 2 ? 1 : -1, v: 2.2, wait: 0, x: 0, z: 0, fx: 1, fz: 0, vx: 0, vz: 0, y: C.waterY + 0.75, hit: { tag: 'boat', vx: 0, vz: 0, boat: true } });
     }
     // sailboats on the lake, drifting
-    for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-900 + r() * 1700, 0, 1300 + r() * 500); g.userData = { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }; W.group.add(g); boats.push({ sail: g }); }
+    for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-900 + r() * 1700, 0, 1300 + r() * 500); Object.assign(g.userData, { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }); boats.push({ sail: g }); }
     // birds: flocks circling high, gulls gliding over the water, pigeons on the plazas that scatter
     const birdG = new THREE.BufferGeometry(); birdG.setAttribute('position', new THREE.Float32BufferAttribute([-0.6, 0, -0.2, 0, 0, 0.2, 0, 0.05, -0.1, 0, 0.05, -0.1, 0, 0, 0.2, 0.6, 0, -0.2], 3)); birdG.computeVertexNormals();
     const flockDefs = [[-700, -400, 70, 12], [600, -900, 140, 9], [-300, 1150, 30, 14], [700, 800, 50, 10], [100, -300, 110, 8], [-850, -1100, 60, 10], [300, 600, 45, 9], [900, -300, 60, 8], [-500, 600, 40, 10]];
@@ -209,31 +209,60 @@ const Life = (() => {
     const prev = W.groundExtra;
     W.groundExtra = (x, z, yMax, rr) => { const a = prev(x, z, yMax, rr), b = ground(x, z, yMax); return b && (!a || b.y > a.y) ? b : a; };
   }
+  // vehicles are instanced: one draw for the painted parts (tinted per instance), one for the fixed
+  // colours, one for the outline. A plain Object3D stands in for each vehicle.
+  function instKit(parts, n, outlineT) {
+    const mat = G.solidMat || (G.solidMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: G.grad }));
+    const mk = (geo, m) => { const im = new THREE.InstancedMesh(geo, m, n); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; W.group.add(im); return im; };
+    const paint = parts.filter(p => !p[2]).map(([g, m]) => [g, m, '#ffffff']), fixed = parts.filter(p => p[2]);
+    const A = paint.length ? mk(mergeParts(paint), mat) : null, Bm = fixed.length ? mk(mergeParts(fixed), mat) : null;
+    const all = mergeParts(parts.map(([g, m, c]) => [g, m, c || '#ffffff']));
+    all.computeBoundingBox(); const bb = all.boundingBox, size = bb.getSize(V3()), ctr = bb.getCenter(V3());
+    const sc = V3((size.x + 2 * outlineT) / size.x, (size.y + 2 * outlineT) / size.y, (size.z + 2 * outlineT) / size.z);
+    all.applyMatrix4(new THREE.Matrix4().makeTranslation(ctr.x, ctr.y, ctr.z).multiply(new THREE.Matrix4().makeScale(sc.x, sc.y, sc.z)).multiply(new THREE.Matrix4().makeTranslation(-ctr.x, -ctr.y, -ctr.z)));
+    const O = mk(all, G.outlineMat);
+    let k = 0; const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    if (A) A.setColorAt(0, _c.set('#ffffff'));
+    return {
+      add(col) { const o = new THREE.Object3D(); o.userData.i = k; if (A) A.setColorAt(k, _c.set(col)); k++; if (A && A.instanceColor) A.instanceColor.needsUpdate = true; return o; },
+      write(o) { const i = o.userData.i; let m = zero; if (o.visible) { o.updateMatrix(); m = o.matrix; } if (A) A.setMatrixAt(i, m); if (Bm) Bm.setMatrixAt(i, m); O.setMatrixAt(i, m); },
+      flush() { for (const im of [A, Bm, O]) if (im) { im.count = k; im.instanceMatrix.needsUpdate = true; } },
+    };
+  }
+  let carKit, boatKit, sailKit;
   function carMesh(c) {
-    const parts = [
-      [new THREE.BoxGeometry(1.9, 0.75, 4.1), T4(0, 0.7, 0), c],
-      [new THREE.BoxGeometry(1.7, 0.65, 2.1), T4(0, 1.38, -0.2), c],
-      [new THREE.BoxGeometry(1.74, 0.45, 1.92), T4(0, 1.38, -0.2), '#2a3550'],
-      [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(-0.6, 0.78, 2.07), '#fff3c4'], [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(0.6, 0.78, 2.07), '#fff3c4'],
-      [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(-0.6, 0.78, -2.07), '#ff3a3a'], [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(0.6, 0.78, -2.07), '#ff3a3a'],
-    ];
-    for (const [sx, sz] of [[-0.95, 1.25], [0.95, 1.25], [-0.95, -1.25], [0.95, -1.25]]) parts.push([new THREE.CylinderGeometry(0.33, 0.33, 0.22, 8), T4(sx, 0.33, sz, 0, 0, Math.PI / 2), '#1b1a24']);
-    const g = new THREE.Group(); g.add(solid(parts, 0.05)); return g;
+    if (!carKit) {
+      const parts = [
+        [new THREE.BoxGeometry(1.9, 0.75, 4.1), T4(0, 0.7, 0), null],
+        [new THREE.BoxGeometry(1.7, 0.65, 2.1), T4(0, 1.38, -0.2), null],
+        [new THREE.BoxGeometry(1.74, 0.45, 1.92), T4(0, 1.38, -0.2), '#2a3550'],
+        [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(-0.6, 0.78, 2.07), '#fff3c4'], [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(0.6, 0.78, 2.07), '#fff3c4'],
+        [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(-0.6, 0.78, -2.07), '#ff3a3a'], [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(0.6, 0.78, -2.07), '#ff3a3a'],
+      ];
+      for (const [sx, sz] of [[-0.95, 1.25], [0.95, 1.25], [-0.95, -1.25], [0.95, -1.25]]) parts.push([new THREE.CylinderGeometry(0.33, 0.33, 0.22, 8), T4(sx, 0.33, sz, 0, 0, Math.PI / 2), '#1b1a24']);
+      carKit = instKit(parts, 24, 0.05);
+    }
+    const o = carKit.add(c); o.kit = carKit; return o;
   }
   function boatMesh(c) {
-    const parts = [
-      [new THREE.BoxGeometry(2.6, 1.0, 15), T4(0, -0.2, 0), c],
-      [new THREE.CylinderGeometry(1.3, 1.3, 1.0, 10, 1, false, 0, Math.PI), T4(0, -0.2, 7.5), c],
-      [new THREE.BoxGeometry(2.3, 0.12, 15), T4(0, 0.32, 0), '#a0805a'],
-      [new THREE.BoxGeometry(2.0, 1.2, 4.5), T4(0, 0.95, -3.5), '#e8dcc0'],
-    ];
-    for (let i = 0; i < 4; i++) parts.push([new THREE.CylinderGeometry(0.25, 0.3, 0.4, 8), T4(i % 2 ? 0.6 : -0.6, 0.55, 2 + i * 1.2), ['#c4523a', '#3e8f86', '#e8b84a', '#f2efe6'][i]]);
-    const g = new THREE.Group(); g.add(solid(parts, 0.05)); return g;
+    if (!boatKit) {
+      const parts = [
+        [new THREE.BoxGeometry(2.6, 1.0, 15), T4(0, -0.2, 0), null],
+        [new THREE.CylinderGeometry(1.3, 1.3, 1.0, 10, 1, false, 0, Math.PI), T4(0, -0.2, 7.5), null],
+        [new THREE.BoxGeometry(2.3, 0.12, 15), T4(0, 0.32, 0), '#a0805a'],
+        [new THREE.BoxGeometry(2.0, 1.2, 4.5), T4(0, 0.95, -3.5), '#e8dcc0'],
+      ];
+      for (let i = 0; i < 4; i++) parts.push([new THREE.CylinderGeometry(0.25, 0.3, 0.4, 8), T4(i % 2 ? 0.6 : -0.6, 0.55, 2 + i * 1.2), ['#c4523a', '#3e8f86', '#e8b84a', '#f2efe6'][i]]);
+      boatKit = instKit(parts, 6, 0.05);
+    }
+    const o = boatKit.add(c); o.kit = boatKit; return o;
   }
   function sailMesh(r) {
-    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.8, 0.5, 0, 8, 0.6, 0, 0.8, -2.6, 0, 0.8, 0.5, 0, 0.8, -2.6, 0, 8, 0.6], 3));
-    const parts = [[new THREE.BoxGeometry(1.8, 0.7, 6), T4(0, 0.2, 0), '#f2efe6'], [new THREE.CylinderGeometry(0.06, 0.06, 8, 5), T4(0, 4.4, 0.6), '#c9c2b4'], [sg, null, r < 0.3 ? '#e4572e' : '#ffffff']];
-    const g = new THREE.Group(); g.add(solid(parts, 0.04)); return g;
+    if (!sailKit) {
+      const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.8, 0.5, 0, 8, 0.6, 0, 0.8, -2.6, 0, 0.8, 0.5, 0, 0.8, -2.6, 0, 8, 0.6], 3));
+      sailKit = instKit([[new THREE.BoxGeometry(1.8, 0.7, 6), T4(0, 0.2, 0), '#f2efe6'], [new THREE.CylinderGeometry(0.06, 0.06, 8, 5), T4(0, 4.4, 0.6), '#c9c2b4'], [sg, null, null]], 10, 0.04);
+    }
+    const o = sailKit.add(r < 0.3 ? '#e4572e' : '#ffffff'); o.kit = sailKit; return o;
   }
   // stand on a long boat (or a cabin of the big wheel)
   function ground(x, z, yMax) {
@@ -263,7 +292,7 @@ const Life = (() => {
     const fx = focus.x, fz = focus.z, pl = Game.player;
     // people: everyone within reach is animated and packed into the instanced meshes
     let crowd = 0; slot = 0;
-    const R = 230, cap = PM.torso.instanceMatrix.count;
+    const R = Math.min(230, (Game.cellR || 360) * 0.64), cap = PM.torso.instanceMatrix.count;
     for (const w of walkers) {
       w.s += w.sp * dt * w.dir; if (w.s > w.len) { w.s = w.len; w.dir = -1; } else if (w.s < 0) { w.s = 0; w.dir = 1; }
       if (Math.abs(w.x - fx) > R || Math.abs(w.z - fz) > R) { if (!w.y || Math.random() < 0.02) { pathPos(w.segs, w.s, _pp); w.x = _pp.x; w.z = _pp.z; w.y = w.y0 ?? terrainAt(w.x, w.z); } continue; }
@@ -331,7 +360,9 @@ const Life = (() => {
       c.y = y; c.vx = c.fx * c.v; c.vz = c.fz * c.v;
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;
+      carKit.write(c.g);
     }
+    if (carKit) carKit.flush();
     // the big wheel
     const fw = W.ferris;
     if (fw) {
@@ -364,7 +395,7 @@ const Life = (() => {
     }
     // canal boats: glide, pause at the ends, turn around
     for (const b of boats) {
-      if (b.sail) { const u = b.sail.userData; u.a += dt * u.sp * 0.2; b.sail.position.set(u.cx + Math.cos(u.a) * u.r, Math.sin(Game.t * 0.8 + u.a) * 0.15, u.cz + Math.sin(u.a) * u.r * 0.5); b.sail.rotation.y = -u.a + Math.PI; b.sail.rotation.z = Math.sin(Game.t * 0.6 + u.a) * 0.05; continue; }
+      if (b.sail) { const u = b.sail.userData; u.a += dt * u.sp * 0.2; b.sail.position.set(u.cx + Math.cos(u.a) * u.r, Math.sin(Game.t * 0.8 + u.a) * 0.15, u.cz + Math.sin(u.a) * u.r * 0.5); b.sail.rotation.y = -u.a + Math.PI; b.sail.rotation.z = Math.sin(Game.t * 0.6 + u.a) * 0.05; sailKit.write(b.sail); continue; }
       if (b.wait > 0) { b.wait -= dt; b.vx = b.vz = 0; }
       else { b.s += b.v * dt * b.dir; if (b.s > b.len) { b.s = b.len; b.dir = -1; b.wait = 6; } else if (b.s < 0) { b.s = 0; b.dir = 1; b.wait = 6; } }
       const ux = (b.route.b[0] - b.route.a[0]) / b.len, uz = (b.route.b[1] - b.route.a[1]) / b.len;
@@ -373,8 +404,9 @@ const Life = (() => {
       if (!b.wait || b.wait <= 0) { b.vx = b.fx * b.v; b.vz = b.fz * b.v; }
       b.hit.vx = b.vx; b.hit.vz = b.vz;
       b.y = PLAN.canal.waterY + 0.75 + Math.sin(Game.t * 1.3 + b.s) * 0.04;
-      b.g.position.set(b.x, b.y - 0.4, b.z); b.g.rotation.y = Math.atan2(b.fx, b.fz);
+      b.g.position.set(b.x, b.y - 0.4, b.z); b.g.rotation.y = Math.atan2(b.fx, b.fz); boatKit.write(b.g);
     }
+    if (boatKit) boatKit.flush(); if (sailKit) sailKit.flush();
     // flocks
     for (const fl of flocks) for (const b of fl.birds) {
       b.a += b.sp * dt; b.ph += dt * 9;

@@ -70,7 +70,7 @@ function groundSpan(x0, z0, x1, z1) {
 }
 
 function buildCity() {
-  const T0 = performance.now();
+  const T0 = performance.now(), laps = location.hash === '#laps', lap = (n) => laps && console.log('[city] ' + n + ' ' + Math.round(performance.now() - T0) + 'ms');
   buildHeights();
   const P = PLAN.pond; P.y = landH(P.x, P.z) + 6;
   pondBowl(P.x, P.z, P.r, P.y);
@@ -80,6 +80,7 @@ function buildCity() {
   let run = []; for (const c of corridor) { if (c === null) { if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8); run = []; } else run.push(c); } if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8);
   if (typeof prepDistricts === 'function') prepDistricts();
   // station surroundings: a little forecourt where each ramp lands
+  lap('heights');
   const B = new CellBatch(), F = new FarBatch(), S = makeSlabs();
   const mats = cityMaterials();
   const K = makeKit({
@@ -102,6 +103,7 @@ function buildCity() {
   // ground
   const terrain = terrainMeshes(paintGround, mats.ground); W.group.add(terrain);
   W.group.add(outerHills(mats.hills)); hillTrees(F);
+  lap('terrain');
   // lake: a huge sheet of water, and a dark floor far below so you never see through it
   const lakeMat = new THREE.MeshBasicMaterial({ color: 0x6fb0c8, map: mats.waterTex, transparent: true, opacity: 0.78, depthWrite: false });
   mats.waterTex.repeat.set(1, 1);
@@ -114,10 +116,13 @@ function buildCity() {
   buildRoads(K, S, F);
   buildMetro(K, M, S, F);
   buildStations(K, M, S, F);
+  lap('canal, roads, metro');
   buildDistricts(K, S, F);
+  lap('districts');
   // the edges of the world: soft invisible walls on the hills
   for (const b of [[-1300, -1700, -1050, 1300], [1052, -1700, 1300, 1300], [-1300, -1700, 1300, -1480]]) W.boxes.push({ x0: b[0], y0: -50, z0: b[1], x1: b[2], y1: 400, z1: b[3], tag: 'edge', nocam: true });
   K.finish();
+  lap('finish');
   // ground = terrain (with canals open), slabs, train roofs, plus kit boxes
   W.groundExtra = (x, z, yMax, r) => {
     let y = inCanal(x, z) ? PLAN.canal.bedY : inHole(x, z) ? -1e9 : terrainAt(x, z), hit = TERRAIN_HIT;
@@ -132,6 +137,7 @@ function buildCity() {
   W.dyn.push({ update: (dt) => W.trainsys.update(dt) });
   // visibility of the detailed cells
   W.updateCells = (cx, cz, R = 340) => {
+    terrain.userData.lod(cx, cz);
     for (const g of W.cells.values()) {
       const d = Math.hypot(g.userData.cx - cx, g.userData.cz - cz);
       g.visible = g.visible ? d < R + 40 : d < R;

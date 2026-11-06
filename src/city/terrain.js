@@ -96,8 +96,13 @@ function terrainMeshes(paint, mat) {
     return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < shoreZ(cx) + 4);
   };
   for (let tj = 0; tj < nz; tj += TILE) for (let ti = 0; ti < nx; ti += TILE) {
-    const ni = Math.min(TILE, nx - ti), nj = Math.min(TILE, nz - tj);
-    const pos = new Float32Array((ni + 1) * (nj + 1) * 3), cols = new Float32Array((ni + 1) * (nj + 1) * 3), uv = new Float32Array((ni + 1) * (nj + 1) * 2);
+    const ni = Math.min(TILE, nx - ti), nj = Math.min(TILE, nz - tj), NG = (ni + 1) * (nj + 1);
+    // the grid, then a skirt: the tile's border again, 4 m lower (hides cracks next to finer tiles)
+    const ring = [];
+    for (let i = 0; i < ni; i++) ring.push([i, 0]); for (let j = 0; j < nj; j++) ring.push([ni, j]);
+    for (let i = ni; i > 0; i--) ring.push([i, nj]); for (let j = nj; j > 0; j--) ring.push([0, j]);
+    const NV = NG + ring.length;
+    const pos = new Float32Array(NV * 3), cols = new Float32Array(NV * 3), uv = new Float32Array(NV * 2);
     for (let j = 0; j <= nj; j++) for (let i = 0; i <= ni; i++) {
       const gi = ti + i, gj = tj + j, k = j * (ni + 1) + i, x = x0 + gi * cell, z = z0 + gj * cell, y = H[gj * W1 + gi];
       pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
@@ -106,20 +111,47 @@ function terrainMeshes(paint, mat) {
       paint(x, z, y, Math.hypot(gx, gz) / cell, col);
       cols[k * 3] = col.r; cols[k * 3 + 1] = col.g; cols[k * 3 + 2] = col.b;
     }
-    const idx = [];
-    for (let j = 0; j < nj; j++) for (let i = 0; i < ni; i++) {
-      if (hole(ti + i, tj + j)) continue;
-      const a = j * (ni + 1) + i, b = a + 1, c = a + ni + 1, d = c + 1;
-      idx.push(a, c, b, b, c, d);       // diagonal b–c, matching terrainAt
+    const V = (i, j) => j * (ni + 1) + i, skirtOf = new Map();
+    ring.forEach(([i, j], r) => { const a = V(i, j), k = NG + r; skirtOf.set(a, k); pos[k * 3] = pos[a * 3]; pos[k * 3 + 1] = pos[a * 3 + 1] - 4; pos[k * 3 + 2] = pos[a * 3 + 2]; uv[k * 2] = uv[a * 2]; uv[k * 2 + 1] = uv[a * 2 + 1]; cols[k * 3] = cols[a * 3] * 0.9; cols[k * 3 + 1] = cols[a * 3 + 1] * 0.9; cols[k * 3 + 2] = cols[a * 3 + 2] * 0.9; });
+    // index sets: full detail, every 2nd vertex, every 5th (blocks touching a hole stay full detail)
+    const levels = [];
+    for (const st of [1, 2, 5]) {
+      const idx = [];
+      for (let j = 0; j < nj; j += st) for (let i = 0; i < ni; i += st) {
+        const i2 = Math.min(ni, i + st), j2 = Math.min(nj, j + st);
+        let anyHole = false;
+        if (st > 1) for (let jj = j; jj < j2 && !anyHole; jj++) for (let ii = i; ii < i2; ii++) if (hole(ti + ii, tj + jj)) { anyHole = true; break; }
+        if (st === 1 || anyHole) {
+          for (let jj = j; jj < j2; jj++) for (let ii = i; ii < i2; ii++) { if (hole(ti + ii, tj + jj)) continue; const a = V(ii, jj), b = a + 1, c = a + ni + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+        } else { const a = V(i, j), b = V(i2, j), c = V(i, j2), d = V(i2, j2); idx.push(a, c, b, b, c, d); }
+      }
+      if (st > 1) {
+        // skirts along the four edges, between this level's edge vertices
+        const edge = (pts) => { for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], a2 = skirtOf.get(a), b2 = skirtOf.get(b); if (a2 === undefined || b2 === undefined) continue; idx.push(a, b, a2, b, b2, a2, a, a2, b, b, a2, b2); } };
+        const xs = [], zs = []; for (let i = 0; i < ni; i += st) xs.push(i); xs.push(ni); for (let j = 0; j < nj; j += st) zs.push(j); zs.push(nj);
+        edge(xs.map(i => V(i, 0))); edge(xs.map(i => V(i, nj))); edge(zs.map(j => V(0, j))); edge(zs.map(j => V(ni, j)));
+      }
+      levels.push(new THREE.BufferAttribute(NV > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    g.setIndex(idx); g.computeVertexNormals();
+    g.setIndex(levels[0]); g.computeVertexNormals();
+    // skirt normals: copy the edge's (computeVertexNormals gave them odd ones)
+    const nrm = g.attributes.normal.array; for (const [a, k] of skirtOf) { nrm[k * 3] = nrm[a * 3]; nrm[k * 3 + 1] = nrm[a * 3 + 1]; nrm[k * 3 + 2] = nrm[a * 3 + 2]; }
     const m = new THREE.Mesh(g, mat); m.receiveShadow = false;
+    m.userData = { cx: x0 + (ti + ni / 2) * cell, cz: z0 + (tj + nj / 2) * cell, levels, lod: 0 };
     group.add(m);
   }
+  // pick each tile's detail from the camera distance
+  group.userData.lod = (cx, cz) => {
+    for (const m of group.children) {
+      const u = m.userData, d = Math.max(0, Math.hypot(u.cx - cx, u.cz - cz) - TILE * cell * 0.7);
+      const want = d < 260 ? 0 : d < 640 ? 1 : 2;
+      if (want !== u.lod) { u.lod = want; m.geometry.setIndex(u.levels[want]); }
+    }
+  };
   return group;
 }
 // the hills around the city, coarse, for the views (no collision: you can't get there)

@@ -169,14 +169,15 @@ function fillKit(H) {
 //  the fill itself, district by district
 // ============================================================
 function fillDistricts(H) {
-  fillBusiness(H);
-  fillCanalQuarter(H);
-  fillLakeshore(H);
-  fillSouthStrip(H);
-  fillObservatory(H);
-  fillPark(H);
-  fillOldTownMarket(H);
-  fillDocks(H);
+  const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[fill] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
+  fillBusiness(H); lap('business');
+  fillCanalQuarter(H); lap('canal quarter');
+  fillLakeshore(H); lap('lakeshore');
+  fillSouthStrip(H); lap('south strip');
+  fillObservatory(H); lap('observatory');
+  fillPark(H); lap('park');
+  fillOldTownMarket(H); lap('old town + market');
+  fillDocks(H); lap('docks');
 }
 
 function fillBusiness(H) {

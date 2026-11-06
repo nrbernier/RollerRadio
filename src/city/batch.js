@@ -4,23 +4,89 @@
 //  The far copy is a little smaller than the real thing, so up close
 //  it hides inside it; far away it is the skyline.
 // ============================================================
-const CELL = 128;
+const CELL = 160;
+// corners of a box as bits (x, y, z); the twelve edges between them
+const BOX_EDGE_IDX = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+let _boxEdges = new Float32Array(0), _unitBox = null;
+const _bm = new THREE.Matrix4(), _bp = new Float32Array(108), _bn = new Float32Array(108), _bc1 = new THREE.Color(), _bc2 = new THREE.Color();
+const BUCKET_ALIAS = { flat: 'plain', metal: 'plain' };     // same look, one draw call
 class CellBatch extends StaticBatch {
   constructor() { super(); this.cellLines = {}; this.split = { house: ['roof', 'house'], shed: ['roof', 'brick'], tower: ['roof', 'tower'], grid: ['roof', 'grid'], deco: ['roof', 'deco'] }; }
   bucket(name, x, z) {
-    const key = name + '|' + Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
-    return this.buckets[key] || (this.buckets[key] = { name, pos: [], nor: [], col: [], uv: [], cx: Math.floor(x / CELL), cz: Math.floor(z / CELL) });
+    name = BUCKET_ALIAS[name] || name;
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    if (name === this._ln && cx === this._lx && cz === this._lz) return this._lb;     // most calls repeat the last one
+    const key = name + '|' + cx + ',' + cz;
+    const b = this.buckets[key] || (this.buckets[key] = { name, pos: [], nor: [], col: [], uv: [], cx, cz });
+    this._ln = name; this._lx = cx; this._lz = cz; this._lb = b;
+    return b;
   }
   // same as StaticBatch.add, but edges are filed by cell
   add(geo, matrix, color, kind = 'plain', o = {}) {
-    super.add(geo, matrix, color, kind, Object.assign({}, o, { edges: false }));
+    if (geo.type === 'BoxGeometry') this.addBox(geo.parameters, matrix, color, kind, o);
+    else super.add(geo, matrix, color, kind, Object.assign({}, o, { edges: false }));
     if (o.edges === false) return;
-    const eg = new THREE.EdgesGeometry(geo, 30); if (matrix) eg.applyMatrix4(matrix);
-    const a = eg.attributes.position.array;
+    let a;
+    if (geo.type === 'BoxGeometry') {
+      // a box's twelve edges, straight from its size (EdgesGeometry is slow when called thousands of times)
+      const { width: w, height: h, depth: d } = geo.parameters, m = matrix ? matrix.elements : null;
+      a = _boxEdges.length ? _boxEdges : (_boxEdges = new Float32Array(72));
+      let k = 0;
+      for (const [p, q] of BOX_EDGE_IDX) for (const c of [p, q]) {
+        const x = (c & 1 ? 0.5 : -0.5) * w, y = (c & 2 ? 0.5 : -0.5) * h, z = (c & 4 ? 0.5 : -0.5) * d;
+        if (m) { a[k++] = m[0] * x + m[4] * y + m[8] * z + m[12]; a[k++] = m[1] * x + m[5] * y + m[9] * z + m[13]; a[k++] = m[2] * x + m[6] * y + m[10] * z + m[14]; }
+        else { a[k++] = x; a[k++] = y; a[k++] = z; }
+      }
+    } else { const eg = new THREE.EdgesGeometry(geo, 30); if (matrix) eg.applyMatrix4(matrix); a = eg.attributes.position.array; }
     for (let i = 0; i < a.length; i += 6) {
       const key = Math.floor((a[i] + a[i + 3]) / 2 / CELL) + ',' + Math.floor((a[i + 2] + a[i + 5]) / 2 / CELL);
       const L = this.cellLines[key] || (this.cellLines[key] = []);
       for (let k = 0; k < 6; k++) L.push(a[i + k]);
+    }
+  }
+  // boxes are most of the city: fill them straight from a unit box (same result as StaticBatch.add)
+  addBox(par, matrix, color, kind, { outlineT = 0.12, uvScale = 8, roofColor = null } = {}) {
+    const U1 = _unitBox || (_unitBox = prepShape(new THREE.BoxGeometry(1, 1, 1)));
+    _bm.makeScale(par.width, par.height, par.depth); if (matrix) _bm.premultiply(matrix);
+    const e = _bm.elements, P = U1.pos, N = U1.nor, nm = _nm3.getNormalMatrix(_bm).elements;
+    const col = _bc1.set(color), rcol = _bc2.set(roofColor || color);
+    const tp = _bp, tn = _bn;
+    let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+    for (let i = 0; i < 108; i += 3) {
+      const x = P[i], y = P[i + 1], z = P[i + 2];
+      const X = e[0] * x + e[4] * y + e[8] * z + e[12], Y = e[1] * x + e[5] * y + e[9] * z + e[13], Z = e[2] * x + e[6] * y + e[10] * z + e[14];
+      tp[i] = X; tp[i + 1] = Y; tp[i + 2] = Z;
+      if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; if (Z < z0) z0 = Z; if (Z > z1) z1 = Z;
+      const a = N[i], b = N[i + 1], c = N[i + 2];
+      let nx = nm[0] * a + nm[3] * b + nm[6] * c, ny = nm[1] * a + nm[4] * b + nm[7] * c, nz = nm[2] * a + nm[5] * b + nm[8] * c; const l = Math.hypot(nx, ny, nz) || 1;
+      tn[i] = nx / l; tn[i + 1] = ny / l; tn[i + 2] = nz / l;
+    }
+    for (let i = 0; i < 108; i += 9) {
+      const ny = tn[i + 1], nx = tn[i], nz = tn[i + 2];
+      let bn = kind;
+      if (kind === 'building') bn = Math.abs(ny) > 0.5 ? 'roof' : 'wall';
+      else if (this.split[kind]) bn = Math.abs(ny) > 0.5 ? this.split[kind][0] : this.split[kind][1];
+      else if (kind === 'roofonly') bn = 'roof';
+      const b = this.bucket(bn, (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
+      const shade = ny < -0.5 ? 0.55 : 1, cc = bn === 'roof' && roofColor ? rcol : col;
+      const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+      for (let k = 0; k < 9; k += 3) {
+        const j = i + k;
+        b.pos.push(tp[j], tp[j + 1], tp[j + 2]); b.nor.push(tn[j], tn[j + 1], tn[j + 2]); b.col.push(cc.r * shade, cc.g * shade, cc.b * shade);
+        let u, v;
+        if (ay >= ax && ay >= az) { u = tp[j]; v = tp[j + 2]; }
+        else if (ax >= az) { u = tp[j + 2] * Math.sign(nx || 1); v = tp[j + 1]; }
+        else { u = -tp[j] * Math.sign(nz || 1); v = tp[j + 1]; }
+        b.uv.push(u / uvScale, v / uvScale);
+      }
+    }
+    if (outlineT > 0) {
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+      const sx = x1 - x0 > 1e-4 ? (x1 - x0 + 2 * outlineT) / (x1 - x0) : 1, sy = y1 - y0 > 1e-4 ? (y1 - y0 + 2 * outlineT) / (y1 - y0) : 1, sz = z1 - z0 > 1e-4 ? (z1 - z0 + 2 * outlineT) / (z1 - z0) : 1;
+      for (let i = 0; i < 108; i += 9) {
+        const b = this.bucket('outline', (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
+        for (let k = 0; k < 9; k += 3) b.pos.push(cx + (tp[i + k] - cx) * sx, cy + (tp[i + k + 1] - cy) * sy, cz + (tp[i + k + 2] - cz) * sz);
+      }
     }
   }
   // fast path for shapes used thousands of times (trees): no cloning, no edges
@@ -38,16 +104,18 @@ class CellBatch extends StaticBatch {
       let nx = nm[0] * a + nm[3] * b + nm[6] * cc, ny = nm[1] * a + nm[4] * b + nm[7] * cc, nz = nm[2] * a + nm[5] * b + nm[8] * cc; const l = Math.hypot(nx, ny, nz) || 1;
       tn[i * 3] = nx / l; tn[i * 3 + 1] = ny / l; tn[i * 3 + 2] = nz / l;
     }
+    const small = x1 - x0 < 24 && z1 - z0 < 24, b0 = small ? this.bucket(kind, (x0 + x1) / 2, (z0 + z1) / 2) : null;
     for (let i = 0; i < n * 3; i += 9) {
-      const b = this.bucket(kind, (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
+      const b = b0 || this.bucket(kind, (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
       const shade = (tn[i + 1] + tn[i + 4] + tn[i + 7]) / 3 < -0.5 ? 0.55 : 1;
       for (let k = 0; k < 9; k += 3) { b.pos.push(tp[i + k], tp[i + k + 1], tp[i + k + 2]); b.nor.push(tn[i + k], tn[i + k + 1], tn[i + k + 2]); b.col.push(c.r * shade, c.g * shade, c.b * shade); b.uv.push(tp[i + k] / 8, tp[i + k + 2] / 8); }
     }
     if (outlineT > 0) {
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
       const sx = (x1 - x0 + 2 * outlineT) / Math.max(1e-4, x1 - x0), sy = (y1 - y0 + 2 * outlineT) / Math.max(1e-4, y1 - y0), sz = (z1 - z0 + 2 * outlineT) / Math.max(1e-4, z1 - z0);
+      const o0 = small ? this.bucket('outline', (x0 + x1) / 2, (z0 + z1) / 2) : null;
       for (let i = 0; i < n * 3; i += 9) {
-        const b = this.bucket('outline', (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
+        const b = o0 || this.bucket('outline', (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
         for (let k = 0; k < 9; k += 3) b.pos.push(cx + (tp[i + k] - cx) * sx, cy + (tp[i + k + 1] - cy) * sy, cz + (tp[i + k + 2] - cz) * sz);
       }
     }
@@ -81,7 +149,7 @@ class CellBatch extends StaticBatch {
 // far skyline: plain coloured boxes and blobs merged into a few tiles, no outlines, no textures
 const _nm3 = new THREE.Matrix3(), _sc = new THREE.Color(); let _tp = new Float32Array(0), _tn = new Float32Array(0);
 function prepShape(geo) { const g = geo.index ? geo.toNonIndexed() : geo; if (!g.attributes.normal) g.computeVertexNormals(); return { pos: g.attributes.position.array, nor: g.attributes.normal.array }; }
-const FAR_TILE = 640;
+const FAR_TILE = 1100;
 class FarBatch {
   constructor() { this.tiles = {}; }
   tile(x, z) { const k = Math.floor(x / FAR_TILE) + ',' + Math.floor(z / FAR_TILE); return this.tiles[k] || (this.tiles[k] = { pos: [], nor: [], col: [] }); }

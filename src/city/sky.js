@@ -137,7 +137,7 @@ const Sky = (() => {
     M.wall.emissiveIntensity = S.night * 0.95;
     const wantMap = S.night > 0.55 ? M.wallNight : M.wallDay; if (M.wall.map !== wantMap) { M.wall.map = wantMap; M.wall.needsUpdate = true; }
     if (M.house) M.house.emissiveIntensity = S.night * 0.9;
-    if (M.pool) M.pool.opacity = S.night * 0.9;
+    if (M.pool) { M.pool.opacity = S.night * 0.9; M.pool.visible = S.night > 0.02; }
     if (M.tower) M.tower.emissiveIntensity = S.night * 0.85;
     if (M.grid) M.grid.emissiveIntensity = S.night * 0.85;
     if (M.deco) M.deco.emissiveIntensity = S.night * 0.85;

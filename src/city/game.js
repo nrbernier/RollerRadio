@@ -283,14 +283,19 @@ function loop(now) {
     Sky.update(dt, G.camera.position);
   }
   Game.cellT = (Game.cellT || 0) - dt;
-  if (Game.cellT <= 0) { Game.cellT = 0.25; W.updateCells(G.camera.position.x, G.camera.position.z, 360); }
+  if (Game.cellT <= 0) { Game.cellT = 0.25; W.updateCells(G.camera.position.x, G.camera.position.z, Game.cellR || 360); }
   if (!Game.noRender) G.renderer.render(G.scene, G.camera);
   // adaptive resolution
   Game.dprAcc += dt; Game.dprN++;
   if (Game.dprN >= 90) {
     const avg = Game.dprAcc / Game.dprN; Game.dprAcc = 0; Game.dprN = 0;
-    if (avg > 0.026 && G.dpr > 0.75) { G.dpr = Math.max(0.75, G.dpr - 0.25); G.renderer.setPixelRatio(G.dpr); onResize(); }
-    else if (avg < 0.0145 && G.dpr < G.dprMax) { G.dpr = Math.min(G.dprMax, G.dpr + 0.25); G.renderer.setPixelRatio(G.dpr); onResize(); }
+    // quality steps: sharpness first down to 1x, then how far the detailed city reaches, then a little blur
+    const Q = [[G.dprMax, 360], [Math.min(G.dprMax, 1.25), 340], [1, 320], [1, 280], [1, 250], [0.85, 230]];
+    Game.q = Game.q ?? 0;
+    const q0 = Game.q;
+    if (avg > 0.026 && Game.q < Q.length - 1) Game.q++;
+    else if (avg < 0.0145 && Game.q > 0) Game.q--;
+    if (Game.q !== q0) { const [d, R] = Q[Game.q]; Game.cellR = R; if (d !== G.dpr) { G.dpr = d; G.renderer.setPixelRatio(G.dpr); onResize(); } }
   }
 }
 function isCovered(pos) { const M = Game.W.metro; for (let i = 0; i < M.N; i += 4) { const q = M.pts[i]; if (q.covered && Math.hypot(q.x - pos.x, q.z - pos.z) < 8) return true; } return false; }
