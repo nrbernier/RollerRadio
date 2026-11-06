@@ -50,8 +50,13 @@ const Sound = (() => {
   function gain(dest, v = 1) { const g = ctx.createGain(); g.gain.value = v; g.connect(dest); return g; }
   function filt(type, f, q, dest) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(dest); return b; }
   function sends(g, rev = 0, dl = 0) { if (rev > 0) g.connect(gain(revIn, rev)); if (dl > 0) g.connect(gain(dlyIn, dl)); }
-  let voices = 0; const VMAX = 46;          // a polite ceiling on simultaneous notes
-  const voice = (dur) => { if (voices > VMAX) return false; voices++; setTimeout(() => voices--, (dur + 0.3) * 1000); return true; };
+  // a polite ceiling on simultaneous notes, counted against the audio clock (not timers)
+  const VMAX = 56, ends = [];
+  const voice = (dur) => {
+    const now = ctx.currentTime;
+    if (ends.length > VMAX) { for (let i = ends.length - 1; i >= 0; i--) if (ends[i] < now) ends.splice(i, 1); if (ends.length > VMAX) return false; }
+    ends.push(now + Math.min(dur, 6) + 0.3); return true;
+  };
 
   // ---------- instruments (all take time, then velocity; d = destination) ----------
   const I = {
@@ -285,7 +290,7 @@ const Sound = (() => {
         if (!st.ping || c.newPhrase) { st.ping = euclid(r() < 0.5 ? 3 : 5, 16, Math.floor(r() * 16)); }
         if (s === 0 || (s === 10 && e > 0.5)) I.softKick(t, v * 0.8);
         if (s === 8 && e > 0.35) I.rim(t, v * 0.45);
-        if (s === 0 && bar % 2 === 0) I.pad(t, chord(4, 0), sd * 30, v * 0.9, 0.9);
+        if (s === 0 && bar % 2 === 0) I.pad(t, chord(4, 0), sd * 30, v * 0.9, musicOut, 0.9);
         if (s === 0) I.sub(t, deg(0, -2), sd * 10, v * 0.6);
         if (st.ping[s] && r() < 0.6) I.steelpan(t, deg([0, 1, 2, 4, 5][Math.floor(r() * 5)] + (r() < 0.3 ? 7 : 0), 1), v * 0.55);
         if (s === 0 && bar % 2 === 1) I.waves(t, sd * 28, v);

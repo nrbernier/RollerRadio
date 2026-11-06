@@ -102,7 +102,7 @@ function landH(x, z) {
   h += gauss(Math.hypot(x + 300, z + 860), 240) * 22;
   // the edge of the world: hills all round (outside the city)
   const ex = Math.max(0, Math.abs(x) - 1060), en = Math.max(0, -1490 - z);
-  h += ex * ex * 0.0016 + ex * 0.22 + en * en * 0.0012 + en * 0.25;
+  h += ex * ex * 0.0007 + ex * 0.12 + en * en * 0.0009 + en * 0.2;
   // a little ground swell
   h += Math.sin(x * 0.011 + z * 0.004) * 1.1 + Math.sin(z * 0.017 - x * 0.006) * 0.8;
   return h;

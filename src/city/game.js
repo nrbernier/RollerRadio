@@ -270,7 +270,7 @@ function loop(now) {
   }
   Game.cellT = (Game.cellT || 0) - dt;
   if (Game.cellT <= 0) { Game.cellT = 0.25; W.updateCells(G.camera.position.x, G.camera.position.z, 360); }
-  G.renderer.render(G.scene, G.camera);
+  if (!Game.noRender) G.renderer.render(G.scene, G.camera);
   // adaptive resolution
   Game.dprAcc += dt; Game.dprN++;
   if (Game.dprN >= 90) {

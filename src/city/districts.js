@@ -4,28 +4,28 @@
 function districtKit(K, S, F) {
   const W = K.W, B = K.B;
   const H = { K, S, F, W, B };
-  // keep things off the metro viaduct, the big roads and the canal
+  // keep things off the metro viaduct, the big roads, the lanes and each other.
+  // Everything that blocks is filed in two grids: points with a radius, and reserved rects.
+  const PG = makeGrid(24), RG = makeGrid(24);
+  let maxR = 0;
+  const block = (x, z, r) => { const e = { x, z, r }; PG.add(e, x - r, z - r, x + r, z + r); if (r > maxR) maxR = r; };
   const M = W.metro;
+  if (M) for (let i = 0; i < M.N; i++) block(M.pts[i].x, M.pts[i].z, METRO.deckW / 2 + 1.5);
+  for (const st of (W.stations || [])) for (const rp of st.ramps) { const dx = rp.to[0] - rp.from[0], dz = rp.to[1] - rp.from[1], L = Math.hypot(dx, dz); for (let t = 0; t <= L; t += 2) block(rp.from[0] + dx * t / L, rp.from[1] + dz * t / L, 3); }
+  for (const r of Object.values(W.roads || {})) for (let i = 0; i < r.pts.length - 1; i++) {
+    const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
+    for (let t = 0; t <= L; t += 3) block(ax + (bx - ax) * t / L, az + (bz - az) * t / L, r.width / 2 + 3.5);
+  }
+  const _pq = [], _rq = [];
   H.clearOf = (x0, z0, x1, z1, pad = 3) => {
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, rr = Math.hypot(x1 - x0, z1 - z0) / 2 + pad;
-    if (M) for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (Math.abs(p.x - cx) > rr + 12 || Math.abs(p.z - cz) > rr + 12) continue; if (rectDist([x0 - pad, z0 - pad, x1 + pad, z1 + pad], p.x, p.z) < METRO.deckW / 2 + 1.5) return false; }
-    for (const st of (W.stations || [])) for (const rp of st.ramps) { const dx = rp.to[0] - rp.from[0], dz = rp.to[1] - rp.from[1], L = Math.hypot(dx, dz); for (let t = 0; t <= L; t += 4) if (rectDist([x0 - pad, z0 - pad, x1 + pad, z1 + pad], rp.from[0] + dx * t / L, rp.from[1] + dz * t / L) < 3) return false; }
-    for (const r of Object.values(W.roads || {})) for (let i = 0; i < r.pts.length - 1; i++) {
-      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
-      for (let t = 0; t <= L; t += 6) if (rectDist([x0 - pad, z0 - pad, x1 + pad, z1 + pad], ax + (bx - ax) * t / L, az + (bz - az) * t / L) < r.width / 2 + 3.5) return false;
-    }
-    for (const x of [x0, x1, cx]) for (const z of [z0, z1, cz]) if (inCanal(x, z)) return false;
-    for (const b of (H.reserved || [])) if (x1 + pad > b[0] && x0 - pad < b[2] && z1 + pad > b[1] && z0 - pad < b[3]) return false;
-    for (const [P, hw] of H.lines) for (let i = 0; i < P.length - 1; i++) {
-      const [ax, az] = P[i], [bx, bz] = P[i + 1];
-      if (Math.max(ax, bx) + hw < x0 - pad || Math.min(ax, bx) - hw > x1 + pad || Math.max(az, bz) + hw < z0 - pad || Math.min(az, bz) - hw > z1 + pad) continue;
-      const L = Math.hypot(bx - ax, bz - az); for (let t = 0; t <= L; t += 2) if (rectDist([x0 - pad, z0 - pad, x1 + pad, z1 + pad], ax + (bx - ax) * t / L, az + (bz - az) * t / L) < hw) return false;
-    }
+    const a0 = x0 - pad, b0 = z0 - pad, a1 = x1 + pad, b1 = z1 + pad, rr = [a0, b0, a1, b1];
+    for (const x of [x0, x1, (x0 + x1) / 2]) for (const z of [z0, z1, (z0 + z1) / 2]) if (inCanal(x, z)) return false;
+    for (const e of PG.query(a0 - maxR, b0 - maxR, a1 + maxR, b1 + maxR, _pq)) if (rectDist(rr, e.x, e.z) < e.r) return false;
+    for (const b of RG.query(a0, b0, a1, b1, _rq)) if (a1 > b[0] && a0 < b[2] && b1 > b[1] && b0 < b[3]) return false;
     return true;
   };
-  H.reserved = []; H.lines = [];
-  H.line = (P, hw) => H.lines.push([P, hw]);
-  H.reserve = (r) => H.reserved.push(r);
+  H.reserve = (r) => RG.add(r, r[0], r[1], r[2], r[3]);
+  H.line = (P, hw) => { for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], L = Math.hypot(bx - ax, bz - az); for (let t = 0; t <= L; t += 1.5) block(ax + (bx - ax) * t / L, az + (bz - az) * t / L, hw); } };
   // a building standing on the slope (its floor line is the highest corner)
   H.bldg = (x0, z0, x1, z1, h, col, o = {}) => {
     const [lo, hi] = groundSpan(x0, z0, x1, z1);
@@ -44,15 +44,21 @@ function districtKit(K, S, F) {
     F.add(g, new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y, (z0 + z1) / 2), col);
   };
   // trees: faceted canopies (flat-shaded), trunk collider; big ones have no camera box (you're under them)
+  // shared unit shapes, scaled into place (allocating fresh geometry for thousands of trees is slow)
+  const ICO = (() => { const g = flatGeo(new THREE.IcosahedronGeometry(1, 0)); g.computeVertexNormals(); return prepShape(g); })();
+  const TRUNK = prepShape(new THREE.CylinderGeometry(0.7, 1, 1, 6)), ICOF = prepShape(new THREE.IcosahedronGeometry(1, 0));
+  const _tq = new THREE.Quaternion(), _te = new THREE.Euler(), _tm = new THREE.Matrix4(), _tv = V3(), _ts = V3();
   H.tree = (x, z, o = {}) => {
     const s = o.s ?? 1, h = (o.h ?? 4) * s, r = (o.r ?? 2.6) * s, y = o.y ?? terrainAt(x, z), col = o.color || '#3f8a4a', rot = (x * 13.1 + z * 7.7) % 6.28;
-    K.cyl(x, y - 0.3, z, 0.28 * s, h + 0.6, o.trunk || '#6b4a35', { outline: 0.05 * s, seg: 6, r2: 0.4 * s });
-    const blob = (bx, by, bz, br, c) => B.add(flatGeo(new THREE.IcosahedronGeometry(br, 0)), new THREE.Matrix4().compose(V3(bx, by, bz), new THREE.Quaternion().setFromEuler(new THREE.Euler(rot, rot * 2, 0)), V3(1, o.squash ?? 0.85, 1)), c, 'flat', { outlineT: 0.14 * s, edges: false });
+    _tm.compose(_tv.set(x, y - 0.3 + (h + 0.6) / 2, z), _tq.identity(), _ts.set(0.4 * s, h + 0.6, 0.4 * s));
+    B.addShape(TRUNK, _tm, o.trunk || '#6b4a35', 'plain', 0.05 * s);
+    _tq.setFromEuler(_te.set(rot, rot * 2, 0));
+    const blob = (bx, by, bz, br, c) => { _tm.compose(_tv.set(bx, by, bz), _tq, _ts.set(br, br * (o.squash ?? 0.85), br)); B.addShape(ICO, _tm, c, 'flat', 0.14 * s); };
     blob(x, y + h + r * 0.55, z, r, col);
     if (!o.single) { blob(x + r * 0.55, y + h + r * 0.15, z + r * 0.25, r * 0.66, o.color2 || col); blob(x - r * 0.45, y + h + r * 0.25, z - r * 0.35, r * 0.62, o.color2 || col); }
     W.boxes.push({ x0: x - 0.4 * s, y0: y - 1, z0: z - 0.4 * s, x1: x + 0.4 * s, y1: y + h, z1: z + 0.4 * s, tag: 'tree' });
     if (!o.tall) W.camBoxes.push({ x0: x - r, y0: y + h, z0: z - r, x1: x + r, y1: y + h + r * 1.4, z1: z + r });
-    if (o.far !== false) F.add(new THREE.IcosahedronGeometry(r * 0.9, 0), new THREE.Matrix4().compose(V3(x, y + h + r * 0.55, z), new THREE.Quaternion(), V3(1, 0.8, 1)), o.farColor || col);
+    if (o.far !== false) { _tm.compose(_tv.set(x, y + h + r * 0.55, z), _tq.identity(), _ts.set(r * 0.9, r * 0.72, r * 0.9)); F.addShape(ICOF, _tm, o.farColor || col); }
   };
   H.pine = (x, z, o = {}) => {
     const s = o.s ?? 1, y = o.y ?? terrainAt(x, z), col = o.color || '#2f5a3a';
@@ -125,14 +131,15 @@ const BIZ_PAL = ['#8fb7cc', '#d8d2c4', '#c9b28a', '#e6dfcf', '#7a9aa8', '#b9c7cf
 function buildDistricts(K, S, F) {
   const H = districtKit(K, S, F);
   // the canals and lakeshore first: their quays and promenades claim the ground the others avoid
-  buildCanals(H);
-  buildLakeshore(H);
-  buildBusiness(H);
-  buildMarket(H);
-  buildOldTown(H);
-  buildDocks(H);
-  buildPark(H);
-  buildObservatory(H);
+  const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
+  buildCanals(H); lap('canals');
+  buildLakeshore(H); lap('lakeshore');
+  buildBusiness(H); lap('business');
+  buildMarket(H); lap('market');
+  buildOldTown(H); lap('old town');
+  buildDocks(H); lap('docks');
+  buildPark(H); lap('park');
+  buildObservatory(H); lap('observatory');
   return H;
 }
 
@@ -263,7 +270,7 @@ function buildPark(H) {
     [[-520, -60], [-640, 60], [-800, 120], [-960, 60], [-1000, -60], [-960, -180]],
   ];
   const trailPts = [];
-  for (const t of trails) { const P = H.path(t, 4.5, '#c9b892'); trailPts.push(...P); }
+  for (const t of trails) { const P = H.path(t, 4.5, '#c9b892'); trailPts.push(...P); H.line(t, 5.5); }
   W.parkTrails = trails;
   const nearTrail = (x, z, d) => { for (const p of trailPts) if (Math.abs(p[0] - x) < d && Math.abs(p[1] - z) < d && Math.hypot(p[0] - x, p[1] - z) < d) return true; return false; };
   // lanterns + benches along the trails
@@ -305,7 +312,6 @@ function buildPark(H) {
   for (let x = R[0] + 8; x < R[2] - 4; x += 15) for (let z = R[1] + 8; z < R[3] - 4; z += 15) {
     const tx = x + (r() - 0.5) * 12, tz = z + (r() - 0.5) * 12;
     if (clear.some(([cx, cz, cr]) => Math.hypot(tx - cx, tz - cz) < cr)) continue;
-    if (nearTrail(tx, tz, 6)) continue;
     // glades: patches of open meadow
     const glade = Math.sin(tx * 0.013) * Math.sin(tz * 0.011) > 0.55;
     if (glade && r() < 0.85) continue;

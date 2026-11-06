@@ -23,6 +23,35 @@ class CellBatch extends StaticBatch {
       for (let k = 0; k < 6; k++) L.push(a[i + k]);
     }
   }
+  // fast path for shapes used thousands of times (trees): no cloning, no edges
+  addShape(sh, m, color, kind, outlineT = 0) {
+    const e = m.elements, P = sh.pos, Nn = sh.nor, n = P.length / 3;
+    const nm = _nm3.getNormalMatrix(m).elements, c = _sc.set(color);
+    const tp = _tp.length >= P.length ? _tp : (_tp = new Float32Array(P.length)), tn = _tn.length >= P.length ? _tn : (_tn = new Float32Array(P.length));
+    let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+    for (let i = 0; i < n; i++) {
+      const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+      const X = e[0] * x + e[4] * y + e[8] * z + e[12], Y = e[1] * x + e[5] * y + e[9] * z + e[13], Z = e[2] * x + e[6] * y + e[10] * z + e[14];
+      tp[i * 3] = X; tp[i * 3 + 1] = Y; tp[i * 3 + 2] = Z;
+      if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; if (Z < z0) z0 = Z; if (Z > z1) z1 = Z;
+      const a = Nn[i * 3], b = Nn[i * 3 + 1], cc = Nn[i * 3 + 2];
+      let nx = nm[0] * a + nm[3] * b + nm[6] * cc, ny = nm[1] * a + nm[4] * b + nm[7] * cc, nz = nm[2] * a + nm[5] * b + nm[8] * cc; const l = Math.hypot(nx, ny, nz) || 1;
+      tn[i * 3] = nx / l; tn[i * 3 + 1] = ny / l; tn[i * 3 + 2] = nz / l;
+    }
+    for (let i = 0; i < n * 3; i += 9) {
+      const b = this.bucket(kind, (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
+      const shade = (tn[i + 1] + tn[i + 4] + tn[i + 7]) / 3 < -0.5 ? 0.55 : 1;
+      for (let k = 0; k < 9; k += 3) { b.pos.push(tp[i + k], tp[i + k + 1], tp[i + k + 2]); b.nor.push(tn[i + k], tn[i + k + 1], tn[i + k + 2]); b.col.push(c.r * shade, c.g * shade, c.b * shade); b.uv.push(tp[i + k] / 8, tp[i + k + 2] / 8); }
+    }
+    if (outlineT > 0) {
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+      const sx = (x1 - x0 + 2 * outlineT) / Math.max(1e-4, x1 - x0), sy = (y1 - y0 + 2 * outlineT) / Math.max(1e-4, y1 - y0), sz = (z1 - z0 + 2 * outlineT) / Math.max(1e-4, z1 - z0);
+      for (let i = 0; i < n * 3; i += 9) {
+        const b = this.bucket('outline', (tp[i] + tp[i + 3] + tp[i + 6]) / 3, (tp[i + 2] + tp[i + 5] + tp[i + 8]) / 3);
+        for (let k = 0; k < 9; k += 3) b.pos.push(cx + (tp[i + k] - cx) * sx, cy + (tp[i + k + 1] - cy) * sy, cz + (tp[i + k + 2] - cz) * sz);
+      }
+    }
+  }
   // → Map "cx,cz" → Group
   buildCells(materials) {
     const cells = new Map();
@@ -50,6 +79,8 @@ class CellBatch extends StaticBatch {
 }
 
 // far skyline: plain coloured boxes and blobs merged into a few tiles, no outlines, no textures
+const _nm3 = new THREE.Matrix3(), _sc = new THREE.Color(); let _tp = new Float32Array(0), _tn = new Float32Array(0);
+function prepShape(geo) { const g = geo.index ? geo.toNonIndexed() : geo; if (!g.attributes.normal) g.computeVertexNormals(); return { pos: g.attributes.position.array, nor: g.attributes.normal.array }; }
 const FAR_TILE = 640;
 class FarBatch {
   constructor() { this.tiles = {}; }
@@ -62,6 +93,16 @@ class FarBatch {
     g.computeBoundingBox(); const ctr = g.boundingBox.getCenter(V3());
     const T = this.tile(ctr.x, ctr.z);
     for (let i = 0; i < p.length; i += 3) { T.pos.push(p[i], p[i + 1], p[i + 2]); T.nor.push(n[i], n[i + 1], n[i + 2]); const sh = n[i + 1] < -0.5 ? 0.6 : 1; T.col.push(c.r * sh, c.g * sh, c.b * sh); }
+  }
+  addShape(sh, m, color) {
+    const e = m.elements, P = sh.pos, Nn = sh.nor, nm = _nm3.getNormalMatrix(m).elements, c = _sc.set(color);
+    const T = this.tile(e[12], e[14]);
+    for (let i = 0; i < P.length; i += 3) {
+      const x = P[i], y = P[i + 1], z = P[i + 2], a = Nn[i], b = Nn[i + 1], cc = Nn[i + 2];
+      T.pos.push(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]);
+      let nx = nm[0] * a + nm[3] * b + nm[6] * cc, ny = nm[1] * a + nm[4] * b + nm[7] * cc, nz = nm[2] * a + nm[5] * b + nm[8] * cc; const l = Math.hypot(nx, ny, nz) || 1;
+      T.nor.push(nx / l, ny / l, nz / l); const sh2 = ny / l < -0.5 ? 0.6 : 1; T.col.push(c.r * sh2, c.g * sh2, c.b * sh2);
+    }
   }
   box(x0, y0, z0, x1, y1, z1, color, inset = 0.35) {
     const geo = new THREE.BoxGeometry(Math.max(0.1, x1 - x0 - 2 * inset), Math.max(0.1, y1 - y0 - inset), Math.max(0.1, z1 - z0 - 2 * inset));
