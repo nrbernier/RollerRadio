@@ -251,7 +251,7 @@ function worldMaterials(night) {
 function makeKit(meta) {
   const W = Object.assign({ boxes: [], camBoxes: [], ramps: [], rails: [], relays: [], tapes: [], pads: [], drones: [], dyn: [], waters: [],
     group: new THREE.Group(), killY: -24 }, meta);
-  const B = new StaticBatch();
+  const B = meta.batch || new StaticBatch();      // a world may bring its own batcher (the city files geometry by cell)
   const scene = W.group;
   const railDefs = [];
   const K = { W, B, scene };
@@ -802,6 +802,7 @@ function makeKit(meta) {
         const h = rampH(rp, x, z);
         if (h <= yMax && h > best) { best = h; hit = rp; }
       }
+      if (W.groundExtra) { const e = W.groundExtra(x, z, yMax, r); if (e && e.y <= yMax && e.y > best) { best = e.y; hit = e.hit; } }   // terrain, slopes, trains
       return { y: best, hit };
     };
     // rails
@@ -904,7 +905,7 @@ function makeKit(meta) {
         }
       }
     }
-    scene.add(B.build(worldMaterials(W.night)));
+    if (meta.buildBatch) meta.buildBatch(B, W); else scene.add(B.build(worldMaterials(W.night)));
     W.relaysOn = () => W.relays.filter(r => r.active).length;
     W.tapesGot = () => W.tapes.filter(t => t.got).length;
     return W;

@@ -435,6 +435,7 @@ class StaticBatch {
       const ny = (n[i + 1] + n[i + 4] + n[i + 7]) / 3, nx = (n[i] + n[i + 3] + n[i + 6]) / 3, nz = (n[i + 2] + n[i + 5] + n[i + 8]) / 3;
       let bn = kind;
       if (kind === 'building') bn = Math.abs(ny) > 0.5 ? 'roof' : 'wall';
+      else if (this.split && this.split[kind]) bn = Math.abs(ny) > 0.5 ? this.split[kind][0] : this.split[kind][1];
       else if (kind === 'roofonly') bn = 'roof';
       else if (kind === 'metal') bn = 'plain';
       const cx = (p[i] + p[i + 3] + p[i + 6]) / 3, cz = (p[i + 2] + p[i + 5] + p[i + 8]) / 3;
@@ -2279,7 +2280,7 @@ function worldMaterials(night) {
 function makeKit(meta) {
   const W = Object.assign({ boxes: [], camBoxes: [], ramps: [], rails: [], relays: [], tapes: [], pads: [], drones: [], dyn: [], waters: [],
     group: new THREE.Group(), killY: -24 }, meta);
-  const B = new StaticBatch();
+  const B = meta.batch || new StaticBatch();      // a world may bring its own batcher (the city files geometry by cell)
   const scene = W.group;
   const railDefs = [];
   const K = { W, B, scene };
@@ -2830,6 +2831,7 @@ function makeKit(meta) {
         const h = rampH(rp, x, z);
         if (h <= yMax && h > best) { best = h; hit = rp; }
       }
+      if (W.groundExtra) { const e = W.groundExtra(x, z, yMax, r); if (e && e.y <= yMax && e.y > best) { best = e.y; hit = e.hit; } }   // terrain, slopes, trains
       return { y: best, hit };
     };
     // rails
@@ -2932,7 +2934,7 @@ function makeKit(meta) {
         }
       }
     }
-    scene.add(B.build(worldMaterials(W.night)));
+    if (meta.buildBatch) meta.buildBatch(B, W); else scene.add(B.build(worldMaterials(W.night)));
     W.relaysOn = () => W.relays.filter(r => r.active).length;
     W.tapesGot = () => W.tapes.filter(t => t.got).length;
     return W;
@@ -4478,6 +4480,17 @@ const _pc = new THREE.Color(), _pv = V3();
 
 // ---------- player ----------
 const PH = { GRAV: 26, JUMP: 9, BEATJUMP: 10.6, HOLD: 0.24, HOLDG: 0.36, RUN: 13, MAXSP: 25, ACC: 13, AIRACC: 8, STEP: 0.45, R: 0.42, H: 1.7, SNAP: 0.4 };
+// rolling physics a world can tune (W.phys); these defaults are the RollerRadio feel
+const PHYS_DEFAULT = { friction: 2.6, fastFriction: 6, overDecay: 4, slopeK: 0.32, drag: 0, climb: 0 };
+// slope of whatever you're standing on, as [dy/dx, dy/dz]: axis ramps, or anything with a slope(x, z) (terrain)
+function groundSlope(h, x, z, out) {
+  out[0] = 0; out[1] = 0;
+  if (!h) return out;
+  if (h.axis) { const gr = (h.h1 - h.h0) / (h.axis === 'x' ? h.x1 - h.x0 : h.z1 - h.z0); if (h.axis === 'x') out[0] = gr; else out[1] = gr; }
+  else if (h.slope) h.slope(x, z, out);
+  return out;
+}
+const _gs = [0, 0];
 const TRICKS_AIR = [
   { name: '360 SPIN', axis: 'y', amt: 1 }, { name: 'BACKFLIP', axis: 'x', amt: -1 }, { name: 'FLATSPIN 540', axis: 'y', amt: 1.5 },
   { name: 'CORKSCREW', axis: 'z', amt: 1 }, { name: 'FRONTFLIP', axis: 'x', amt: 1 }, { name: 'MISTY 720', axis: 'y', amt: 2 }
@@ -4691,12 +4704,12 @@ class Player {
     // safety net
     if (p.y < W.killY) this.hooks.fell?.();
     // remember safe ground
-    if (this.mode === 'ground' && this.ground && !this.ground.tag && this.ground.y1 !== undefined) {
+    if (this.mode === 'ground' && this.ground && !this.ground.tag && (this.ground.y1 !== undefined || this.ground.slope)) {
       this.safeT -= dt;
       if (this.safeT < 0) {
         this.safeT = 0.35;
-        let ok = true;
-        for (const [ox, oz] of [[0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]]) { const g = W.groundAt(p.x + ox, p.z + oz, p.y + 0.3, 0); if (Math.abs(g.y - p.y) > 0.05) { ok = false; break; } }
+        let ok = true; const tol = this.ground.slope ? 0.5 : 0.05;
+        for (const [ox, oz] of [[0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]]) { const g = W.groundAt(p.x + ox, p.z + oz, p.y + 0.3, 0); if (Math.abs(g.y - p.y) > tol) { ok = false; break; } }
         if (ok) { this.lastSafe.copy(p); this.lastSafeYaw = this.yaw; }
       }
     }
@@ -4716,18 +4729,22 @@ class Player {
     }
   }
   step(dt, ctl) {
-    const W = this.W, p = this.pos, v = this.vel;
+    const W = this.W, p = this.pos, v = this.vel, F = W.phys || PHYS_DEFAULT;
     const { dx = 0, dz = 0, im = 0 } = ctl;
     if (this.mode === 'ground') {
       let sp = Math.hypot(v.x, v.z);
       let head = sp > 0.3 ? Math.atan2(v.x, v.z) : this.yaw;
+      const sl = groundSlope(this.ground, p.x, p.z, _gs);
+      // climbing slows the push a little (worlds opt in with phys.climb)
+      const up = F.climb ? Math.max(0, sl[0] * Math.sin(head) + sl[1] * Math.cos(head)) : 0;
+      const run = PH.RUN * (1 - Math.min(0.45, up * F.climb));
       if (ctl.tank) {
         // skater steering: A/D carve, W pushes, S brakes
         const rate = U.lerp(3.4, 2.3, U.clamp(sp / 20, 0, 1));
         head -= ctl.turn * rate * dt;            // yaw decreases = turning right
-        if (ctl.fwd > 0) { if (sp < PH.RUN) sp = Math.min(PH.RUN, sp + PH.ACC * dt); else sp = Math.max(PH.RUN, sp - 4 * dt); }
+        if (ctl.fwd > 0) { if (sp < run) sp = Math.min(run, sp + PH.ACC * dt); else sp = Math.max(run, sp - F.overDecay * dt); }
         else if (ctl.fwd < 0) sp = Math.max(0, sp - 20 * dt);
-        else sp = Math.max(0, sp - (sp > PH.RUN ? 6 : 2.6) * dt);
+        else sp = Math.max(0, sp - (sp > PH.RUN ? F.fastFriction : F.friction) * dt);
       } else if (im > 0.08) {
         const tgt = Math.atan2(dx, dz);
         const diff = U.wrapAng(tgt - head);
@@ -4735,18 +4752,15 @@ class Player {
         else {
           const rate = U.lerp(9, 3.6, U.clamp(sp / 20, 0, 1));
           head += U.clamp(diff, -rate * dt, rate * dt);
-          const tsp = PH.RUN * Math.min(1, im);
+          const tsp = run * Math.min(1, im);
           if (sp < tsp) sp = Math.min(tsp, sp + PH.ACC * dt * (0.4 + im * 0.6));
-          else sp = Math.max(tsp, sp - 4 * dt);       // boosts fade: keep pushing on the beat
+          else sp = Math.max(tsp, sp - F.overDecay * dt);       // boosts fade: keep pushing on the beat
         }
-      } else sp = Math.max(0, sp - (sp > PH.RUN ? 6 : 2.6) * dt);
+      } else sp = Math.max(0, sp - (sp > PH.RUN ? F.fastFriction : F.friction) * dt);
+      if (F.drag) sp = Math.max(0, sp - F.drag * sp * sp * dt);
       v.x = Math.sin(head) * sp; v.z = Math.cos(head) * sp;
-      // slope pull on ramps
-      if (this.ground && this.ground.axis) {
-        const rp = this.ground, gr = (rp.h1 - rp.h0) / (rp.axis === 'x' ? rp.x1 - rp.x0 : rp.z1 - rp.z0);
-        const a = -PH.GRAV * 0.32 * gr * dt;
-        if (rp.axis === 'x') v.x += a; else v.z += a;
-      }
+      // slope pull on ramps and hills
+      if (sl[0] || sl[1]) { const k = -PH.GRAV * F.slopeK * dt; v.x += k * sl[0]; v.z += k * sl[1]; }
       const oy = p.y;
       p.x += v.x * dt; p.z += v.z * dt;
       this.pushWalls(); this.guardRails();
@@ -4754,8 +4768,8 @@ class Player {
       if (g.y >= p.y - PH.SNAP && g.y > -1e8) {
         p.y = g.y; this.ground = g.hit;
         if (g.hit && g.hit.vx !== undefined) { p.x += g.hit.vx * dt; p.z += g.hit.vz * dt; }   // ride moving platforms
-        // vertical speed only from slopes (launch off kickers) or the moving lift
-        if (g.hit && g.hit.axis) { const rp = g.hit, gr = (rp.h1 - rp.h0) / (rp.axis === 'x' ? rp.x1 - rp.x0 : rp.z1 - rp.z0); v.y = gr * (rp.axis === 'x' ? v.x : v.z); }
+        // vertical speed only from slopes (launch off kickers, crests) or the moving lift
+        if (g.hit && (g.hit.axis || g.hit.slope)) { const s2 = groundSlope(g.hit, p.x, p.z, _gs); v.y = s2[0] * v.x + s2[1] * v.z; }
         else if (g.hit && g.hit.tag === 'lift') v.y = U.clamp((p.y - oy) / dt, 0, 10) * 0.6;
         else v.y = 0;
       } else {

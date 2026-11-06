@@ -1,0 +1,14 @@
+{
+  "name": "Rubato",
+  "short_name": "Rubato",
+  "description": "A city to wander on skates, where the music changes with every neighbourhood.",
+  "start_url": "city.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#b0cce0",
+  "theme_color": "#b0cce0",
+  "icons": [
+    { "src": "icons/city-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/city-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

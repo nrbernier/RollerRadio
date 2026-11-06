@@ -112,6 +112,7 @@ class StaticBatch {
       const ny = (n[i + 1] + n[i + 4] + n[i + 7]) / 3, nx = (n[i] + n[i + 3] + n[i + 6]) / 3, nz = (n[i + 2] + n[i + 5] + n[i + 8]) / 3;
       let bn = kind;
       if (kind === 'building') bn = Math.abs(ny) > 0.5 ? 'roof' : 'wall';
+      else if (this.split && this.split[kind]) bn = Math.abs(ny) > 0.5 ? this.split[kind][0] : this.split[kind][1];
       else if (kind === 'roofonly') bn = 'roof';
       else if (kind === 'metal') bn = 'plain';
       const cx = (p[i] + p[i + 3] + p[i + 6]) / 3, cz = (p[i + 2] + p[i + 5] + p[i + 8]) / 3;

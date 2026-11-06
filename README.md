@@ -74,3 +74,38 @@ build.py           assembles everything into index.html
 ```
 
 Rebuild after editing: `python3 build.py`. three.js r149 loads from jsDelivr.
+
+
+---
+
+# Rubato — the city (`city.html`)
+
+A second game on the same engine: no story, no score, nothing to collect. A hill city that slopes down to a lake, to wander on skates while the music changes with every neighbourhood.
+
+Open `city.html` (on GitHub Pages: `/city.html`). Headphones on.
+
+**Places**, each with its own light, colours and band:
+
+| Place | Music |
+|---|---|
+| Observatory (the summit, where you start) | no drums: drones, bells, voices |
+| Forest park | 12/8 at 66 bpm: marimba, kalimba, wooden flute, a frame-drum heartbeat |
+| Business district | 124 bpm, swung: ride cymbal, walking bass, Rhodes comping, muted trumpet answers |
+| Old town | a waltz: accordion, glockenspiel, pizzicato bass |
+| Market | 12/8 against 2: agogo bell pattern, doum and tek, oud-ish plucks, a call and response |
+| Canals | dub: one-drop drums, offbeat skank, melodica, deep bass |
+| Docks | techno with a metal pattern on a 5- or 7-step loop over 4/4, acid bass |
+| Lakeshore | slow ambient dub: soft kick, steel-pan pings, long pads, waves |
+
+The band is one shared clock. Where you are blends the places' recipes; the tempo glides (through half-time when the jump is big), harmony and key change on bar lines, and in the overlaps the meters run against each other for a while. Energy wanders on 8-bar phrases, so standing still never sounds the same twice.
+
+**Playing the city, with nothing to achieve**
+- Everything you touch is quantized to the beat: lamps, lanterns, bollards, planks, containers, rigging, pigeons scattering.
+- Grinding plays an arpeggio on the place's own instrument; tricks add a small flourish; landings a soft kick.
+- Stop on a bench (or just stand still) to listen: the camera drifts back to the view and the full arrangement comes in.
+- Buskers' tunes join the mix as you come close.
+- Ride the metro on the roof (the rail joints become the beat) or grind its rails. A train, a car, or a fall stops the record with a scratch; the music starts again on the next bar when you move.
+- Hidden spots change the music only while you're there: a music box in the glasshouse, bells by the tower, a trumpet on a rooftop garden, a lo-fi record shop, an echo under the stone bridge, a hum under the water tower, a foghorn at the lighthouse.
+- A slow day and night (about 20 minutes): lit windows, lamps, stars, a lighthouse beam.
+
+**Code**: `src/city/` — `plan.js` (the map), `terrain.js` (one heightfield for drawing and collision), `batch.js` (geometry filed by 128 m cells + an always-on far skyline), `metro.js`, `world.js`, `districts.js` / `districts2.js`, `music.js` (the generative band), `sky.js`, `life.js`, `game.js`, `shell.html`. It shares `core.js`, `characters.js`, `kit.js` and `player.js` with Offbeat. `python3 build.py` writes both pages.

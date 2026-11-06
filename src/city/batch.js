@@ -1,0 +1,180 @@
+// ============================================================
+//  CITY BATCHING — near detail in cells you can see around you,
+//  plus a cheap "far" copy of everything big that is always drawn.
+//  The far copy is a little smaller than the real thing, so up close
+//  it hides inside it; far away it is the skyline.
+// ============================================================
+const CELL = 128;
+class CellBatch extends StaticBatch {
+  constructor() { super(); this.cellLines = {}; this.split = { house: ['roof', 'house'], shed: ['roof', 'brick'], tower: ['roof', 'tower'] }; }
+  bucket(name, x, z) {
+    const key = name + '|' + Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
+    return this.buckets[key] || (this.buckets[key] = { name, pos: [], nor: [], col: [], uv: [], cx: Math.floor(x / CELL), cz: Math.floor(z / CELL) });
+  }
+  // same as StaticBatch.add, but edges are filed by cell
+  add(geo, matrix, color, kind = 'plain', o = {}) {
+    super.add(geo, matrix, color, kind, Object.assign({}, o, { edges: false }));
+    if (o.edges === false) return;
+    const eg = new THREE.EdgesGeometry(geo, 30); if (matrix) eg.applyMatrix4(matrix);
+    const a = eg.attributes.position.array;
+    for (let i = 0; i < a.length; i += 6) {
+      const key = Math.floor((a[i] + a[i + 3]) / 2 / CELL) + ',' + Math.floor((a[i + 2] + a[i + 5]) / 2 / CELL);
+      const L = this.cellLines[key] || (this.cellLines[key] = []);
+      for (let k = 0; k < 6; k++) L.push(a[i + k]);
+    }
+  }
+  // → Map "cx,cz" → Group
+  buildCells(materials) {
+    const cells = new Map();
+    const cellOf = (key) => { let g = cells.get(key); if (!g) { g = new THREE.Group(); const [cx, cz] = key.split(',').map(Number); g.userData = { cx: (cx + 0.5) * CELL, cz: (cz + 0.5) * CELL }; cells.set(key, g); } return g; };
+    for (const key in this.buckets) {
+      const b = this.buckets[key], name = b.name;
+      if (!b.pos.length) continue;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+      const ck = key.split('|')[1];
+      if (name === 'outline') { cellOf(ck).add(new THREE.Mesh(g, G.outlineMat)); continue; }
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      const mesh = new THREE.Mesh(g, materials[name] || materials.plain);
+      if (name === 'water' || name === 'glow' || name === 'lamp') mesh.renderOrder = 3;
+      cellOf(ck).add(mesh);
+    }
+    for (const key in this.cellLines) {
+      const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(this.cellLines[key], 3));
+      cellOf(key).add(new THREE.LineSegments(lg, G.lineMat));
+    }
+    return cells;
+  }
+}
+
+// far skyline: plain coloured boxes and blobs merged into a few tiles, no outlines, no textures
+const FAR_TILE = 640;
+class FarBatch {
+  constructor() { this.tiles = {}; }
+  tile(x, z) { const k = Math.floor(x / FAR_TILE) + ',' + Math.floor(z / FAR_TILE); return this.tiles[k] || (this.tiles[k] = { pos: [], nor: [], col: [] }); }
+  add(geo, matrix, color) {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    if (matrix) g.applyMatrix4(matrix);
+    g.computeVertexNormals();
+    const p = g.attributes.position.array, n = g.attributes.normal.array, c = new THREE.Color(color);
+    g.computeBoundingBox(); const ctr = g.boundingBox.getCenter(V3());
+    const T = this.tile(ctr.x, ctr.z);
+    for (let i = 0; i < p.length; i += 3) { T.pos.push(p[i], p[i + 1], p[i + 2]); T.nor.push(n[i], n[i + 1], n[i + 2]); const sh = n[i + 1] < -0.5 ? 0.6 : 1; T.col.push(c.r * sh, c.g * sh, c.b * sh); }
+  }
+  box(x0, y0, z0, x1, y1, z1, color, inset = 0.35) {
+    const geo = new THREE.BoxGeometry(Math.max(0.1, x1 - x0 - 2 * inset), Math.max(0.1, y1 - y0 - inset), Math.max(0.1, z1 - z0 - 2 * inset));
+    this.add(geo, new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1 - inset) / 2, (z0 + z1) / 2), color);
+  }
+  build(mat) {
+    const group = new THREE.Group();
+    for (const k in this.tiles) {
+      const T = this.tiles[k]; if (!T.pos.length) continue;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(T.pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(T.nor, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(T.col, 3));
+      group.add(new THREE.Mesh(g, mat));
+    }
+    return group;
+  }
+}
+
+// ---------- materials ----------
+// one set for the whole city; the day/night cycle drives the window glow and the lamps
+function cityMaterials() {
+  if (G.cityMats) return G.cityMats;
+  const base = worldMaterials(false);
+  const M = Object.assign({}, base);
+  const winTex = nightWindowTex(), glowTex = nightGlowTex();
+  // daytime: pale walls, windows that read as glass (blue-grey with a sky glint), floor lines
+  const dayTex = canvasTex(1024, 1024, (x, w, h) => {
+    const r = U.rng(23);
+    x.fillStyle = '#f4f1ea'; x.fillRect(0, 0, w, h);
+    NIGHT_WIN.forEach((c, i) => {
+      const [X, Y, W2, H2] = nightWinRect(c, i % 16, Math.floor(i / 16));
+      x.fillStyle = '#5d6f86'; x.fillRect(X - 2, Y - 2, W2 + 4, H2 + 4);
+      const g = x.createLinearGradient(X, Y, X + W2, Y + H2); g.addColorStop(0, '#9fb8cf'); g.addColorStop(0.55, '#7d93ab'); g.addColorStop(1, '#6a7f96');
+      x.fillStyle = g; x.fillRect(X, Y, W2, H2);
+      x.fillStyle = 'rgba(255,255,255,.35)'; x.beginPath(); x.moveTo(X, Y + H2); x.lineTo(X + W2 * 0.35, Y); x.lineTo(X + W2 * 0.5, Y); x.lineTo(X + W2 * 0.15, Y + H2); x.fill();
+      x.fillStyle = '#4c5a6c'; if (c.style !== 'wide') x.fillRect(X + W2 / 2 - 1.5, Y, 3, H2);
+      if (c.blind) { x.fillStyle = 'rgba(240,236,226,.85)'; x.fillRect(X, Y, W2, H2 * c.blind * 0.8); }
+    });
+    for (let f = 0; f < 16; f++) { x.fillStyle = 'rgba(80,70,60,.18)'; x.fillRect(0, f * 64 + 54, w, 6); }
+  }, { repeat: true }).tex; dayTex.repeat.set(0.25, 0.25);
+  M.wall = new THREE.MeshToonMaterial({ vertexColors: true, map: dayTex, emissiveMap: glowTex, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  M.wallDay = dayTex; M.wallNight = winTex;
+  // towers: continuous glass bands between thin spandrels, mullions every couple of metres
+  const towerTex = canvasTex(256, 256, (x, w, h) => {
+    for (let f = 0; f < 4; f++) {
+      const y = f * 64; x.fillStyle = '#eef0ee'; x.fillRect(0, y, w, 16);
+      const g = x.createLinearGradient(0, y + 16, 0, y + 64); g.addColorStop(0, '#a8c4d8'); g.addColorStop(1, '#6f8ea8'); x.fillStyle = g; x.fillRect(0, y + 16, w, 48);
+      x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(0, y + 18, w, 6);
+      x.fillStyle = '#5f7488'; for (let c = 0; c < 8; c++) x.fillRect(c * 32, y + 16, 2, 48);
+    }
+  }, { repeat: true }).tex; towerTex.repeat.set(1, 1);
+  const towerGlow = canvasTex(256, 256, (x, w, h) => { const r = U.rng(61); x.fillStyle = '#000'; x.fillRect(0, 0, w, h); for (let f = 0; f < 4; f++) for (let c = 0; c < 8; c++) if (r() < 0.45) { x.fillStyle = r() < 0.7 ? '#ffe6b0' : '#d8f0ff'; x.fillRect(c * 32 + 2, f * 64 + 18, 30, 44); } }, { repeat: true }).tex;
+  M.tower = new THREE.MeshToonMaterial({ vertexColors: true, map: towerTex, emissiveMap: towerGlow, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // older houses: plaster, small windows with shutters, a lit one here and there at night
+  const HW = []; { const r = U.rng(41); for (let i = 0; i < 64; i++) HW.push({ lit: r() < 0.45, col: r() < 0.5 ? '#ffd88a' : '#ffe8c0', sh: ['#3f6a5a', '#7a4a3a', '#4a5a7a', '#6a6a52'][Math.floor(r() * 4)], box: r() < 0.3, open: r() < 0.3 }); }
+  const hwRect = (i) => { const c = i % 8, f = Math.floor(i / 8); return [c * 64 + 20, f * 64 + 14, 24, 32]; };
+  const houseTex = canvasTex(512, 512, (x, w, h) => {
+    const r = U.rng(43); x.fillStyle = '#f6efe2'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 1500; i++) { x.fillStyle = `rgba(120,100,80,${r() * 0.06})`; x.fillRect(r() * w, r() * h, 2 + r() * 10, 1 + r() * 4); }
+    HW.forEach((c, i) => {
+      const [X, Y, W2, H2] = hwRect(i);
+      x.fillStyle = '#e6dcc8'; x.fillRect(X - 4, Y - 4, W2 + 8, H2 + 8);
+      x.fillStyle = '#3e4a58'; x.fillRect(X, Y, W2, H2);
+      x.fillStyle = 'rgba(200,220,235,.35)'; x.fillRect(X + 2, Y + 2, W2 / 2 - 3, H2 - 4);
+      x.fillStyle = '#e6dcc8'; x.fillRect(X + W2 / 2 - 1, Y, 2, H2); x.fillRect(X, Y + H2 / 2 - 1, W2, 2);
+      x.fillStyle = c.sh; if (!c.open) { x.fillRect(X - 10, Y, 9, H2); x.fillRect(X + W2 + 1, Y, 9, H2); } else x.fillRect(X - 10, Y, 9, H2);
+      if (c.box) { x.fillStyle = '#7a5a3a'; x.fillRect(X - 2, Y + H2 + 2, W2 + 4, 5); x.fillStyle = ['#e85a6a', '#f2c23a', '#ffffff'][i % 3]; for (let k = 0; k < 5; k++) x.fillRect(X + k * 5, Y + H2 - 2, 4, 4); }
+    });
+  }, { repeat: true }).tex;
+  const houseGlow = canvasTex(512, 512, (x, w, h) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); HW.forEach((c, i) => { if (!c.lit) return; const [X, Y, W2, H2] = hwRect(i); x.fillStyle = c.col; x.fillRect(X, Y, W2, H2); x.fillStyle = '#000'; x.fillRect(X + W2 / 2 - 1, Y, 2, H2); x.fillRect(X, Y + H2 / 2 - 1, W2, 2); }); }, { repeat: true }).tex;
+  houseTex.repeat.set(0.5, 0.5); houseGlow.repeat.set(0.5, 0.5);
+  M.house = new THREE.MeshToonMaterial({ vertexColors: true, map: houseTex, emissiveMap: houseGlow, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  M.lamp = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0xffffff });       // street lamps: colour scaled by the night amount
+  const noise = canvasTex(256, 256, (x, w, h) => {
+    const r = U.rng(5); x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 1400; i++) { x.fillStyle = `rgba(40,60,30,${r() * 0.08})`; x.beginPath(); x.ellipse(r() * w, r() * h, 2 + r() * 9, 1 + r() * 5, r() * 3, 0, 7); x.fill(); }
+  }, { repeat: true }).tex;
+  M.ground = new THREE.MeshToonMaterial({ vertexColors: true, map: noise, gradientMap: G.grad });
+  M.far = new THREE.MeshLambertMaterial({ vertexColors: true });
+  M.hills = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // things lying on the ground are pulled towards the camera so they never flicker into the terrain
+  const decal = (map, f = -2) => new THREE.MeshToonMaterial({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: f, polygonOffsetUnits: f * 2 });
+  M.road = decal(base.asphalt.map, -3); M.walk = decal(base.paving.map, -2); M.gravel = decal(base.sand.map, -2); M.tiles = decal(base.tile.map, -2);
+  M.paint = new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  M.flat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: G.grad });
+  G.cityMats = M;
+  return M;
+}
+
+// one mesh from many parts ([geometry, matrix|null, colour]) — vehicles are a single draw (plus an outline)
+function mergeParts(parts) {
+  const pos = [], nor = [], col = [], c = new THREE.Color();
+  for (const [geo, m, colr] of parts) {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    if (m) g.applyMatrix4(m);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const p = g.attributes.position.array, n = g.attributes.normal.array; c.set(colr);
+    for (let i = 0; i < p.length; i += 3) { pos.push(p[i], p[i + 1], p[i + 2]); nor.push(n[i], n[i + 1], n[i + 2]); col.push(c.r, c.g, c.b); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+function solid(parts, outline = 0.06) {
+  const g = mergeParts(parts);
+  const mat = G.solidMat || (G.solidMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: G.grad }));
+  const m = new THREE.Mesh(g, mat);
+  if (outline) {
+    g.computeBoundingBox(); const bb = g.boundingBox, size = bb.getSize(V3()), ctr = bb.getCenter(V3());
+    const o = new THREE.Mesh(g, G.outlineMat); const sc = V3((size.x + 2 * outline) / size.x, (size.y + 2 * outline) / size.y, (size.z + 2 * outline) / size.z);
+    o.scale.copy(sc); o.position.set(ctr.x * (1 - sc.x), ctr.y * (1 - sc.y), ctr.z * (1 - sc.z)); m.add(o);
+  }
+  return m;
+}
+const T4 = (x, y, z, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz)).setPosition(x, y, z);
