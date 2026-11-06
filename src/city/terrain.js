@@ -123,20 +123,28 @@ function terrainMeshes(paint, mat) {
   return group;
 }
 // the hills around the city, coarse, for the views (no collision: you can't get there)
+// patchwork outside the city: woods, meadows, a few fields; rolling bumps further out
+const hillFbm = (x, z) => Math.sin(x * 0.0031 + Math.sin(z * 0.0023) * 2) * 0.5 + Math.sin(z * 0.0042 - x * 0.0017 + 1.7) * 0.35 + Math.sin((x + z) * 0.009) * 0.15;
+const hillWood = (x, z) => hillFbm(x * 1.7 + 300, z * 1.7 - 200) > 0.25;
+function hillY(x, z) {
+  const out = Math.max(0, Math.abs(x) - 1250, -1650 - z);
+  let y = landH(x, z) - 0.4 + U.smooth(U.clamp(out / 600, 0, 1)) * (hillFbm(x, z) * 55 + Math.sin(x * 0.0013 + 2) * 25);
+  if (z > 1100) y = Math.min(y, U.lerp(y, -8, U.clamp((z - 1100) / 200, 0, 1)));
+  return y;
+}
 function outerHills(mat) {
   // vertices line up with the terrain grid (every 6th), so the seam at the edge is clean
   const step = 48, X0 = TER.x0 - step * 40, X1 = TER.x1 + step * 40, Z0 = TER.z0 - step * 44, Z1 = TER.z0 + step * 58;
-  const nx = (X1 - X0) / step, nz = (Z1 - Z0) / step, pos = [], cols = [], idx = [], col = new THREE.Color();
+  const nx = (X1 - X0) / step, nz = (Z1 - Z0) / step, pos = [], cols = [], idx = [], col = new THREE.Color(), c2 = new THREE.Color();
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = X0 + i * step, z = Z0 + j * step;
     const inside = x > TER.x0 + 1 && x < TER.x1 - 1 && z > TER.z0 + 1;
-    let y = landH(x, z) - 0.4;
+    let y = hillY(x, z);
     if (inside) y -= 30;                                   // tucked under the real terrain
-    y += Math.max(0, Math.abs(x) - 1300) * 0.12 + Math.sin(x * 0.004) * Math.max(0, -z - 1600) * 0.05;
-    if (z > 1100) y = Math.min(y, U.lerp(y, -8, (z - 1100) / 200));
     pos.push(x, y, z);
-    const vine = Math.abs(x) > 1200 && z > -900 && z < 1100;
-    col.set(vine ? ((Math.floor(z / 40) % 2) ? '#7d9a4a' : '#6a8a3e') : y > 260 ? '#8a9a7a' : '#5f8a4a');
+    const wood = hillWood(x, z), field = !wood && Math.sin(x * 0.02) * Math.sin(z * 0.017) > 0.55;
+    col.set(wood ? '#3f6a3a' : field ? '#b8b06a' : '#6f9a4e');
+    c2.set('#8aa07a'); col.lerp(c2, U.clamp((y - 180) / 120, 0, 0.6));
     cols.push(col.r, col.g, col.b);
   }
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
@@ -145,4 +153,19 @@ function outerHills(mat) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   g.setIndex(idx); g.computeVertexNormals();
   return new THREE.Mesh(g, mat);
+}
+
+// clumps of trees on the wooded patches of the hills (far batch only: they're never close)
+function hillTrees(F) {
+  const r = U.rng(77), m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = V3(), sc = V3();
+  const ICO = prepShape(new THREE.IcosahedronGeometry(1, 0));
+  let n = 0;
+  for (let i = 0; i < 9000 && n < 2600; i++) {
+    const x = TER.x0 - 1700 + r() * (TER.x1 - TER.x0 + 3400), z = TER.z0 - 1900 + r() * 3200;
+    if (x > TER.x0 - 30 && x < TER.x1 + 30 && z > TER.z0 - 30) continue;
+    if (!hillWood(x, z) && r() > 0.08) continue;
+    const y = hillY(x, z), s = 7 + r() * 7;
+    m.compose(v.set(x, y + s * 0.7, z), q.identity(), sc.set(s, s * 1.1, s));
+    F.addShape(ICO, m, r() < 0.5 ? '#3a6436' : '#2f5a34'); n++;
+  }
 }

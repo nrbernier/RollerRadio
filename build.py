@@ -33,7 +33,7 @@ print('built', len(body(CDN)) // 1024, 'KB')
 
 # ---------- Rubato: the city ----------
 CITY_SHARED = ['core.js', 'characters.js', 'kit.js', 'player.js']
-CITY_ORDER = ['plan.js', 'terrain.js', 'batch.js', 'music.js', 'metro.js', 'world.js', 'districts.js', 'districts2.js', 'sky.js', 'life.js', 'game.js']
+CITY_ORDER = ['plan.js', 'terrain.js', 'batch.js', 'music.js', 'metro.js', 'world.js', 'districts.js', 'districts2.js', 'fill.js', 'sky.js', 'life.js', 'game.js']
 cshell = (ROOT / 'src/city/shell.html').read_text()
 cjs = '\n'.join([(ROOT / 'src' / f).read_text() for f in CITY_SHARED] + [(ROOT / 'src/city' / f).read_text() for f in CITY_ORDER if (ROOT / 'src/city' / f).exists()])
 cbody = lambda three: f'{cshell}\n<script src="{three}"></script>\n<script>\n"use strict";\n{cjs}\n</script>\n'

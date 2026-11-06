@@ -101,7 +101,7 @@ function buildCity() {
   W.spawn.y = terrainAt(W.spawn.x, W.spawn.z);
   // ground
   const terrain = terrainMeshes(paintGround, mats.ground); W.group.add(terrain);
-  W.group.add(outerHills(mats.hills));
+  W.group.add(outerHills(mats.hills)); hillTrees(F);
   // lake: a huge sheet of water, and a dark floor far below so you never see through it
   const lakeMat = new THREE.MeshBasicMaterial({ color: 0x6fb0c8, map: mats.waterTex, transparent: true, opacity: 0.78, depthWrite: false });
   mats.waterTex.repeat.set(1, 1);

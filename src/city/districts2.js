@@ -3,8 +3,11 @@
 // ============================================================
 // terrain edits that must happen before the ground is drawn
 const CELLAR = [878, 166, 902, 190];          // grid-aligned: the sunken record shop in the market
+const SKATE = [-620, 200, -470, 312];      // the skatepark in the strip south of the park: levelled
 function prepDistricts() {
   TER.holes.push(CELLAR);
+  PLAN.skateY = (cityHeight(SKATE[0], SKATE[1]) + cityHeight(SKATE[2], SKATE[3]) + cityHeight(SKATE[0], SKATE[3]) + cityHeight(SKATE[2], SKATE[1])) / 4;
+  flattenRect(SKATE, PLAN.skateY, 18, 'set');
   // cut the observatory terrace into the hillside so it sits level
   const tx = 96, tz = -1180, ty = cityHeight(tx, tz) + 0.3;
   flattenRect([tx - 31, tz - 19, tx + 31, tz + 7], ty - 0.5, 14, 'min');

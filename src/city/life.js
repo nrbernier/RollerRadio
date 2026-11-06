@@ -2,58 +2,136 @@
 //  LIFE — people, cars, boats, birds
 // ============================================================
 const Life = (() => {
-  let W, people, heads, birdIM, cars = [], boats = [], flocks = [], pigeons = [];
-  const walkers = [], standers = [];
+  let W, cars = [], boats = [], flocks = [], pigeons = [], ducks = [], gulls = [];
+  let birdIM, duckIM, dogIM;
+  const walkers = [], standers = [], all = [], dogs = [];
   const L = { crowdNear: 0 };
   const STYLE = {
-    business: ['#2a2f45', '#3e4a6a', '#6a6a72', '#1f2433', '#8a5a4a', '#c9c2b4', '#2f5f8a'],
-    park: ['#6f8a5a', '#b8743a', '#d9a441', '#7a6a9a', '#4a6a8a'],
-    market: ['#e8b84a', '#c4523a', '#3e8f86', '#d9779a', '#f2efe6', '#8a5a9e'],
-    canals: ['#5a7a8a', '#9a6a4a', '#d9c9a8', '#3a4a5a'],
-    oldtown: ['#c46a4a', '#e8d4a0', '#6a8aa0', '#a0a07a'],
-    lake: ['#f2efe6', '#4aa0c8', '#e88a6a', '#e8c84a'],
-    docks: ['#ff8a3a', '#3a4a5a', '#e8c84a', '#5a5a62'],
+    business: ['#2a2f45', '#3e4a6a', '#6a6a72', '#1f2433', '#8a5a4a', '#c9c2b4', '#2f5f8a', '#e8e2d4', '#7a2f3a'],
+    park: ['#6f8a5a', '#b8743a', '#d9a441', '#7a6a9a', '#4a6a8a', '#c4523a', '#e8dcc0'],
+    market: ['#e8b84a', '#c4523a', '#3e8f86', '#d9779a', '#f2efe6', '#8a5a9e', '#2f8f9d', '#e4572e'],
+    canals: ['#5a7a8a', '#9a6a4a', '#d9c9a8', '#3a4a5a', '#a03a3a', '#e8dcc0', '#4a6a5a'],
+    oldtown: ['#c46a4a', '#e8d4a0', '#6a8aa0', '#a0a07a', '#7a4a6a', '#f2efe6'],
+    lake: ['#f2efe6', '#4aa0c8', '#e88a6a', '#e8c84a', '#2f8f9d', '#e4572e', '#ffffff'],
+    docks: ['#ff8a3a', '#3a4a5a', '#e8c84a', '#5a5a62', '#2f5f8a'],
+    obs: ['#7a6a9a', '#3a4a6a', '#c9c2b4', '#5a6a4a', '#b8743a'],
   };
-  const SKIN = ['#f0c8a0', '#d9a07a', '#a8704a', '#7a4a32', '#e8b890'];
-  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _c = new THREE.Color(), _v = V3(), _s = V3();
+  const PANTS = ['#2a2f45', '#3a3a42', '#4a5a7a', '#6a5a4a', '#1f1f28', '#c9c2b4', '#5a4a3a', '#2f4a6a'];
+  const SKIN = ['#f0c8a0', '#d9a07a', '#a8704a', '#7a4a32', '#e8b890', '#c68c5a'];
+  const HAIR = ['#1f1a18', '#3a2a20', '#5a3a24', '#8a5a30', '#c8a060', '#9a9a9a', '#2a1f1a', '#7a2f1f', '#e8e2d4'];
+  const HATS = ['#c4523a', '#2f5f8a', '#e8c84a', '#3e8f86', '#f2efe6'];
+  const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _m3 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _c = new THREE.Color(), _v = V3(), _s = V3(), _e = new THREE.Euler();
+  const Y = V3(0, 1, 0);
+
+  // ---------- people: six instanced meshes (torso+arms, two legs, bent legs, head, hair) ----------
+  // everyone near the camera is packed into the first slots each frame, so far people cost nothing
+  const PM = {};
+  function personMeshes(n) {
+    const merge = (parts) => mergeParts(parts.map(([g, m]) => [g, m, '#ffffff']));
+    const torso = merge([
+      [new THREE.CylinderGeometry(0.2, 0.25, 0.62, 8), T4(0, 1.12, 0)],
+      [new THREE.SphereGeometry(0.235, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.Matrix4().makeScale(1, 0.55, 0.8).setPosition(0, 1.42, 0)],
+      [new THREE.CylinderGeometry(0.065, 0.055, 0.6, 5), T4(-0.27, 1.12, 0, 0, 0, -0.12)],
+      [new THREE.CylinderGeometry(0.065, 0.055, 0.6, 5), T4(0.27, 1.12, 0, 0, 0, 0.12)],
+    ]);
+    const head = merge([[new THREE.SphereGeometry(0.17, 10, 8), T4(0, 1.66, 0)], [new THREE.CylinderGeometry(0.07, 0.08, 0.14, 6), T4(0, 1.5, 0)]]);
+    const hair = merge([[new THREE.SphereGeometry(0.182, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.Matrix4().makeScale(1, 0.92, 1.05).setPosition(0, 1.67, -0.015)]]);
+    // a leg hangs from the hip (pivot at the origin)
+    const leg = merge([[new THREE.CylinderGeometry(0.085, 0.068, 0.8, 6), T4(0, -0.4, 0)], [new THREE.BoxGeometry(0.13, 0.08, 0.24), T4(0, -0.78, 0.05)]]);
+    // sitting: thighs forward, shins down (both legs)
+    const sit = merge([
+      [new THREE.CylinderGeometry(0.09, 0.08, 0.44, 6), T4(-0.11, 0, 0.2, Math.PI / 2, 0, 0)], [new THREE.CylinderGeometry(0.09, 0.08, 0.44, 6), T4(0.11, 0, 0.2, Math.PI / 2, 0, 0)],
+      [new THREE.CylinderGeometry(0.075, 0.065, 0.46, 6), T4(-0.11, -0.22, 0.43)], [new THREE.CylinderGeometry(0.075, 0.065, 0.46, 6), T4(0.11, -0.22, 0.43)],
+      [new THREE.BoxGeometry(0.13, 0.08, 0.24), T4(-0.11, -0.43, 0.49)], [new THREE.BoxGeometry(0.13, 0.08, 0.24), T4(0.11, -0.43, 0.49)],
+    ]);
+    const mk = (g, cnt = n) => { const im = new THREE.InstancedMesh(g, toon('#ffffff', { noCache: true }), cnt); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.count = 0; im.setColorAt(0, _c.set('#ffffff')); W.group.add(im); return im; };
+    PM.torso = mk(torso); PM.legL = mk(leg); PM.legR = mk(leg); PM.head = mk(head); PM.hair = mk(hair); PM.sit = mk(sit);
+  }
+  function person(style, r, o = {}) {
+    const pal = STYLE[style] || STYLE.business;
+    const kid = !o.sit && r() < 0.08;
+    const p = {
+      top: _c.set(pal[Math.floor(r() * pal.length)]).getHex(), pants: _c.set(PANTS[Math.floor(r() * PANTS.length)]).getHex(),
+      skin: _c.set(SKIN[Math.floor(r() * SKIN.length)]).getHex(),
+      hair: _c.set(r() < 0.12 ? HATS[Math.floor(r() * HATS.length)] : HAIR[Math.floor(r() * HAIR.length)]).getHex(),
+      sc: kid ? 0.62 + r() * 0.1 : 0.9 + r() * 0.16, wide: 0.92 + r() * 0.2, t: r() * 9, x: 0, y: 0, z: 0, yaw: 0, ph: r() * 6,
+    };
+    all.push(p);
+    return Object.assign(p, o);
+  }
+  const pickStyle = (x, z) => { const d = districtAt(x, z); return d ? d.key : 'business'; };
+  let slot = 0;
+  function emit(p, swing, bob, pose) {
+    const k = slot++;
+    _q.setFromAxisAngle(Y, p.yaw);
+    _m.compose(_v.set(p.x, p.y + bob, p.z), _q, _s.set(p.sc * p.wide, p.sc, p.sc * p.wide));
+    PM.torso.setMatrixAt(k, _m); PM.head.setMatrixAt(k, _m); PM.hair.setMatrixAt(k, _m);
+    PM.torso.setColorAt(k, _c.setHex(p.top)); PM.head.setColorAt(k, _c.setHex(p.skin)); PM.hair.setColorAt(k, _c.setHex(p.hair));
+    PM.legL.setColorAt(k, _c.setHex(p.pants)); PM.legR.setColorAt(k, _c); PM.sit.setColorAt(k, _c);
+    if (pose === 'sit') {
+      _m2.makeTranslation(0, 0.8, 0.02); PM.sit.setMatrixAt(k, _m3.multiplyMatrices(_m, _m2));
+      _m2.makeScale(0, 0, 0); PM.legL.setMatrixAt(k, _m2); PM.legR.setMatrixAt(k, _m2);
+    } else {
+      const lift = pose === 'ground' ? -Math.PI / 2 : 0;
+      for (const [im, sx, sw] of [[PM.legL, -0.11, swing], [PM.legR, 0.11, -swing]]) {
+        _m2.makeRotationX(sw + lift).setPosition(sx, 0.82, 0); im.setMatrixAt(k, _m3.multiplyMatrices(_m, _m2));
+      }
+      _m2.makeScale(0, 0, 0); PM.sit.setMatrixAt(k, _m2);
+    }
+  }
 
   function init(world) {
     W = world;
     const r = U.rng(4242);
-    // people: two instanced meshes (body, head) for everyone
-    let n = 0; for (const e of W.npcs) n += e.kind === 'walk' ? e.n : e.pts.length;
-    n = Math.max(1, n);
-    const bodyG = new THREE.CapsuleGeometry(0.28, 0.85, 3, 8); bodyG.translate(0, 0.72, 0);
-    const headG = new THREE.SphereGeometry(0.21, 10, 8); headG.translate(0, 1.58, 0);
-    people = new THREE.InstancedMesh(bodyG, toon('#ffffff', { noCache: true }), n); heads = new THREE.InstancedMesh(headG, toon('#ffffff', { noCache: true }), n);
-    people.instanceMatrix.setUsage(THREE.DynamicDrawUsage); heads.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    people.frustumCulled = false; heads.frustumCulled = false;
-    W.group.add(people, heads);
-    let k = 0;
+    let n = 0; for (const e of W.npcs) n += e.kind === 'walk' ? e.n : e.kind === 'group' ? e.n : e.pts.length;
+    // sitters on about half the benches (one end each, so there's room for you too)
+    const benchSit = [];
+    for (const b of W.benches) if (r() < 0.45) { benchSit.push(b); n++; }
+    personMeshes(Math.min(1400, n + 10));
     for (const e of W.npcs) {
-      const pal = STYLE[e.style] || STYLE.business;
       if (e.kind === 'walk') {
         const paths = e.paths.filter(p => p.length > 1);
         for (let i = 0; i < e.n && paths.length; i++) {
           const P = paths[Math.floor(r() * paths.length)];
-          const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
+          const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); if (l < 0.01) continue; segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
           if (len < 5) continue;
-          const w = { k: k++, segs, len, s: r() * len, dir: r() < 0.5 ? 1 : -1, sp: 1.0 + r() * 0.6, off: (r() - 0.5) * 2.2, x: 0, z: 0, y: 0, yaw: 0, t: r() * 9, dodge: 0 };
-          people.setColorAt(w.k, _c.set(pal[Math.floor(r() * pal.length)])); heads.setColorAt(w.k, _c.set(SKIN[Math.floor(r() * SKIN.length)]));
+          const jog = e.style === 'park' || e.style === 'lake' ? r() < 0.15 : false;
+          const w = person(e.style, r, { segs, len, s: r() * len, dir: r() < 0.5 ? 1 : -1, sp: jog ? 2.6 + r() * 0.6 : 0.95 + r() * 0.6, jog, off: (r() - 0.5) * (e.width || 2.2), dodge: 0, y0: e.y });
           walkers.push(w);
+          if (!jog && r() < (e.dogs ?? 0.07)) dogs.push({ owner: w, side: r() < 0.5 ? -1 : 1, col: pick(r, ['#8a5a30', '#1f1a18', '#e8e2d4', '#c8a060', '#5a4a3a']), sc: 0.7 + r() * 0.6, x: 0, z: 0, y: 0, yaw: 0 });
+        }
+      } else if (e.kind === 'group') {
+        // a few people chatting in a ring
+        for (let i = 0; i < e.n; i++) {
+          const a = (i / e.n) * Math.PI * 2 + r() * 0.4, rr = 0.75 + e.n * 0.12, x = e.x + Math.cos(a) * rr, z = e.z + Math.sin(a) * rr;
+          standers.push(person(e.style, r, { x, z, y: e.y ?? terrainAt(x, z), yaw0: Math.atan2(e.x - x, e.z - z), talk: true }));
         }
       } else {
+        // pts: [x, z, yaw, y, pose]; for 'sit' y is the seat, for 'ground' it's the ground
         for (const pt of e.pts) {
-          const s = { k: k++, x: pt[0], z: pt[1], yaw: pt[2] || 0, y: pt[3] ?? terrainAt(pt[0], pt[1]), t: r() * 9 };
-          people.setColorAt(s.k, _c.set(pal[Math.floor(r() * pal.length)])); heads.setColorAt(s.k, _c.set(SKIN[Math.floor(r() * SKIN.length)]));
+          const pose = pt[4] || e.pose, y = pt[3] ?? terrainAt(pt[0], pt[1]);
+          const s = person(e.style, r, { x: pt[0], z: pt[1], yaw0: pt[2] || 0, pose, sit: pose === 'sit' || pose === 'ground' });
+          s.y = pose === 'sit' ? y - 0.8 * s.sc : pose === 'ground' ? y - 0.82 * s.sc + 0.12 : y;
           standers.push(s);
         }
       }
     }
-    for (let i = k; i < n; i++) { _m.makeScale(0, 0, 0); people.setMatrixAt(i, _m); heads.setMatrixAt(i, _m); }
-    people.count = heads.count = n;
-    if (people.instanceColor) people.instanceColor.needsUpdate = true; if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
-    for (const s of standers) place(s.k, s.x, s.y, s.z, s.yaw, 0);
+    for (const b of benchSit) {
+      const end = r() < 0.5 ? -1.1 : 1.1, side = r() < 0.5 ? -1 : 1;
+      const x = b.alongX ? b.x + end : b.x, z = b.alongX ? b.z : b.z + end;
+      const yaw = b.alongX ? (side > 0 ? 0 : Math.PI) : (side > 0 ? Math.PI / 2 : -Math.PI / 2);
+      const st = person(pickStyle(x, z), r, { x: x - Math.sin(yaw) * 0.1, z: z - Math.cos(yaw) * 0.1, yaw0: yaw, pose: 'sit', sit: true });
+      st.y = b.y + 0.5 - 0.8 * st.sc; standers.push(st); b.half = end;
+    }
+    for (const s of standers) s.yaw = s.yaw0;
+    // dogs (one instanced mesh)
+    const dogG = mergeParts([
+      [new THREE.BoxGeometry(0.26, 0.26, 0.62), T4(0, 0.42, 0), '#ffffff'], [new THREE.BoxGeometry(0.22, 0.22, 0.26), T4(0, 0.6, 0.38), '#ffffff'],
+      [new THREE.BoxGeometry(0.12, 0.1, 0.14), T4(0, 0.56, 0.54), '#ffffff'], [new THREE.BoxGeometry(0.06, 0.12, 0.06), T4(-0.08, 0.76, 0.34), '#ffffff'], [new THREE.BoxGeometry(0.06, 0.12, 0.06), T4(0.08, 0.76, 0.34), '#ffffff'],
+      [new THREE.BoxGeometry(0.05, 0.05, 0.26), T4(0, 0.6, -0.4, -0.7, 0, 0), '#ffffff'],
+      ...[[-0.09, 0.22], [0.09, 0.22], [-0.09, -0.22], [0.09, -0.22]].map(([lx, lz]) => [new THREE.BoxGeometry(0.07, 0.32, 0.07), T4(lx, 0.16, lz), '#ffffff']),
+    ]);
+    dogIM = new THREE.InstancedMesh(dogG, toon('#ffffff', { noCache: true }), Math.max(1, dogs.length)); dogIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); dogIM.frustumCulled = false; dogIM.count = 0; dogIM.setColorAt(0, _c.set('#ffffff')); W.group.add(dogIM);
     // cars on the big roads: two lanes each way, U-turn at the ends
     const carCols = ['#c4523a', '#2f5f8a', '#e8b84a', '#f2efe6', '#3e8f86', '#2a2838', '#8a5a9e', '#d9779a'];
     for (const [key, n2] of [['boulevard', 8], ['avenue', 8], ['hill', 3]]) {
@@ -74,10 +152,12 @@ const Life = (() => {
     }
     // sailboats on the lake, drifting
     for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-900 + r() * 1700, 0, 1300 + r() * 500); g.userData = { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }; W.group.add(g); boats.push({ sail: g }); }
-    // birds: flocks circling high, and pigeons on the plazas that scatter
+    // birds: flocks circling high, gulls gliding over the water, pigeons on the plazas that scatter
     const birdG = new THREE.BufferGeometry(); birdG.setAttribute('position', new THREE.Float32BufferAttribute([-0.6, 0, -0.2, 0, 0, 0.2, 0, 0.05, -0.1, 0, 0.05, -0.1, 0, 0, 0.2, 0.6, 0, -0.2], 3)); birdG.computeVertexNormals();
-    const flockDefs = [[-700, -400, 70, 12], [600, -900, 140, 9], [-300, 1150, 30, 14], [700, 800, 50, 10], [100, -300, 110, 8]];
-    let nb = 0; for (const f of flockDefs) nb += f[3]; for (const p of (W.pigeonSpots || [])) nb += p[2];
+    const flockDefs = [[-700, -400, 70, 12], [600, -900, 140, 9], [-300, 1150, 30, 14], [700, 800, 50, 10], [100, -300, 110, 8], [-850, -1100, 60, 10], [300, 600, 45, 9], [900, -300, 60, 8], [-500, 600, 40, 10]];
+    const gullDefs = [[-600, 1320, 22, 7], [-100, 1400, 30, 6], [700, 1250, 26, 8], [300, 1300, 18, 5], [850, 1000, 34, 5]];
+    const perches = (W.gullSpots || []);
+    let nb = 0; for (const f of flockDefs) nb += f[3]; for (const f of gullDefs) nb += f[3]; for (const p of (W.pigeonSpots || [])) nb += p[2]; for (const p of perches) nb += p[2];
     birdIM = new THREE.InstancedMesh(birdG, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: true }), nb);
     birdIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); birdIM.frustumCulled = false; W.group.add(birdIM);
     let bi = 0;
@@ -88,17 +168,33 @@ const Life = (() => {
       for (let i = 0; i < nB; i++) { const m = mk('#2a2a34'); m.scale.setScalar(1.6); fl.birds.push({ m, a: r() * 6, r: 30 + r() * 40, sp: 0.18 + r() * 0.1, dh: r() * 10, ph: r() * 6 }); }
       flocks.push(fl);
     }
-    for (const [cx, cz, nP] of (W.pigeonSpots || [])) {
-      for (let i = 0; i < nP; i++) { const m = mk('#6a6a7a'); const x = cx + (r() - 0.5) * 16, z = cz + (r() - 0.5) * 16; m.position.set(x, terrainAt(x, z) + 0.15, z); m.scale.setScalar(0.6); pigeons.push({ m, x, z, home: [x, z], fly: 0, vy: 0, a: r() * 6 }); }
+    for (const [cx, cz, h, nB] of gullDefs) {
+      const fl = { cx, cz, h, gull: true, birds: [] };
+      for (let i = 0; i < nB; i++) { const m = mk('#f4f4f0'); m.scale.set(2.4, 1, 1.6); fl.birds.push({ m, a: r() * 6, r: 20 + r() * 50, sp: (0.08 + r() * 0.08) * (r() < 0.5 ? -1 : 1), dh: r() * 8, ph: r() * 6 }); }
+      flocks.push(fl);
     }
+    const perch = (cx, cz, nP, col, sc, y0, spread) => {
+      for (let i = 0; i < nP; i++) { const m = mk(col); const x = cx + (r() - 0.5) * spread, z = cz + (r() - 0.5) * spread; const y = y0 ?? terrainAt(x, z); m.position.set(x, y + 0.15, z); m.scale.setScalar(sc); pigeons.push({ m, x, z, y0, sc, home: [x, z], fly: 0, vy: 0, a: r() * 6 }); }
+    };
+    for (const [cx, cz, nP] of (W.pigeonSpots || [])) perch(cx, cz, nP, '#6a6a7a', 0.6, undefined, 16);
+    for (const [cx, cz, nP, y0] of perches) perch(cx, cz, nP, '#f4f4f0', 0.9, y0, 6);
     if (birdIM.instanceColor) birdIM.instanceColor.needsUpdate = true;
+    // ducks on the pond and the canal, swans by the shore: they paddle about and drift away from you
+    const duckG = mergeParts([
+      [new THREE.SphereGeometry(0.3, 8, 5), new THREE.Matrix4().makeScale(0.8, 0.55, 1.2), '#ffffff'],
+      [new THREE.SphereGeometry(0.14, 6, 5), T4(0, 0.3, 0.3), '#ffffff'], [new THREE.ConeGeometry(0.06, 0.16, 4), T4(0, 0.28, 0.48, Math.PI / 2, 0, 0), '#e8a040'],
+    ]);
+    const swimSpots = [];
+    const pond = PLAN.pond;
+    if (W.pond) for (let i = 0; i < 16; i++) { const a = r() * 6.28, d = r() * pond.r * 0.6; swimSpots.push({ x: pond.x + Math.cos(a) * d, z: pond.z + Math.sin(a) * d, y: W.pond.y, ok: (x, z) => Math.hypot(x - pond.x, z - pond.z) < pond.r * 0.78, col: pick(r, ['#6a5a3a', '#6a5a3a', '#f2efe6', '#3a5a3a']), sc: 1 }); }
+    for (let i = 0; i < 26; i++) { const x = C.x0 + 60 + r() * (C.bendX - C.x0 - 100), z = C.z + (r() - 0.5) * C.half * 1.2; swimSpots.push({ x, z, y: C.waterY, ok: (x, z) => inCanal(x, z) && Math.abs(z - C.z) < C.half - 2 || (Math.abs(x - C.bendX) < C.half - 2 && z > C.z), col: pick(r, ['#6a5a3a', '#7a6a4a', '#f2efe6']), sc: 1 }); }
+    for (let i = 0; i < 14; i++) { const x = -1000 + r() * 1200, z = shoreZ(x) + 14 + r() * 40; swimSpots.push({ x, z, y: 0.05, ok: (x, z) => z > shoreZ(x) + 8 && z < shoreZ(x) + 80 && x > -1050 && x < 260, col: '#ffffff', sc: 1.9 }); }
+    duckIM = new THREE.InstancedMesh(duckG, toon('#ffffff', { noCache: true }), swimSpots.length); duckIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); duckIM.frustumCulled = false; W.group.add(duckIM);
+    swimSpots.forEach((d, i) => { duckIM.setColorAt(i, _c.set(d.col)); ducks.push(Object.assign(d, { i, yaw: r() * 6, sp: 0.3 + r() * 0.3, turn: 0, flee: 0, t: r() * 9 })); });
+    if (duckIM.instanceColor) duckIM.instanceColor.needsUpdate = true;
     W.lifeGround = ground;
     const prev = W.groundExtra;
     W.groundExtra = (x, z, yMax, rr) => { const a = prev(x, z, yMax, rr), b = ground(x, z, yMax); return b && (!a || b.y > a.y) ? b : a; };
-  }
-  function place(k, x, y, z, yaw, bob) {
-    _q.setFromAxisAngle(_v.set(0, 1, 0), yaw); _m.compose(_s.set(x, y + bob, z), _q, _v.set(1, 1, 1));
-    people.setMatrixAt(k, _m); heads.setMatrixAt(k, _m);
   }
   function carMesh(c) {
     const parts = [
@@ -126,9 +222,13 @@ const Life = (() => {
     const parts = [[new THREE.BoxGeometry(1.8, 0.7, 6), T4(0, 0.2, 0), '#f2efe6'], [new THREE.CylinderGeometry(0.06, 0.06, 8, 5), T4(0, 4.4, 0.6), '#c9c2b4'], [sg, null, r < 0.3 ? '#e4572e' : '#ffffff']];
     const g = new THREE.Group(); g.add(solid(parts, 0.04)); return g;
   }
-  // stand on a long boat
+  // stand on a long boat (or a cabin of the big wheel)
   function ground(x, z, yMax) {
     let best = null;
+    const fw = W.ferris;
+    if (fw && Math.abs(x - fw.x) < fw.R + 3 && Math.abs(z - fw.z) < 1.4) {
+      for (const c of fw.cab) { if (Math.abs(x - c.x) < 1.25 && c.y - 0.6 <= yMax && (!best || c.y - 0.6 > best.y)) best = { y: c.y - 0.62, hit: fw.hit }; }
+    }
     for (const b of boats) {
       if (!b.hit) continue;
       const dx = x - b.x, dz = z - b.z, al = dx * b.fx + dz * b.fz, lat = dx * -b.fz + dz * b.fx;
@@ -143,25 +243,64 @@ const Life = (() => {
   function update(dt, bi, focus) {
     if (!W) return;
     const fx = focus.x, fz = focus.z, pl = Game.player;
-    // walkers (only the nearby ones move; far ones are hidden)
-    let crowd = 0;
+    // people: everyone within reach is animated and packed into the instanced meshes
+    let crowd = 0; slot = 0;
+    const R = 230, cap = PM.torso.instanceMatrix.count;
     for (const w of walkers) {
-      const near = Math.abs(w.x - fx) < 260 && Math.abs(w.z - fz) < 260;
-      if (!near && w.y) { if (!w.hidden) { _m.makeScale(0, 0, 0); people.setMatrixAt(w.k, _m); heads.setMatrixAt(w.k, _m); w.hidden = true; } w.s = (w.s + w.sp * dt * w.dir + w.len) % w.len; pathPos(w.segs, w.s, _pp); w.x = _pp.x; w.z = _pp.z; continue; }
-      w.hidden = false; w.t += dt;
       w.s += w.sp * dt * w.dir; if (w.s > w.len) { w.s = w.len; w.dir = -1; } else if (w.s < 0) { w.s = 0; w.dir = 1; }
+      if (Math.abs(w.x - fx) > R || Math.abs(w.z - fz) > R) { if (!w.y || Math.random() < 0.02) { pathPos(w.segs, w.s, _pp); w.x = _pp.x; w.z = _pp.z; w.y = w.y0 ?? terrainAt(w.x, w.z); } continue; }
+      w.t += dt;
       pathPos(w.segs, w.s, _pp);
       // step aside when you come through
       const dxp = pl.pos.x - w.x, dzp = pl.pos.z - w.z, dp = Math.hypot(dxp, dzp);
       w.dodge = U.damp(w.dodge, dp < 3.2 ? (dxp * -_pp.fz + dzp * _pp.fx > 0 ? -1.8 : 1.8) : 0, 4, dt);
       const ox = -_pp.fz * (w.off + w.dodge), oz = _pp.fx * (w.off + w.dodge);
-      w.x = _pp.x + ox; w.z = _pp.z + oz; w.y = terrainAt(w.x, w.z);
+      w.x = _pp.x + ox; w.z = _pp.z + oz; w.y = w.y0 ?? terrainAt(w.x, w.z);
       w.yaw = Math.atan2(_pp.fx * w.dir, _pp.fz * w.dir);
-      place(w.k, w.x, w.y, w.z, w.yaw, Math.abs(Math.sin(w.t * 6)) * 0.05);
+      if (slot >= cap) continue;
+      const f = w.sp * (w.jog ? 2.4 : 3.6) / w.sc, ph = w.t * f;
+      emit(w, Math.sin(ph) * (w.jog ? 0.7 : 0.42), Math.abs(Math.cos(ph)) * (w.jog ? 0.09 : 0.035), 'walk');
       if (dp < 12) crowd++;
     }
-    people.instanceMatrix.needsUpdate = true; heads.instanceMatrix.needsUpdate = true;
+    for (const s of standers) {
+      if (Math.abs(s.x - fx) > R || Math.abs(s.z - fz) > R || slot >= cap) continue;
+      s.t += dt;
+      if (s.talk) s.yaw = s.yaw0 + Math.sin(s.t * 0.7 + s.ph) * 0.25;
+      else if (!s.sit) s.yaw = s.yaw0 + Math.sin(s.t * 0.23 + s.ph) * 0.35;
+      emit(s, 0, s.talk ? Math.max(0, Math.sin(s.t * 3.1 + s.ph)) * 0.02 : 0, s.pose === 'sit' ? 'sit' : s.pose === 'ground' ? 'ground' : 'stand');
+      if (Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z) < 12) crowd++;
+    }
+    for (const k in PM) { const im = PM[k]; im.count = slot; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     L.crowdNear = U.damp(L.crowdNear, Math.min(1, crowd / 8), 2, dt);
+    // dogs trot beside their people
+    let nd = 0;
+    for (const d of dogs) {
+      const o = d.owner; if (Math.abs(o.x - fx) > R * 0.7 || Math.abs(o.z - fz) > R * 0.7) continue;
+      const fx2 = Math.sin(o.yaw), fz2 = Math.cos(o.yaw);
+      const tx = o.x + fz2 * d.side * 0.9 + fx2 * 1.1, tz = o.z - fx2 * d.side * 0.9 + fz2 * 1.1;
+      if (!d.x) { d.x = tx; d.z = tz; }
+      d.x = U.damp(d.x, tx, 3, dt); d.z = U.damp(d.z, tz, 3, dt); d.yaw = o.yaw;
+      d.y = o.y0 ?? terrainAt(d.x, d.z);
+      _q.setFromAxisAngle(Y, d.yaw); _m.compose(_v.set(d.x, d.y + Math.abs(Math.sin(o.t * 9)) * 0.05, d.z), _q, _s.setScalar(d.sc));
+      dogIM.setMatrixAt(nd, _m); dogIM.setColorAt(nd, _c.set(d.col)); nd++;
+    }
+    dogIM.count = nd; dogIM.instanceMatrix.needsUpdate = true; if (dogIM.instanceColor) dogIM.instanceColor.needsUpdate = true;
+    // ducks: lazy circles, a little wake of fear around you
+    for (const d of ducks) {
+      d.t += dt;
+      const near = Math.abs(d.x - fx) < 300 && Math.abs(d.z - fz) < 300;
+      if (!near) continue;
+      const dx = d.x - pl.pos.x, dz = d.z - pl.pos.z, dd = Math.hypot(dx, dz);
+      if (dd < 7) { d.yaw = U.lerp(d.yaw, Math.atan2(dx, dz), 0.1); d.flee = 1.5; }
+      else if (Math.random() < dt * 0.3) d.turn = (Math.random() - 0.5) * 0.8;
+      d.yaw += d.turn * dt; d.flee = Math.max(0, d.flee - dt);
+      const v = d.sp * (1 + d.flee * 2) * (0.6 + Math.sin(d.t * 0.5) * 0.4);
+      const nx = d.x + Math.sin(d.yaw) * v * dt, nz = d.z + Math.cos(d.yaw) * v * dt;
+      if (d.ok(nx, nz)) { d.x = nx; d.z = nz; } else d.yaw += Math.PI * (0.5 + Math.random() * 0.5);
+      _q.setFromAxisAngle(Y, d.yaw); _m.compose(_v.set(d.x, d.y + 0.08 + Math.sin(d.t * 2) * 0.02, d.z), _q, _s.setScalar(d.sc));
+      duckIM.setMatrixAt(d.i, _m);
+    }
+    duckIM.instanceMatrix.needsUpdate = true;
     // cars
     for (const c of cars) {
       // slow down behind you
@@ -174,6 +313,21 @@ const Life = (() => {
       c.y = y; c.vx = c.fx * c.v; c.vz = c.fz * c.v;
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;
+    }
+    // the big wheel
+    const fw = W.ferris;
+    if (fw) {
+      fw.a += fw.w * dt; fw.rot.rotation.z = fw.a;
+      for (let i = 0; i < fw.n; i++) {
+        const a = fw.a + i / fw.n * Math.PI * 2, c = fw.cab[i];
+        c.x = fw.x + Math.cos(a) * fw.R; c.y = fw.y + Math.sin(a) * fw.R;
+        _m.makeRotationZ(Math.sin(Game.t * 0.7 + i) * 0.03).setPosition(c.x, c.y, fw.z); fw.cabs.setMatrixAt(i, _m);
+      }
+      fw.cabs.instanceMatrix.needsUpdate = true;
+      // the cabin under you (if any) sets the carry speed
+      const pp = Game.player.pos; let bc = null, bd = 2;
+      for (const c of fw.cab) { const d = Math.abs(pp.x - c.x) + Math.abs(pp.y - (c.y - 0.62)); if (d < bd) { bd = d; bc = c; } }
+      if (bc) { const a = Math.atan2(bc.y - fw.y, bc.x - fw.x); fw.hit.vx = -Math.sin(a) * fw.R * fw.w; fw.hit.vz = 0; }
     }
     // canal boats: glide, pause at the ends, turn around
     for (const b of boats) {
@@ -192,7 +346,8 @@ const Life = (() => {
     for (const fl of flocks) for (const b of fl.birds) {
       b.a += b.sp * dt; b.ph += dt * 9;
       b.m.position.set(fl.cx + Math.cos(b.a) * b.r, fl.h + b.dh + Math.sin(b.a * 2) * 4, fl.cz + Math.sin(b.a) * b.r);
-      b.m.rotation.set(0, -b.a, 0); b.m.scale.y = 1 + Math.sin(b.ph) * 0.6;
+      b.m.rotation.set(0, -b.a + (b.sp < 0 ? Math.PI : 0), fl.gull ? Math.sin(b.a * 3) * 0.25 : 0);
+      b.m.scale.y = fl.gull ? 1 + Math.max(0, Math.sin(b.ph * 0.4)) * Math.sin(b.ph) * 0.5 : 1 + Math.sin(b.ph) * 0.6;
     }
     // pigeons scatter as you come through, into a little run of notes
     for (const pg of pigeons) {
@@ -200,8 +355,8 @@ const Life = (() => {
       if (pg.fly <= 0 && d < 5 && pl.speed > 3) { pg.fly = 5 + Math.random() * 3; pg.vy = 4 + Math.random() * 2; pg.a = Math.atan2(pg.x - pl.pos.x, pg.z - pl.pos.z) + (Math.random() - 0.5); if (Math.random() < 0.4) Sound.sfx.touch('bird', Math.floor(Math.random() * 5)); }
       if (pg.fly > 0) {
         pg.fly -= dt; pg.vy = Math.max(-1, pg.vy - dt * 1.2);
-        pg.x += Math.sin(pg.a) * 6 * dt; pg.z += Math.cos(pg.a) * 6 * dt; pg.m.position.set(pg.x, pg.m.position.y + pg.vy * dt, pg.z); pg.m.scale.y = 0.6 + Math.sin(Game.t * 20) * 0.4;
-        if (pg.fly <= 0) { pg.x = pg.home[0] + (Math.random() - 0.5) * 6; pg.z = pg.home[1] + (Math.random() - 0.5) * 6; pg.m.position.set(pg.x, terrainAt(pg.x, pg.z) + 0.15, pg.z); pg.m.scale.y = 0.6; }
+        pg.x += Math.sin(pg.a) * 6 * dt; pg.z += Math.cos(pg.a) * 6 * dt; pg.m.position.set(pg.x, pg.m.position.y + pg.vy * dt, pg.z); pg.m.scale.y = pg.sc + Math.sin(Game.t * 20) * pg.sc * 0.66;
+        if (pg.fly <= 0) { pg.x = pg.home[0] + (Math.random() - 0.5) * 6; pg.z = pg.home[1] + (Math.random() - 0.5) * 6; pg.m.position.set(pg.x, (pg.y0 ?? terrainAt(pg.x, pg.z)) + 0.15, pg.z); pg.m.scale.y = pg.sc; }
       } else if (Math.random() < dt * 0.6) { pg.m.rotation.y = Math.random() * 6; }
     }
     for (const fl of flocks) for (const b of fl.birds) { b.m.updateMatrix(); birdIM.setMatrixAt(b.m.userData.i, b.m.matrix); }

@@ -24,6 +24,13 @@ function districtKit(K, S, F) {
     for (const b of RG.query(a0, b0, a1, b1, _rq)) if (a1 > b[0] && a0 < b[2] && b1 > b[1] && b0 < b[3]) return false;
     return true;
   };
+  // only the hard obstacles (viaduct, roads, lanes): for filling places that were reserved as a whole
+  H.clearPts = (x0, z0, x1, z1, pad = 1) => {
+    const a0 = x0 - pad, b0 = z0 - pad, a1 = x1 + pad, b1 = z1 + pad, rr = [a0, b0, a1, b1];
+    for (const e of PG.query(a0 - maxR, b0 - maxR, a1 + maxR, b1 + maxR, _pq)) if (rectDist(rr, e.x, e.z) < e.r) return false;
+    return true;
+  };
+  H.block = block;
   H.reserve = (r) => RG.add(r, r[0], r[1], r[2], r[3]);
   H.line = (P, hw) => { for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], L = Math.hypot(bx - ax, bz - az); for (let t = 0; t <= L; t += 1.5) block(ax + (bx - ax) * t / L, az + (bz - az) * t / L, hw); } };
   // a building standing on the slope (its floor line is the highest corner)
@@ -156,6 +163,7 @@ function buildDistricts(K, S, F) {
   buildDocks(H); lap('docks');
   buildPark(H); lap('park');
   buildObservatory(H); lap('observatory');
+  fillDistricts(H); lap('fill');
   return H;
 }
 

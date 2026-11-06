@@ -84,6 +84,8 @@ function profileH(z) {
   return (2 * t3 - 3 * t2 + 1) * P[i][1] + (t3 - 2 * t2 + t) * h * _pm[i] + (-2 * t3 + 3 * t2) * P[i + 1][1] + (t3 - t2) * h * _pm[i + 1];
 }
 const gauss = (d, r) => Math.exp(-(d * d) / (r * r));
+// a hill that starts gently at the city edge and levels off at `top` metres
+const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 300) * 0.04;
 function shoreZ(x) { return PLAN.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5; }
 // the raw land before carving
 function landH(x, z) {
@@ -101,8 +103,9 @@ function landH(x, z) {
   // a ridge spur between park and hilltop (the metro tunnels through it)
   h += gauss(Math.hypot(x + 300, z + 860), 240) * 22;
   // the edge of the world: hills all round (outside the city)
+  // (they rise, then roll: no green walls in the distance)
   const ex = Math.max(0, Math.abs(x) - 1060), en = Math.max(0, -1490 - z);
-  h += ex * ex * 0.0007 + ex * 0.12 + en * en * 0.0009 + en * 0.2;
+  h += edgeRise(ex, 210, 640) + edgeRise(en, 240, 620);
   // a little ground swell
   h += Math.sin(x * 0.011 + z * 0.004) * 1.1 + Math.sin(z * 0.017 - x * 0.006) * 0.8;
   return h;

@@ -205,7 +205,7 @@ function updateListening(dt) {
         // face away from the bench, towards the view (downhill, or the lake)
         const ax = best.alongX ? 0 : 1, az = best.alongX ? 1 : 0;
         const down = terrainAt(best.x + ax * 6, best.z + az * 6) < terrainAt(best.x - ax * 6, best.z - az * 6) ? 1 : -1;
-        p.yaw = Math.atan2(ax * down, az * down); p.pos.set(best.x, best.y, best.z);
+        p.yaw = Math.atan2(ax * down, az * down); const h = best.half ? -best.half : 0; p.pos.set(best.x + (best.alongX ? h : 0), best.y, best.z + (best.alongX ? 0 : h));
       }
     }
   } else Game.still = 0;
