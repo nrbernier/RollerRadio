@@ -49,6 +49,47 @@ function districtKit(K, S, F) {
     else { const m = (z0 + z1) / 2; K.ramp(x0 - 0.4, z0 - 0.4, x1 + 0.4, m, 'z', y, y + rise, col, false, y - 0.3, 'roof'); K.ramp(x0 - 0.4, m, x1 + 0.4, z1 + 0.4, 'z', y + rise, y, col, false, y - 0.3, 'roof'); }
     const g = ax ? prismGeo(x1 - x0 + 0.8, rise, z1 - z0 + 0.8, true) : prismGeo(x1 - x0 + 0.8, rise, z1 - z0 + 0.8, false);
     F.add(g, new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y, (z0 + z1) / 2), col);
+    // a chimney or two, sometimes a dormer
+    const rr = U.rng(((x0 * 31 + z0 * 17) | 0) ^ 0x5f3), n = rr() < 0.7 ? 1 + (rr() < 0.3 ? 1 : 0) : 0;
+    for (let k = 0; k < n && H.put; k++) {
+      const t = 0.2 + rr() * 0.6, off = (rr() - 0.5) * 0.5;
+      const cx = ax ? U.lerp(x0, x1, t) : (x0 + x1) / 2 + off * (x1 - x0), cz = ax ? (z0 + z1) / 2 + off * (z1 - z0) : U.lerp(z0, z1, t);
+      const yy = y + rise * (1 - Math.abs(off) * 2) - 0.4, ch = 1.6 + rr() * 0.8, cc = rr() < 0.6 ? '#8a4a3a' : '#9a9080';
+      H.put(H.SH.BOX, cx, yy + ch / 2, cz, 0.8, ch, 0.8, cc, 'plain', 0.04);
+      H.put(H.SH.BOX, cx, yy + ch + 0.08, cz, 1.0, 0.16, 1.0, '#3a3530', 'plain', 0.02);
+    }
+    if (H.put && rr() < 0.35) {
+      // a dormer window on one slope
+      const t = 0.3 + rr() * 0.4, sd = rr() < 0.5 ? -1 : 1, w = 1.6;
+      const dx = ax ? U.lerp(x0, x1, t) : (sd < 0 ? x0 + (x1 - x0) * 0.28 : x1 - (x1 - x0) * 0.28), dz = ax ? (sd < 0 ? z0 + (z1 - z0) * 0.28 : z1 - (z1 - z0) * 0.28) : U.lerp(z0, z1, t);
+      const dy = y + rise * 0.44;
+      H.put(H.SH.BOX, dx, dy + 0.55, dz, ax ? w : 1.4, 1.1, ax ? 1.4 : w, '#f2ede2', 'plain', 0.04);
+      H.put(H.SH.BOX, dx + (ax ? 0 : sd * 0.71), dy + 0.55, dz + (ax ? sd * 0.71 : 0), ax ? 0.8 : 0.04, 0.7, ax ? 0.04 : 0.8, '#3e4a58', 'plain', 0);
+      H.put(H.SH.BOX, dx, dy + 1.2, dz, ax ? w + 0.3 : 1.7, 0.2, ax ? 1.7 : w + 0.3, col, 'plain', 0.03);
+    }
+  };
+  // balconies on a house front (their railings are short grinds), a shop at street level
+  H.frontage = (x0, x1, zf, dir, lo, top, r, o = {}) => {
+    // zf: the facade line; dir: +1 if the street is to the north (facade faces -z), -1 if to the south
+    const out = -dir;
+    if (o.shop && r() < o.shop) {
+      const ac = pick(r, ['#a03a3a', '#2f5f6a', '#e8c84a', '#3e8f86', '#d9779a', '#e4572e', '#f2efe6']);
+      H.put(H.SH.BOX, (x0 + x1) / 2, lo + 1.5, zf + out * 0.08, x1 - x0 - 1.2, 2.6, 0.12, '#2e3c4c', 'plain', 0);
+      H.put(H.SH.BOX, (x0 + x1) / 2, lo + 3.3, zf + out * 0.75, x1 - x0 - 0.8, 0.08, 1.5, ac, 'plain', 0.03, 0, out * 0.3);
+      H.put(H.SH.BOX, (x0 + x1) / 2, lo + 3.9, zf + out * 0.06, x1 - x0 - 2, 0.5, 0.1, pick(r, ['#f2efe6', '#2a2838']), 'plain', 0);
+    }
+    if (o.balcony && r() < o.balcony && top - lo > 9) {
+      const w = Math.min(3.2, x1 - x0 - 2), cx = (x0 + x1) / 2 + (r() - 0.5) * (x1 - x0 - w - 1);
+      for (let fy = lo + 5.5; fy < top - 2; fy += 3.2) {
+        if (r() < 0.25) continue;
+        const z = zf + out * 0.6;
+        H.put(H.SH.BOX, cx, fy, z, w, 0.15, 1.2, '#e6dfd2', 'plain', 0.03);
+        H.put(H.SH.BOX, cx, fy + 0.55, zf + out * 1.17, w, 0.06, 0.06, '#2a2838', 'plain', 0);
+        for (let k = 0; k <= 4; k++) H.put(H.SH.BOX, cx - w / 2 + k * w / 4, fy + 0.3, zf + out * 1.17, 0.04, 0.5, 0.04, '#2a2838', 'plain', 0);
+        if (r() < 0.5) H.put(H.SH.ICO, cx + w / 2 - 0.4, fy + 0.35, z, 0.35, 0.3, 0.35, pick(r, H.FLOWERS), 'flat', 0);
+        K.rail([[cx - w / 2 + 0.1, fy + 0.6, zf + out * 1.17], [cx + w / 2 - 0.1, fy + 0.6, zf + out * 1.17]], { hidden: true });
+      }
+    }
   };
   // trees: faceted canopies (flat-shaded), trunk collider; big ones have no camera box (you're under them)
   // shared unit shapes, scaled into place (allocating fresh geometry for thousands of trees is slow)
@@ -152,7 +193,7 @@ const pick = (r, a) => a[Math.floor(r() * a.length) % a.length];
 const BIZ_PAL = ['#8fb7cc', '#d8d2c4', '#c9b28a', '#e6dfcf', '#7a9aa8', '#b9c7cf', '#d9a07a', '#e8c87a', '#9fbfb0', '#e4572e', '#2f8f9d', '#f2efe6'];
 
 function buildDistricts(K, S, F) {
-  const H = districtKit(K, S, F);
+  const H = districtKit(K, S, F); fillKit(H);
   // the canals and lakeshore first: their quays and promenades claim the ground the others avoid
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   buildCanals(H); lap('canals');
@@ -213,22 +254,7 @@ function buildBusiness(H) {
         continue;
       }
       const tall = 14 + r() * 20 + core * (40 + r() * 70);
-      const col = pick(r, pal), trim = pick(r, ['#2a2838', '#e8e2d4', '#c9a24a', '#14101f']);
-      // a podium, then a tower with set-backs
-      const pod = H.bldg(x0, z0, x1, z1, 7 + r() * 4, pick(r, ['#d9d3c4', '#c8bfae', '#b5a993', '#e6dfd0']), { trim: '#3a3550' });
-      let y = pod.top, ix0 = x0 + 3, iz0 = z0 + 3, ix1 = x1 - 3, iz1 = z1 - 3, h = tall;
-      let tiers = 1 + Math.floor(r() * 3);
-      while (tiers-- > 0 && h > 8) {
-        const th = tiers === 0 ? h : h * (0.45 + r() * 0.25);
-        K.box(ix0, y - 0.2, iz0, ix1, y + th, iz1, col, r() < 0.65 ? 'tower' : 'building', { roofColor: '#c9c2b4', outlineT: 0.16 });
-        B.box(ix0 - 0.2, y + th - 0.7, iz0 - 0.2, ix1 + 0.2, y + th - 0.1, iz1 + 0.2, trim, 'plain', { outlineT: 0, edges: false });
-        F.box(ix0, y - 0.2, iz0, ix1, y + th, iz1, col);
-        y += th; h -= th; const sh = 2 + r() * 3; ix0 += sh; iz0 += sh; ix1 -= sh; iz1 -= sh;
-        if (ix1 - ix0 < 6 || iz1 - iz0 < 6) break;
-      }
-      // crowns: antenna, beacon, rooftop boxes
-      if (tall > 60 && r() < 0.6) { const ax = (ix0 + ix1) / 2, az = (iz0 + iz1) / 2; K.cyl(ax, y, az, 0.25, 8 + r() * 10, '#d9d4ea', { outline: 0.03, seg: 6 }); K.sphere(ax, y + 9, az, 0.5, '#ff5a5a', { kind: 'lamp', outline: 0.04, seg: 8 }); }
-      else if (r() < 0.7) K.ac((ix0 + ix1) / 2 + (r() - 0.5) * 4, (iz0 + iz1) / 2 + (r() - 0.5) * 4, y, 3, 1.6, 3, '#e9e4f5');
+      bizBuilding(H, x0, z0, x1, z1, tall, r);
     }
     // street trees + lamps along the block edges
     for (let t = bz0 + 6; t < bz1 - 4; t += 18) {
@@ -239,6 +265,94 @@ function buildBusiness(H) {
   // people: lots of them, walking the sidewalks
   H.walkers(W.walkLines, 140, 'business');
   // music points: the district's crowd percussion lives on the sidewalks (see life)
+}
+// one business lot: a podium and a tower of one of several kinds, with something on the roof
+function bizBuilding(H, x0, z0, x1, z1, tall, r) {
+  const { K, W, B, F } = H, pal = BIZ_PAL;
+  const put = H.put;
+  const col = pick(r, pal), trim = pick(r, ['#2a2838', '#e8e2d4', '#c9a24a', '#14101f', '#8a8fa8']);
+  const pod = H.bldg(x0, z0, x1, z1, 6 + r() * 5, pick(r, ['#d9d3c4', '#c8bfae', '#b5a993', '#e6dfd0', '#a8a49a']), { trim: '#3a3550' });
+  // shopfronts: a dark glass band round the podium's foot, awnings over some
+  const sy0 = pod.hi + 0.2, sy1 = pod.hi + 3.4;
+  for (const [ax, az, bx, bz] of [[x0 - 0.06, z0 + 1, x0 + 0.1, z1 - 1], [x1 - 0.1, z0 + 1, x1 + 0.06, z1 - 1], [x0 + 1, z0 - 0.06, x1 - 1, z0 + 0.1], [x0 + 1, z1 - 0.1, x1 - 1, z1 + 0.06]]) B.box(ax, sy0, az, bx, sy1, bz, '#34465a', 'plain', { outlineT: 0, edges: false });
+  const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  let y = pod.top, top = y;
+  const ix0 = x0 + 3, iz0 = z0 + 3, ix1 = x1 - 3, iz1 = z1 - 3, iw = ix1 - ix0, id = iz1 - iz0;
+  const t = r(), big = tall > 45;
+  const crownRoof = (rx0, rz0, rx1, rz1, yy) => {
+    const q = r();
+    if (q < 0.25) { put(H.SH.BOX, (rx0 + rx1) / 2, yy + 1.6, (rz0 + rz1) / 2, (rx1 - rx0) * 0.4, 3.2, (rz1 - rz0) * 0.4, '#d9d4ea', 'plain', 0.05); }
+    else if (q < 0.45) { const tx = rx0 + 3, tz = rz0 + 3; for (const [a, b] of [[0, 0], [2, 0], [0, 2], [2, 2]]) put(H.SH.BOX, tx + a, yy + 1, tz + b, 0.15, 2, 0.15, '#5a4a3a', 'plain', 0); K.cyl(tx + 1, yy + 2, tz + 1, 1.4, 2.6, '#8a6a4a', { kind: 'wood', outline: 0.04, seg: 10 }); B.add(new THREE.ConeGeometry(1.5, 0.9, 10), new THREE.Matrix4().makeTranslation(tx + 1, yy + 5.05, tz + 1), '#5a4a3a', 'plain', { outlineT: 0.03, edges: false }); }
+    else if (q < 0.6) { for (let k = 0; k < 4; k++) put(H.SH.BOX, U.lerp(rx0 + 2, rx1 - 2, (k + 0.5) / 4), yy + 0.6, (rz0 + rz1) / 2, (rx1 - rx0) / 4 - 0.8, 0.08, (rz1 - rz0) * 0.6, '#2f4a6a', 'plain', 0.02, 0); }
+    else if (q < 0.75) { B.box(rx0 + 1, yy, rz0 + 1, rx1 - 1, yy + 0.3, rz1 - 1, '#6a9a52', 'plain', { outlineT: 0.02, edges: false }); for (let k = 0; k < 3; k++) H.tree(U.lerp(rx0 + 3, rx1 - 3, r()), U.lerp(rz0 + 3, rz1 - 3, r()), { y: yy + 0.3, s: 0.5, h: 2, color: '#5aa35a', far: false }); }
+    else K.ac((rx0 + rx1) / 2 + (r() - 0.5) * 4, (rz0 + rz1) / 2 + (r() - 0.5) * 4, yy, 3, 1.6, 3, '#e9e4f5');
+  };
+  const fins = (bx0, bz0, bx1, bz1, yy0, yy1, c) => {
+    for (let x = bx0 + 1.5; x < bx1 - 1; x += 3) for (const z of [bz0, bz1]) put(H.SH.BOX, x, (yy0 + yy1) / 2, z, 0.3, yy1 - yy0, 0.7, c, 'plain', 0.02);
+    for (let z = bz0 + 1.5; z < bz1 - 1; z += 3) for (const x of [bx0, bx1]) put(H.SH.BOX, x, (yy0 + yy1) / 2, z, 0.7, yy1 - yy0, 0.3, c, 'plain', 0.02);
+  };
+  if (big && t < 0.22 && iw > 14 && id > 14) {
+    // a round tower (glass bands), a thin crown ring and a drum on top
+    const rad = Math.min(iw, id) / 2 - 1;
+    K.cyl(cx, y - 0.2, cz, rad, tall, col, { kind: r() < 0.6 ? 'tower' : 'grid', seg: 24, outline: 0.16 });
+    W.boxes.push({ x0: cx - rad * 0.86, y0: y - 1, z0: cz - rad * 0.86, x1: cx + rad * 0.86, y1: y + tall, z1: cz + rad * 0.86, tag: 'tower' });
+    F.add(new THREE.CylinderGeometry(rad, rad, tall, 12), new THREE.Matrix4().makeTranslation(cx, y + tall / 2, cz), col);
+    K.cyl(cx, y + tall - 0.6, cz, rad + 0.3, 0.6, trim, { seg: 24, outline: 0 });
+    top = y + tall;
+    if (r() < 0.6) { K.cyl(cx, top, cz, rad * 0.55, 4, '#e9e4f5', { seg: 18, outline: 0.06 }); K.cyl(cx, top + 4, cz, 0.3, 10, '#d9d4ea', { seg: 6, outline: 0.03 }); K.sphere(cx, top + 14.2, cz, 0.5, '#ff5a5a', { kind: 'lamp', outline: 0.04, seg: 8 }); }
+    else crownRoof(cx - rad * 0.6, cz - rad * 0.6, cx + rad * 0.6, cz + rad * 0.6, top);
+  } else if (big && t < 0.38 && (iw > 30 || id > 30)) {
+    // twins: two slim towers on one podium, a sky bridge between
+    const alongX = iw >= id, gap = 6;
+    const A = alongX ? [ix0, iz0, (ix0 + ix1) / 2 - gap / 2, iz1] : [ix0, iz0, ix1, (iz0 + iz1) / 2 - gap / 2];
+    const Bq = alongX ? [(ix0 + ix1) / 2 + gap / 2, iz0, ix1, iz1] : [ix0, (iz0 + iz1) / 2 + gap / 2, ix1, iz1];
+    const kind = pick(r, ['tower', 'grid', 'tower']), h2 = tall * (0.75 + r() * 0.2);
+    for (const [q, hh] of [[A, tall], [Bq, h2]]) {
+      K.box(q[0], y - 0.2, q[1], q[2], y + hh, q[3], col, kind, { roofColor: '#c9c2b4', outlineT: 0.16 });
+      B.box(q[0] - 0.2, y + hh - 0.7, q[1] - 0.2, q[2] + 0.2, y + hh - 0.1, q[3] + 0.2, trim, 'plain', { outlineT: 0, edges: false });
+      F.box(q[0], y - 0.2, q[1], q[2], y + hh, q[3], col);
+      crownRoof(q[0], q[1], q[2], q[3], y + hh);
+    }
+    const by = y + Math.min(tall, h2) * 0.62;
+    if (alongX) { const zc = (iz0 + iz1) / 2; K.box(A[2], by, zc - 2.5, Bq[0], by + 3.2, zc + 2.5, '#a8c4d8', 'plain', { outlineT: 0.06 }); K.rail([[A[2] - 0.2, by + 3.25, zc], [Bq[0] + 0.2, by + 3.25, zc]], { hidden: true }); }
+    else { const xc = (ix0 + ix1) / 2; K.box(xc - 2.5, by, A[3], xc + 2.5, by + 3.2, Bq[1], '#a8c4d8', 'plain', { outlineT: 0.06 }); K.rail([[xc, by + 3.25, A[3] - 0.2], [xc, by + 3.25, Bq[1] + 0.2]], { hidden: true }); }
+    top = y + tall;
+  } else if (big && t < 0.55) {
+    // art deco: many small set-backs and a spire
+    let bx0 = ix0, bz0 = iz0, bx1 = ix1, bz1 = iz1, h = tall, yy = y;
+    const c2 = pick(r, ['#e8dcc0', '#d9c9a8', '#c8b89a', '#e6d6b8', '#b8a888']);
+    for (let k = 0; k < 5 && h > 4 && bx1 - bx0 > 6 && bz1 - bz0 > 6; k++) {
+      const th = k === 4 ? h : h * (k === 0 ? 0.5 : 0.35);
+      K.box(bx0, yy - 0.2, bz0, bx1, yy + th, bz1, c2, 'deco', { roofColor: '#c9b89a', outlineT: 0.14 });
+      B.box(bx0 - 0.25, yy + th - 0.9, bz0 - 0.25, bx1 + 0.25, yy + th - 0.1, bz1 + 0.25, '#b8905a', 'plain', { outlineT: 0, edges: false });
+      F.box(bx0, yy - 0.2, bz0, bx1, yy + th, bz1, c2);
+      yy += th; h -= th; const sh = 1.6 + r() * 1.4; bx0 += sh; bz0 += sh; bx1 -= sh; bz1 -= sh;
+    }
+    const sx = (bx0 + bx1) / 2, sz = (bz0 + bz1) / 2;
+    B.add(new THREE.ConeGeometry(Math.max(1.5, (bx1 - bx0) / 2), 10 + r() * 8, 4), new THREE.Matrix4().makeRotationY(Math.PI / 4).setPosition(sx, yy + 6, sz), '#c9a24a', 'plain', { outlineT: 0.08, edges: false });
+    K.cyl(sx, yy + 10, sz, 0.18, 12, '#e9e4f5', { seg: 5, outline: 0.03 }); K.sphere(sx, yy + 22, sz, 0.45, '#ff5a5a', { kind: 'lamp', outline: 0.04, seg: 8 });
+    top = yy;
+  } else {
+    // slabs with set-backs; some wear vertical fins, the rest get a rooftop
+    let h = tall, bx0 = ix0, bz0 = iz0, bx1 = ix1, bz1 = iz1;
+    let tiers = 1 + Math.floor(r() * 3);
+    const kind = big ? pick(r, ['tower', 'tower', 'grid', 'building']) : pick(r, ['grid', 'building', 'building', 'tower']), finned = r() < 0.3;
+    const fc = pick(r, ['#e9e4f5', '#2a2838', '#c9a24a', '#8a8fa8']);
+    while (tiers-- > 0 && h > 8) {
+      const th = tiers === 0 ? h : h * (0.45 + r() * 0.25);
+      K.box(bx0, y - 0.2, bz0, bx1, y + th, bz1, col, kind, { roofColor: '#c9c2b4', outlineT: 0.16 });
+      B.box(bx0 - 0.2, y + th - 0.7, bz0 - 0.2, bx1 + 0.2, y + th - 0.1, bz1 + 0.2, trim, 'plain', { outlineT: 0, edges: false });
+      F.box(bx0, y - 0.2, bz0, bx1, y + th, bz1, col);
+      if (finned) fins(bx0, bz0, bx1, bz1, y, y + th - 0.7, fc);
+      y += th; h -= th; const sh = 2 + r() * 3; bx0 += sh; bz0 += sh; bx1 -= sh; bz1 -= sh;
+      if (bx1 - bx0 < 6 || bz1 - bz0 < 6) break;
+    }
+    top = y;
+    if (tall > 60 && r() < 0.5) { const ax = (bx0 + bx1) / 2, az = (bz0 + bz1) / 2; K.cyl(ax, y, az, 0.25, 8 + r() * 10, '#d9d4ea', { outline: 0.03, seg: 6 }); K.sphere(ax, y + 9, az, 0.5, '#ff5a5a', { kind: 'lamp', outline: 0.04, seg: 8 }); }
+    else crownRoof(bx0 + 1, bz0 + 1, bx1 - 1, bz1 - 1, y);
+  }
+  // the podium roof: a terrace with planters (reachable from a neighbour, or the sky rail)
+  if (r() < 0.4) for (let k = 0; k < 3; k++) { const px2 = U.lerp(x0 + 1.5, x1 - 1.5, r()), pz2 = r() < 0.5 ? z0 + 1.5 : z1 - 1.5; put(H.SH.BOX, px2, pod.top + 0.35, pz2, 2.2, 0.7, 1, '#8a7a6a', 'plain', 0.03); put(H.SH.ICO, px2, pod.top + 0.9, pz2, 0.9, 0.5, 0.5, '#5aa35a', 'flat', 0.04); }
 }
 // a four-level car park: ramps up the east and west strips in turn; the roof is a garden (hidden spot)
 function buildGarage(H, x0, z0, x1, z1) {

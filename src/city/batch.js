@@ -6,7 +6,7 @@
 // ============================================================
 const CELL = 128;
 class CellBatch extends StaticBatch {
-  constructor() { super(); this.cellLines = {}; this.split = { house: ['roof', 'house'], shed: ['roof', 'brick'], tower: ['roof', 'tower'] }; }
+  constructor() { super(); this.cellLines = {}; this.split = { house: ['roof', 'house'], shed: ['roof', 'brick'], tower: ['roof', 'tower'], grid: ['roof', 'grid'], deco: ['roof', 'deco'] }; }
   bucket(name, x, z) {
     const key = name + '|' + Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
     return this.buckets[key] || (this.buckets[key] = { name, pos: [], nor: [], col: [], uv: [], cx: Math.floor(x / CELL), cz: Math.floor(z / CELL) });
@@ -157,6 +157,31 @@ function cityMaterials() {
   }, { repeat: true }).tex; towerTex.repeat.set(1, 1);
   const towerGlow = canvasTex(256, 256, (x, w, h) => { const r = U.rng(61); x.fillStyle = '#000'; x.fillRect(0, 0, w, h); for (let f = 0; f < 4; f++) for (let c = 0; c < 8; c++) if (r() < 0.45) { x.fillStyle = r() < 0.7 ? '#ffe6b0' : '#d8f0ff'; x.fillRect(c * 32 + 2, f * 64 + 18, 30, 44); } }, { repeat: true }).tex;
   M.tower = new THREE.MeshToonMaterial({ vertexColors: true, map: towerTex, emissiveMap: towerGlow, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // concrete grid: deep square windows in a frame (tinted by the vertex colour)
+  const gridTex = canvasTex(256, 256, (x, w, h) => {
+    x.fillStyle = '#f2f0ea'; x.fillRect(0, 0, w, h);
+    for (let f = 0; f < 4; f++) for (let c = 0; c < 4; c++) {
+      const X = c * 64 + 10, Y = f * 64 + 12, W2 = 44, H2 = 40;
+      x.fillStyle = '#c9c4b8'; x.fillRect(X - 4, Y - 4, W2 + 8, H2 + 8);
+      const g = x.createLinearGradient(X, Y, X + W2, Y + H2); g.addColorStop(0, '#8aa4bc'); g.addColorStop(1, '#4f647a'); x.fillStyle = g; x.fillRect(X, Y, W2, H2);
+      x.fillStyle = 'rgba(255,255,255,.28)'; x.beginPath(); x.moveTo(X, Y + H2); x.lineTo(X + 14, Y); x.lineTo(X + 22, Y); x.lineTo(X + 8, Y + H2); x.fill();
+      x.fillStyle = '#3f4a58'; x.fillRect(X, Y + H2 - 5, W2, 5);
+    }
+  }, { repeat: true }).tex;
+  const gridGlow = canvasTex(256, 256, (x, w, h) => { const r = U.rng(71); x.fillStyle = '#000'; x.fillRect(0, 0, w, h); for (let f = 0; f < 4; f++) for (let c = 0; c < 4; c++) if (r() < 0.5) { x.fillStyle = r() < 0.6 ? '#ffe0a0' : '#e0f0ff'; x.fillRect(c * 64 + 10, f * 64 + 12, 44, 35); } }, { repeat: true }).tex;
+  M.grid = new THREE.MeshToonMaterial({ vertexColors: true, map: gridTex, emissiveMap: gridGlow, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // art deco: tall piers with narrow windows between them, a spandrel at each floor
+  const decoTex = canvasTex(256, 256, (x, w, h) => {
+    x.fillStyle = '#f4efe4'; x.fillRect(0, 0, w, h);
+    for (let c = 0; c < 8; c++) {
+      const X = c * 32 + 9, W2 = 14;
+      const g = x.createLinearGradient(X, 0, X + W2, 0); g.addColorStop(0, '#6f8296'); g.addColorStop(1, '#9cb0c2'); x.fillStyle = g; x.fillRect(X, 0, W2, h);
+      x.fillStyle = '#d8cdb8'; for (let f = 0; f < 4; f++) x.fillRect(X - 1, f * 64 + 50, W2 + 2, 14);
+    }
+    x.fillStyle = 'rgba(90,70,40,.18)'; for (let c = 0; c < 8; c++) x.fillRect(c * 32, 0, 3, h);
+  }, { repeat: true }).tex;
+  const decoGlow = canvasTex(256, 256, (x, w, h) => { const r = U.rng(73); x.fillStyle = '#000'; x.fillRect(0, 0, w, h); for (let c = 0; c < 8; c++) for (let f = 0; f < 4; f++) if (r() < 0.45) { x.fillStyle = '#ffd890'; x.fillRect(c * 32 + 9, f * 64, 14, 50); } }, { repeat: true }).tex;
+  M.deco = new THREE.MeshToonMaterial({ vertexColors: true, map: decoTex, emissiveMap: decoGlow, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   // older houses: plaster, small windows with shutters, a lit one here and there at night
   const HW = []; { const r = U.rng(41); for (let i = 0; i < 64; i++) HW.push({ lit: r() < 0.45, col: r() < 0.5 ? '#ffd88a' : '#ffe8c0', sh: ['#3f6a5a', '#7a4a3a', '#4a5a7a', '#6a6a52'][Math.floor(r() * 4)], box: r() < 0.3, open: r() < 0.3 }); }
   const hwRect = (i) => { const c = i % 8, f = Math.floor(i / 8); return [c * 64 + 20, f * 64 + 14, 24, 32]; };

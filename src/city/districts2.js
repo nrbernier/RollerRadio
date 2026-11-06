@@ -74,7 +74,7 @@ function buildOldTown(H) {
       const hgt = 7 + r() * 6, bb = H.bldg(x0, z0, x1, z1, hgt, pick(r, pastel), { trim: '#6a5a4a', outline: 0.12, kind: 'house' });
       H.roof(x0, z0, x1, z1, bb.top, 2.6 + r() * 1.6, pick(r, roofs));
       H.reserve([x0, z0, x1, z1]);
-      if (r() < 0.25) K.box(cx - 0.6, bb.top, cz - 0.6, cx + 0.6, bb.top + 3.4, cz + 0.6, '#8a7a6a', 'brick', { outlineT: 0.05 });   // chimney
+      if (alongX) { const laneZ = az + uz * s, south = cz < laneZ; H.frontage(x0, x1, south ? z1 : z0, south ? -1 : 1, bb.hi, bb.top, r, { shop: 0.3, balcony: 0.3 }); }
     }
     // washing lines across the lane (grindable, with laundry)
     if (r() < 0.75) {
@@ -246,6 +246,7 @@ function buildCanals(H) {
       const z0 = dir > 0 ? zFront : zFront - d, z1 = dir > 0 ? zFront + d : zFront;
       if (H.clearOf(x, z0, x + w, z1, 0.5)) {
         const bb = H.bldg(x, z0, x + w, z1, 10 + r() * 8, pick(r, cols), { trim: '#f2ede2', outline: 0.12, kind: 'house' });
+        H.frontage(x, x + w, dir > 0 ? z0 : z1, dir, bb.hi, bb.top, r, { shop: 0.25, balcony: 0.45 });
         H.roof(x, z0, x + w, z1, bb.top, 3.5 + r() * 2, pick(r, ['#5a4a42', '#6a5a52', '#4a4a52', '#7a4a3a']), true);
         H.reserve([x, z0, x + w, z1]);
       }

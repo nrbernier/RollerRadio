@@ -169,7 +169,6 @@ function fillKit(H) {
 //  the fill itself, district by district
 // ============================================================
 function fillDistricts(H) {
-  fillKit(H);
   fillBusiness(H);
   fillCanalQuarter(H);
   fillLakeshore(H);
@@ -262,7 +261,7 @@ function fillCanalQuarter(H) {
       if (H.clearOf(x, z0, x + w, z1, 0.4)) {
         const bb = H.bldg(x, z0, x + w, z1, 8 + r() * 9, pick(r, cols), { trim: '#f2ede2', outline: 0.12, kind: 'house' });
         H.roof(x, z0, x + w, z1, bb.top, 3 + r() * 2.2, pick(r, roofs), true);
-        if (r() < 0.3) { const fz = dir > 0 ? z0 : z1; B.box(x + 0.6, bb.hi + 2.4, fz - (dir > 0 ? 1.2 : 0), x + w - 0.6, bb.hi + 2.5, fz + (dir > 0 ? 0 : 1.2), pick(r, ['#a03a3a', '#2f5f6a', '#e8c84a', '#f2efe6']), 'plain', { outlineT: 0.03, edges: false }); }
+        H.frontage(x, x + w, dir > 0 ? z0 : z1, dir, bb.hi, bb.top, r, { shop: 0.35, balcony: 0.35 });
         H.reserve([x, z0, x + w, z1]);
       }
       x += w + (r() < 0.12 ? 7 : 0.05);
