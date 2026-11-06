@@ -107,32 +107,49 @@ function buildMetro(K, M, S, F) {
     q(L(a, hw - 1.3, -1.5), L(b, hw - 1.3, -1.5), L(b, -hw + 1.3, -1.5), L(a, -hw + 1.3, -1.5));   // underside
     q(L(a, hw, -0.6), L(b, hw, -0.6), L(b, hw - 1.3, -1.5), L(a, hw - 1.3, -1.5));
     q(L(a, -hw + 1.3, -1.5), L(b, -hw + 1.3, -1.5), L(b, -hw, -0.6), L(a, -hw, -0.6));
-    // ballast + running rails, painted on top
-    for (const side of [-1, 1]) {
-      const c = side * METRO.trackOff;
-      q(L(a, c - 1.3, 0.04), L(b, c - 1.3, 0.04), L(b, c + 1.3, 0.04), L(a, c + 1.3, 0.04));
-    }
   }
   // split the deck triangles: top/sides go to concrete, ballast strips darker
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
   B.add(g, null, deckCol, 'plain', { outlineT: 0, edges: false });
-  // rails: thin dark strips + hidden grindable rails
-  const railPos = [];
+  // the track bed: ballast with sleepers (textured along the line, in chunks so cells can cull it)
+  const tex = canvasTex(128, 128, (x, w, h) => {
+    const r = U.rng(3); x.fillStyle = '#8f877a'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${40 + r() * 60},${40 + r() * 50},${35 + r() * 40},${0.25 + r() * 0.3})`; x.fillRect(r() * w, r() * h, 2 + r() * 3, 2 + r() * 3); }
+    for (const y of [10, 74]) { x.fillStyle = '#5a4636'; x.fillRect(6, y, w - 12, 40); x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(6, y, w - 12, 5); x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(6, y + 36, w - 12, 4); }
+  }, { repeat: true }).tex;
+  const bedMat = new THREE.MeshToonMaterial({ map: tex, gradientMap: G.grad, color: 0xffffff });
+  for (let c0 = 0; c0 < N; c0 += 40) {
+    const pos2 = [], uv2 = [];
+    for (let i = c0; i < Math.min(N, c0 + 40); i++) {
+      const a = M.pts[i], b = M.pts[(i + 1) % N], va = i * M.step / 1.2, vb = (i + 1) * M.step / 1.2;
+      for (const side of [-1, 1]) {
+        const c = side * METRO.trackOff;
+        pos2.push(...L(a, c - 1.35, 0.12), ...L(b, c - 1.35, 0.12), ...L(b, c + 1.35, 0.12), ...L(a, c - 1.35, 0.12), ...L(b, c + 1.35, 0.12), ...L(a, c + 1.35, 0.12));
+        uv2.push(0, va, 0, vb, 1, vb, 0, va, 1, vb, 1, va);
+      }
+    }
+    const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(pos2, 3)); g2.setAttribute('uv', new THREE.Float32BufferAttribute(uv2, 2)); g2.computeVertexNormals();
+    const mid = M.pts[Math.min(N - 1, c0 + 20)];
+    (W.cellExtras || (W.cellExtras = [])).push({ mesh: new THREE.Mesh(g2, bedMat), x: mid.x, z: mid.z });
+  }
+  // the running rails: shiny heads on dark webs, standing proud of the sleepers
+  const top = [], web = [];
   for (let i = 0; i < N; i++) {
     const a = M.pts[i], b = M.pts[(i + 1) % N];
-    for (const side of [-1, 1]) for (const r of [-0.7, 0.7]) {
-      const c = side * METRO.trackOff + r;
-      railPos.push(...L(a, c - 0.06, 0.2), ...L(b, c - 0.06, 0.2), ...L(b, c + 0.06, 0.2), ...L(a, c - 0.06, 0.2), ...L(b, c + 0.06, 0.2), ...L(a, c + 0.06, 0.2));
+    for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) {
+      const c = side * METRO.trackOff + r, h = 0.36, f = 0.16;
+      top.push(...L(a, c - 0.07, h), ...L(b, c - 0.07, h), ...L(b, c + 0.07, h), ...L(a, c - 0.07, h), ...L(b, c + 0.07, h), ...L(a, c + 0.07, h));
+      web.push(...L(a, c + 0.07, h), ...L(b, c + 0.07, h), ...L(b, c + 0.07, f), ...L(a, c + 0.07, h), ...L(b, c + 0.07, f), ...L(a, c + 0.07, f));
+      web.push(...L(a, c - 0.07, f), ...L(b, c - 0.07, f), ...L(b, c - 0.07, h), ...L(a, c - 0.07, f), ...L(b, c - 0.07, h), ...L(a, c - 0.07, h));
     }
   }
-  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(railPos, 3)); rg.computeVertexNormals();
-  B.add(rg, null, '#3a3a48', 'plain', { outlineT: 0, edges: false });
-  const ball = []; for (let i = 0; i < N; i++) { const a = M.pts[i], b = M.pts[(i + 1) % N]; for (const side of [-1, 1]) { const c = side * METRO.trackOff; ball.push(...L(a, c - 1.2, 0.06), ...L(b, c - 1.2, 0.06), ...L(b, c + 1.2, 0.06), ...L(a, c - 1.2, 0.06), ...L(b, c + 1.2, 0.06), ...L(a, c + 1.2, 0.06)); } }
-  const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(ball, 3)); bg.computeVertexNormals();
-  B.add(bg, null, '#8a8478', 'paving', { outlineT: 0, edges: false });
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); tg.computeVertexNormals();
+  B.add(tg, null, '#e6e9ef', 'plain', { outlineT: 0, edges: false });
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(web, 3)); wg.computeVertexNormals();
+  B.add(wg, null, '#4a4e58', 'plain', { outlineT: 0, edges: false });
   // grindable running rails (in long runs, so grinding carries you far)
-  const run = (side, r) => { const P = []; for (let i = 0; i <= N; i++) { const p = M.pts[i % N]; P.push(L(p, side * METRO.trackOff + r, 0.25)); } return P; };
-  for (const side of [-1, 1]) for (const r of [-0.7, 0.7]) K.rail(run(side, r), { hidden: true, loop: false, round: 0 });
+  const run = (side, r) => { const P = []; for (let i = 0; i <= N; i++) { const p = M.pts[i % N]; P.push(L(p, side * METRO.trackOff + r, 0.38)); } return P; };
+  for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) K.rail(run(side, r), { hidden: true, loop: false, round: 0 });
   // handrails along both edges (grindable; they also stop you skating off)
   const halfI = Math.ceil(METRO.platLen / 2 / M.step) + 2;
   const atStation = (i) => M.stations.some(st => { const d = Math.abs(((i - st.i) % N + N + N / 2) % N - N / 2); return d <= halfI; });
@@ -202,65 +219,75 @@ function stationSign(name) {
   }).tex;
 }
 function buildStations(K, M, S, F) {
-  const W = K.W, hw = METRO.deckW / 2;
+  const W = K.W, B = K.B, N = M.N;
   W.stations = [];
+  const IN = 3.95, WIDTH = 4.6, PH = 1.2, CAN = 6.6;      // platform starts right where the train ends
+  const L = (p, o, dy = 0) => [p.x - p.dz * o, p.y + dy, p.z + p.dx * o];
+  const quads = { plat: [], edge: [], side: [], can: [] };
+  const q = (arr, a, b, c, d) => arr.push(...a, ...b, ...c, ...a, ...c, ...d);
   for (const st of M.stations) {
-    const p = M.pts[st.i], yaw = Math.atan2(p.dx, p.dz), half = METRO.platLen / 2;
-    const fx = p.dx, fz = p.dz, rx = -p.dz, rz = p.dx;
-    const at = (along, side) => [p.x + fx * along + rx * side, p.z + fz * along + rz * side];
-    // side platforms, a little higher than the deck, with canopies
+    const p = M.pts[st.i], yaw = Math.atan2(p.dx, p.dz), hn = Math.round(METRO.platLen / 2 / M.step);
+    const idx = (k) => (st.i + k + N) % N;
     for (const sd of [-1, 1]) {
-      const o = sd * (hw + 2.2);
-      const [x0, z0] = at(-half, o), [x1, z1] = at(half, o);
-      S.add(x0, p.y + 1.2, z0, x1, p.y + 1.2, z1, 2.4);
-      const m = new THREE.Matrix4().makeRotationY(yaw);
-      K.B.add(new THREE.BoxGeometry(4.8, 2.6, METRO.platLen), m.clone().setPosition(p.x + rx * o, p.y - 0.1, p.z + rz * o), '#d8d0c0', 'paving', { outlineT: 0.08 });
-      // canopy on posts
-      K.B.add(new THREE.BoxGeometry(5.6, 0.35, METRO.platLen * 0.7), m.clone().setPosition(p.x + rx * (o + sd * 0.3), p.y + 6.6, p.z + rz * (o + sd * 0.3)), st.key === 'central' ? '#e4572e' : '#7aa6b8', 'plain', { outlineT: 0.08 });
-      for (let a = -half * 0.65; a <= half * 0.65; a += 11) { const [px, pz] = at(a, o + sd * 1.8); K.cyl(px, p.y + 1.2, pz, 0.14, 5.4, '#3a3550', { outline: 0.03, seg: 6 }); W.boxes.push({ x0: px - 0.2, y0: p.y + 1.2, z0: pz - 0.2, x1: px + 0.2, y1: p.y + 6.6, z1: pz + 0.2 }); }
-      // signs
-      // name boards on the canopy edge: one facing the tracks, one facing the street
-      const smat = W.signMats || (W.signMats = {}); const sm = smat[st.name] || (smat[st.name] = new THREE.MeshBasicMaterial({ map: stationSign(st.name) }));
-      for (const face of [-1, 1]) {
-        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm);
-        const off = o + sd * (face < 0 ? -2.75 : 3.05);
-        const [sx, sz] = at(face < 0 ? -12 : 12, off); sign.position.set(sx, p.y + 7.6, sz);
-        sign.rotation.y = Math.atan2(rx * sd * face, rz * sd * face); K.scene.add(sign);
+      const oi = sd * IN, oo = sd * (IN + WIDTH), om = sd * (IN + WIDTH / 2);
+      for (let k = -hn; k < hn; k++) {
+        const a = M.pts[idx(k)], b = M.pts[idx(k + 1)];
+        const A = sd > 0 ? [oi, oo] : [oo, oi];
+        q(quads.plat, L(a, A[0], PH), L(b, A[0], PH), L(b, A[1], PH), L(a, A[1], PH));
+        // the yellow line along the edge, the face down to the track, the back wall
+        const e0 = sd * (IN + 0.05), e1 = sd * (IN + 0.45), E = sd > 0 ? [e0, e1] : [e1, e0];
+        q(quads.edge, L(a, E[0], PH + 0.02), L(b, E[0], PH + 0.02), L(b, E[1], PH + 0.02), L(a, E[1], PH + 0.02));
+        if (sd > 0) { q(quads.side, L(a, oi, 0), L(b, oi, 0), L(b, oi, PH), L(a, oi, PH)); q(quads.side, L(a, oo, PH), L(b, oo, PH), L(b, oo, -2.2), L(a, oo, -2.2)); }
+        else { q(quads.side, L(a, oi, PH), L(b, oi, PH), L(b, oi, 0), L(a, oi, 0)); q(quads.side, L(a, oo, -2.2), L(b, oo, -2.2), L(b, oo, PH), L(a, oo, PH)); }
+        S.add(...L(a, om, PH), ...L(b, om, PH), WIDTH / 2);
+        // canopy over the middle two thirds
+        if (Math.abs(k) < hn * 0.7) {
+          const c0 = sd * (IN + 0.3), c1 = sd * (IN + WIDTH + 0.6), C = sd > 0 ? [c0, c1] : [c1, c0];
+          q(quads.can, L(a, C[0], CAN), L(b, C[0], CAN), L(b, C[1], CAN), L(a, C[1], CAN));
+          q(quads.can, L(a, C[1], CAN - 0.3), L(b, C[1], CAN - 0.3), L(b, C[0], CAN - 0.3), L(a, C[0], CAN - 0.3));
+          if (k % 4 === 0) { const [px, , pz] = L(a, sd * (IN + WIDTH - 0.6)); K.cyl(px, p.y + PH, pz, 0.14, CAN - PH, '#3a3550', { outline: 0.03, seg: 6 }); W.boxes.push({ x0: px - 0.2, y0: p.y + PH, z0: pz - 0.2, x1: px + 0.2, y1: p.y + CAN, z1: pz + 0.2 }); }
+        }
+        if (k % 3 === 0) { const [fx, , fz] = L(a, om); F.add(new THREE.BoxGeometry(WIDTH - 0.4, 2, M.step * 3), new THREE.Matrix4().makeRotationY(Math.atan2(a.dx, a.dz)).setPosition(fx, p.y - 0.2, fz), '#c8c0b0'); }
       }
-      // benches
-      for (const a of [-20, 20]) { const [bx, bz] = at(a, o + sd * 1.3); K.bench(bx, bz, Math.abs(fx) > Math.abs(fz), p.y + 1.2, '#c97a3c', false); }
-      F.add(new THREE.BoxGeometry(4.4, 2, METRO.platLen - 2), m.clone().setPosition(p.x + rx * o, p.y - 0.3, p.z + rz * o), '#c8c0b0');
+      // name boards and benches along the platform
+      const smat = W.signMats || (W.signMats = {}); const sm = smat[st.name] || (smat[st.name] = new THREE.MeshBasicMaterial({ map: stationSign(st.name) }));
+      for (const [k, face] of [[-4, -1], [4, 1]]) {
+        const a = M.pts[idx(k)], [sx, , sz] = L(a, sd * (face < 0 ? IN + 0.35 : IN + WIDTH + 0.65), CAN + 0.9);
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm); sign.position.set(sx, p.y + CAN + 0.9, sz);
+        const nx = a.dz * sd * face, nz = -a.dx * sd * face; sign.rotation.y = Math.atan2(nx, nz); K.scene.add(sign);
+      }
+      for (const k of [-8, 8]) { const a = M.pts[idx(k)], [bx, , bz] = L(a, sd * (IN + WIDTH - 1.3)); K.bench(bx, bz, Math.abs(a.dx) > Math.abs(a.dz), p.y + PH, '#c97a3c', false); W.benches.push({ x: bx, y: p.y + PH, z: bz, alongX: Math.abs(a.dx) > Math.abs(a.dz) }); }
     }
-    // ramps down to the street on both sides, heading away from the line
+    // ramps down to the street, leaving each platform end at an angle, away from the line
     const ramps = [];
     for (const sd of [-1, 1]) {
-      const o = sd * (hw + 4.4);
-      // ramp runs along the line from the platform end back down to the ground
-      const startA = half - 4, [sx, sz] = at(sd > 0 ? startA : -startA, o + sd * 1.6);
-      const dirA = sd > 0 ? 1 : -1;
+      const kEnd = sd > 0 ? hn : -hn, e = M.pts[idx(kEnd)], dirA = sd > 0 ? 1 : -1;
+      const tx = e.dx * dirA, tz = e.dz * dirA, ox = -e.dz * sd, oz = e.dx * sd;
+      const ux = tx * 0.86 + ox * 0.5, uz = tz * 0.86 + oz * 0.5;
+      const [sx, , sz] = L(e, sd * (IN + WIDTH / 2), PH);
       let len = 30, gy = 0;
-      for (len = 30; len < 140; len += 4) { const [ex, ez] = at(dirA * (startA + len), o + sd * 1.6); gy = terrainAt(ex, ez); if ((p.y + 1.2 - gy) / len < 0.14) break; }
-      const [ex, ez] = at(dirA * (startA + len), o + sd * 1.6);
-      gy = terrainAt(ex, ez);
-      S.add(sx, p.y + 1.2, sz, ex, gy, ez, 1.8);
-      // its visible deck + side walls + posts
-      const n = Math.ceil(len / 6);
+      for (len = 30; len < 150; len += 4) { gy = terrainAt(sx + ux * len, sz + uz * len); if ((p.y + PH - gy) / len < 0.13) break; }
+      const ex = sx + ux * len, ez = sz + uz * len; gy = terrainAt(ex, ez);
+      S.add(sx, p.y + PH, sz, ex, gy, ez, 1.9);
+      const ryaw = Math.atan2(ux, uz), n = Math.ceil(len / 6);
       for (let k = 0; k < n; k++) {
-        const t0 = k / n, t1 = (k + 1) / n;
-        const ax = U.lerp(sx, ex, t0), az = U.lerp(sz, ez, t0), ay = U.lerp(p.y + 1.2, gy, t0), bx = U.lerp(sx, ex, t1), bz = U.lerp(sz, ez, t1), by = U.lerp(p.y + 1.2, gy, t1);
-        const mid = V3((ax + bx) / 2, (ay + by) / 2 - 0.25, (az + bz) / 2), segL = Math.hypot(bx - ax, bz - az), pitch = Math.atan2(ay - by, segL);
-        const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(dirA > 0 ? pitch : -pitch, yaw, 0, 'YXZ')).setPosition(mid);
-        K.B.add(new THREE.BoxGeometry(3.8, 0.5, segL + 0.05), m, '#cfc7b8', 'paving', { outlineT: 0, edges: false });
+        const t0 = k / n, t1 = (k + 1) / n, ay = U.lerp(p.y + PH, gy, t0), by = U.lerp(p.y + PH, gy, t1);
+        const mid = V3(sx + ux * len * (t0 + t1) / 2, (ay + by) / 2 - 0.25, sz + uz * len * (t0 + t1) / 2), segL = len / n;
+        B.add(new THREE.BoxGeometry(3.9, 0.5, segL + 0.05), new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.atan2(ay - by, segL), ryaw, 0, 'YXZ')).setPosition(mid), '#cfc7b8', 'paving', { outlineT: 0.05, edges: false });
         const g2 = terrainAt(mid.x, mid.z);
-        if (mid.y - g2 > 1.5 && k % 2 === 0) { K.cyl(mid.x, g2 - 0.5, mid.z, 0.5, mid.y - g2, '#b8b0a2', { outline: 0.05, seg: 8 }); W.boxes.push({ x0: mid.x - 0.5, y0: g2 - 1, z0: mid.z - 0.5, x1: mid.x + 0.5, y1: mid.y - 0.6, z1: mid.z + 0.5, tag: 'pillar' }); }
+        if (mid.y - g2 > 1.5 && k % 2 === 0) { K.cyl(mid.x, g2 - 0.5, mid.z, 0.45, mid.y - g2, '#b8b0a2', { outline: 0.05, seg: 8 }); W.boxes.push({ x0: mid.x - 0.45, y0: g2 - 1, z0: mid.z - 0.45, x1: mid.x + 0.45, y1: mid.y - 0.6, z1: mid.z + 0.45, tag: 'pillar' }); }
       }
-      // handrail on the outer edge
-      const rp = []; for (let k = 0; k <= n; k++) { const t = k / n; rp.push([U.lerp(sx, ex, t) + rx * sd * 1.75, U.lerp(p.y + 1.2, gy, t) + 1.0, U.lerp(sz, ez, t) + rz * sd * 1.75]); }
-      K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.3, round: 0, radius: 0.06 });
+      for (const side of [-1, 1]) {
+        const rx = -uz * side * 1.8, rz = ux * side * 1.8, rp = [];
+        for (let k = 0; k <= n; k++) { const t = k / n; rp.push([sx + ux * len * t + rx, U.lerp(p.y + PH, gy, t) + 1.0, sz + uz * len * t + rz]); }
+        K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.3, round: 0, radius: 0.06 });
+      }
       ramps.push({ from: [sx, sz], to: [ex, ez] });
     }
-    W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + 1.2 }));
+    W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 }));
   }
+  const mk = (arr, col, kind) => { if (!arr.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
+  mk(quads.plat, '#d8d0c0', 'paving'); mk(quads.edge, '#e8c84a', 'paint'); mk(quads.side, '#b9b1a2', 'plain'); mk(quads.can, '#7aa6b8', 'plain');
 }
 
 // ---------- sloped slabs you can skate on (viaduct deck, ramps, bridges) ----------
@@ -373,7 +400,7 @@ function makeTrains(W, M, scene) {
         if (T.v < 0.5) continue;
         for (const b of T.boxes) {
           const dx = p.x - b.cx, dz = p.z - b.cz, along = dx * b.fx + dz * b.fz, lat = dx * -b.fz + dz * b.fx;
-          if (Math.abs(along) < 8.1 && Math.abs(lat) < 1.75 && p.y < b.top - 0.4 + along * b.grade && p.y + 1.7 > b.cy) return T;
+          if (Math.abs(along) < 8.1 && Math.abs(lat) < 1.62 && p.y < b.top - 0.4 + along * b.grade && p.y + 1.7 > b.cy) return T;
         }
       }
       return null;

@@ -39,8 +39,8 @@ const Sky = (() => {
   const S = { phase: 0.6, t: 0, night: 0, sun: V3(), dome: null };
   // keyframes by sun height (-1..1): colours for the dome, fog, light
   const K = [
-    { h: -0.35, top: '#0b1030', mid: '#18224a', hor: '#2c3a66', low: '#141a33', fog: '#1d2748', hemi: ['#5a6aa0', '#1a1a30', 0.42], sun: ['#7a8ad0', 0.15], cloud: '#2a3560' },
-    { h: -0.06, top: '#2a2a62', mid: '#7a4a88', hor: '#ff9a6a', low: '#3a2a50', fog: '#8a6a8a', hemi: ['#b08ab0', '#3a2a50', 0.5], sun: ['#ffa070', 0.45], cloud: '#e08a8a' },
+    { h: -0.35, top: '#101840', mid: '#22305e', hor: '#3a4a7a', low: '#1a2240', fog: '#2c3864', hemi: ['#8a9ad0', '#2c2c4c', 0.66], sun: ['#a8b8f0', 0.36], cloud: '#3a4878' },
+    { h: -0.06, top: '#2a2a62', mid: '#7a4a88', hor: '#ff9a6a', low: '#3a2a50', fog: '#8a6a8a', hemi: ['#b89ac0', '#3a2a50', 0.6], sun: ['#ffa070', 0.48], cloud: '#e08a8a' },
     { h: 0.08, top: '#4a6ab0', mid: '#e89a8a', hor: '#ffc88a', low: '#6a5a7a', fog: '#e8b098', hemi: ['#ffe0c8', '#6a5a7a', 0.6], sun: ['#ffc890', 0.75], cloud: '#ffd0b0' },
     { h: 0.3, top: '#3f7fd0', mid: '#7fb2e8', hor: '#cfe4f0', low: '#8a9ab0', fog: '#b8d0e0', hemi: ['#f4f8ff', '#6a7a5a', 0.56], sun: ['#fff2dc', 0.72], cloud: '#ffffff' },
     { h: 1.0, top: '#2f6fc8', mid: '#6aa8e8', hor: '#c8e2f2', low: '#8a9ab0', fog: '#b0cce0', hemi: ['#ffffff', '#6a7a5a', 0.6], sun: ['#fffaf0', 0.76], cloud: '#ffffff' },
@@ -122,6 +122,7 @@ const Sky = (() => {
     const wts = S.weights || { obs: 1 };
     for (const key in wts) { const A = AMB[key], w = wts[key]; if (!A || w < 0.001) continue; lm += A[0] * w; ambC.r += _a.set(A[1]).r * w; ambC.g += _a.g * w; ambC.b += _a.b * w; airC.r += _a.set(A[2]).r * w * A[3]; airC.g += _a.g * w * A[3]; airC.b += _a.b * w * A[3]; air += A[3] * w; wsum += w; }
     if (wsum > 0) { lm /= wsum; ambC.multiplyScalar(1 / wsum); } else { lm = 1; ambC.setRGB(1, 1, 1); }
+    lm = U.lerp(lm, 1, (S.night || 0) * 0.7);       // after dark the places dim less (it's dark enough)
     S.lm = U.damp(S.lm ?? lm, lm, 1.2, dt || 1);
     const fogC = _l.copy(k.fog); if (air > 0) fogC.lerp(airC.multiplyScalar(1 / air), Math.min(0.5, air) * (1 - S.night * 0.7));
     G.scene.fog.color.copy(fogC); G.renderer.setClearColor(fogC);
@@ -136,6 +137,7 @@ const Sky = (() => {
     M.wall.emissiveIntensity = S.night * 0.95;
     const wantMap = S.night > 0.55 ? M.wallNight : M.wallDay; if (M.wall.map !== wantMap) { M.wall.map = wantMap; M.wall.needsUpdate = true; }
     if (M.house) M.house.emissiveIntensity = S.night * 0.9;
+    if (M.pool) M.pool.opacity = S.night * 0.9;
     if (M.tower) M.tower.emissiveIntensity = S.night * 0.85;
     if (W.lighthouse) { W.lighthouse.piv.rotation.y += dt * 0.5; W.lighthouse.beam.material.opacity = S.night * 0.22; }
     M.lamp.color.copy(_a.copy(lampDay).lerp(lampNight, S.night)).multiplyScalar(0.75 + S.night * 0.5);

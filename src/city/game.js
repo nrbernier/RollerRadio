@@ -23,7 +23,7 @@ function makeNao() {
 
 // ---------- hooks: the player's moves, answered softly by the music ----------
 const hooks = {
-  jump(q) { Sound.sfx.jump(q !== 'miss'); },
+  jump(q) { Sound.sfx.jump(q !== 'miss'); Game.usedJump = true; },
   push(q) { Sound.sfx.push(q !== 'miss'); },
   trick(q) {
     const b = Game.W.bell, p = Game.player.pos;
@@ -55,7 +55,7 @@ function getUp() {
   for (let i = 0; i < W.metro.N; i += 3) { const q = W.metro.pts[i]; if (Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < 7 && Math.abs(q.y - p.pos.y) < 6) { onLine = true; break; } }
   if (onLine || Game.hitByTrain) {
     let best = null, bd = 1e9; for (const st of W.stations) { const d = Math.hypot(st.p.x - p.pos.x, st.p.z - p.pos.z); if (d < bd) { bd = d; best = st; } }
-    const sd = 1, o = METRO.deckW / 2 + 2.2;
+    const sd = 1, o = best.platOff;
     p.pos.set(best.p.x - best.p.dz * o * sd, best.platY, best.p.z + best.p.dx * o * sd); p.yaw = best.yaw;
   } else p.respawn(false);
   p.vel.set(0, 0, 0); p.mode = 'ground'; p.spinX = p.spinY = p.spinZ = 0;
@@ -106,28 +106,35 @@ function bindUI() {
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(true); });
 }
 function pause(on) {
-  if (on && Game.state === 'play') { Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100); }
+  if (on && Game.state === 'play') {
+    Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100);
+    const d = PLAN.byKey[Sound.place], R = Sound.REC[Sound.place];
+    $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm` : '';
+    $('howto').innerHTML = HOWTO.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join('');
+  }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }
 }
 
-// ---------- hints: a few words at the start, then nothing ----------
-const HINTS = U.isTouch ? [
-  { text: 'drag on the left to skate', done: () => Game.player.speed > 6 },
-  { text: 'drag on the right to look around', done: () => Math.abs(Game.cam.yaw - Game.player.yaw) > 0.8 },
-  { text: 'tap the big circle to jump — on the beat goes higher', done: () => Game.player.mode === 'air' },
-  { text: 'stop on a bench, or just stand still, to listen', done: () => Game.listen > 0.6, wait: 20 },
-] : [
-  { text: 'W A S D or the arrows to skate', done: () => Game.player.speed > 6 },
-  { text: 'space to jump — on the beat goes higher · shift for a flourish', done: () => Game.player.mode === 'air' },
-  { text: 'drag the mouse to look around', done: () => Math.abs(Game.cam.yaw - Game.player.yaw) > 0.8 },
-  { text: 'stop on a bench, or just stand still, to listen', done: () => Game.listen > 0.6, wait: 20 },
-];
+// ---------- no words on screen: the labels on the circles fade once you've used them ----------
 function updateHints(dt) {
-  if (Game.hintI >= HINTS.length) return;
-  const h = HINTS[Game.hintI]; Game.hintT += dt;
-  if (!Game.hintShown && Game.hintT > (Game.hintI === 0 ? 2.5 : h.wait || 2.2)) { Game.hintShown = true; Game.hintT = 0; $('hint').textContent = h.text; $('hint').classList.add('show'); }
-  if (Game.hintShown && (h.done() || Game.hintT > 12)) { $('hint').classList.remove('show'); Game.hintI++; Game.hintShown = false; Game.hintT = 0; if (Game.hintI >= 3) document.body.classList.add('quiet'); }
+  if (document.body.classList.contains('quiet')) return;
+  Game.hintT += dt;
+  if ((Game.usedJump && Game.player.speed > 4) || Game.hintT > 30) document.body.classList.add('quiet');
 }
+const HOWTO = U.isTouch ? [['Skate', 'drag on the left half'], ['Look', 'drag on the right half'], ['Jump', 'big circle — on the beat goes higher'], ['Flourish', 'small circle (in the air: a trick)'], ['Grind', 'jump onto any rail, ledge or cable'], ['Listen', 'stop on a bench, or stand still']]
+  : [['Skate', 'W A S D or the arrows'], ['Look', 'drag the mouse, or Q / E'], ['Jump', 'space — on the beat goes higher'], ['Flourish', 'shift (in the air: a trick)'], ['Grind', 'jump onto any rail, ledge or cable'], ['Listen', 'stop on a bench, or stand still'], ['Pause', 'Esc']];
+// iOS zooms in on a quick double tap even when zoom is disabled: stop it (and pinches)
+function preventZoom() {
+  const stop = (e) => e.preventDefault();
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, stop, { passive: false });
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  let lastEnd = 0;
+  document.addEventListener('touchend', (e) => { const now = e.timeStamp; if (now - lastEnd < 350 && !e.target.closest('input')) e.preventDefault(); lastEnd = now; }, { passive: false });
+  document.addEventListener('dblclick', stop, { passive: false });
+  window.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+  window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) e.preventDefault(); });
+}
+preventZoom();
 
 // ---------- the world reacting to you ----------
 const _sq = [], _dw = {};
@@ -251,9 +258,6 @@ function loop(now) {
     const ground = p.ground;
     Sound.update(dt, { speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
     updateHints(dt);
-    // the name of the place, softly, when you arrive somewhere new
-    if (Sound.place !== Game.lastPlace) { Game.lastPlace = Sound.place; const d = PLAN.byKey[Sound.place]; if (d && Game.t > 3) { $('place').textContent = d.name; $('place').classList.add('show'); Game.placeT = 4.5; } }
-    if (Game.placeT > 0) { Game.placeT -= dt; if (Game.placeT <= 0) $('place').classList.remove('show'); }
   } else if (Game.state === 'title') {
     // a slow flight over the city
     // a slow glide high above the old town and the observatory, looking down the slope to the lake

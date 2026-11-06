@@ -67,7 +67,7 @@ class CellBatch extends StaticBatch {
       g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
       const mesh = new THREE.Mesh(g, materials[name] || materials.plain);
-      if (name === 'water' || name === 'glow' || name === 'lamp') mesh.renderOrder = 3;
+      if (name === 'water' || name === 'glow' || name === 'lamp' || name === 'pool') mesh.renderOrder = 3;
       cellOf(ck).add(mesh);
     }
     for (const key in this.cellLines) {
@@ -183,6 +183,8 @@ function cityMaterials() {
   }, { repeat: true }).tex;
   M.ground = new THREE.MeshToonMaterial({ vertexColors: true, map: noise, gradientMap: G.grad });
   M.far = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // pools of lamplight on the ground (only visible at night)
+  M.pool = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 });
   M.hills = new THREE.MeshLambertMaterial({ vertexColors: true });
   // things lying on the ground are pulled towards the camera so they never flicker into the terrain
   const decal = (map, f = -2) => new THREE.MeshToonMaterial({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: f, polygonOffsetUnits: f * 2 });

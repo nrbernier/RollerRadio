@@ -75,7 +75,23 @@ function districtKit(K, S, F) {
     else { B.box(x - 0.32, y + h - 0.1, z - 0.32, x + 0.32, y + h + 0.05, z + 0.32, col, 'plain', { outlineT: 0.02, edges: false }); B.box(x - 0.24, y + h - 0.5, z - 0.24, x + 0.24, y + h - 0.1, z + 0.24, o.glow || '#ffe2a6', 'lamp', { outlineT: 0.02, edges: false }); }
     W.boxes.push({ x0: x - 0.14, y0: y - 1, z0: z - 0.14, x1: x + 0.14, y1: y + h, z1: z + 0.14, tag: 'lamp' });
     W.lamps.push([x, y + h, z]);
+    H.pool(x, z, Math.min(9, 3 + h * 0.9), o.glow === '#ffb36a' ? '#ff9a4a' : '#ffc870', o.y);
     if (o.sound !== false) H.sound(x, y + 1, z, 1.6, o.sound || 'lamp');
+  };
+  // a warm disc of light on whatever is under the lamp (additive: black at the rim adds nothing)
+  const _pc = new THREE.Color(), _pk = new THREE.Color('#000000');
+  H.pool = (x, z, r, col, yFixed) => {
+    const n = 14, pos = [], cols = [], c = _pc.set(col);
+    const y0 = yFixed !== undefined ? yFixed + 0.14 : W.groundAt ? terrainAt(x, z) + 0.14 : terrainAt(x, z) + 0.14;
+    const at = (a, rr) => { const px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr; return [px, yFixed !== undefined ? yFixed + 0.14 : terrainAt(px, pz) + 0.14, pz]; };
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2;
+      pos.push(x, y0, z, ...at(a1, r), ...at(a0, r)); cols.push(c.r, c.g, c.b, 0, 0, 0, 0, 0, 0);
+    }
+    // straight into the batch's pool bucket (its own colours, no shading)
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    const b = B.bucket('pool', x, z), P = g.attributes.position.array;
+    for (let i = 0; i < P.length; i += 3) { b.pos.push(P[i], P[i + 1], P[i + 2]); b.nor.push(0, 1, 0); b.col.push(cols[i], cols[i + 1], cols[i + 2]); b.uv.push(0, 0); }
   };
   H.bench = (x, z, alongX = true, o = {}) => {
     const y = o.y ?? terrainAt(x, z) + 0.02;

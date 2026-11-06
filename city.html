@@ -53,12 +53,7 @@ body.playing #btnPause { display: block; }
 #btnPause::before { left: 14px; } #btnPause::after { right: 14px; }
 
 /* words */
-#hint { position: fixed; z-index: 5; left: 50%; bottom: calc(26px + var(--sab)); transform: translate(-50%, 10px); opacity: 0; transition: opacity 1.1s, transform 1.1s; max-width: min(460px, 70vw); text-align: center; font-family: var(--f-title); font-weight: 300; font-size: clamp(16px, 2.3vw, 20px); line-height: 1.45; color: var(--paper); text-shadow: 0 1px 14px rgba(0,0,0,.45), 0 0 2px rgba(0,0,0,.3); pointer-events: none; }
-#hint.show { opacity: 1; transform: translate(-50%, 0); }
-body.touch #hint { bottom: calc(190px + var(--sab)); }
-#place { position: fixed; z-index: 5; left: calc(22px + var(--sal)); top: calc(18px + var(--sat)); font-family: var(--f-title); font-weight: 300; font-size: 15px; letter-spacing: .14em; text-transform: lowercase; color: var(--paper); text-shadow: 0 1px 10px rgba(0,0,0,.4); opacity: 0; transition: opacity 2s; pointer-events: none; }
-#place.show { opacity: .85; }
-
+body.touch 
 /* title */
 .overlay { position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; text-align: center; padding: 24px; }
 #title { cursor: pointer; background: radial-gradient(ellipse at 50% 60%, rgba(14,26,36,.0), rgba(14,26,36,.35)); }
@@ -79,6 +74,11 @@ body.touch #hint { bottom: calc(190px + var(--sab)); }
 .card button { flex: 1; padding: 11px 14px; border-radius: 12px; border: 1.5px solid #1b1a24; background: transparent; font-size: 14px; }
 .card button.main { background: #1b1a24; color: var(--paper); }
 .card small { display: block; margin-top: 14px; font-size: 12px; line-height: 1.5; opacity: .65; }
+.card .where { margin: -8px 0 10px; font-family: var(--f-title); font-size: 17px; opacity: .8; }
+.card .howto { margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.55; }
+.card .howto li { display: grid; grid-template-columns: 7.5em 1fr; gap: 10px; }
+.card .howto b { font-weight: 500; opacity: .7; }
+#pause { overflow-y: auto; }
 </style>
 <div id="loading">building the city…</div>
 </head><body><canvas id="gl"></canvas>
@@ -89,8 +89,6 @@ body.touch #hint { bottom: calc(190px + var(--sab)); }
   <button class="pad-btn" id="btnJump" aria-label="Jump"><span>jump</span></button>
 </div>
 <button id="btnPause" aria-label="Pause"></button>
-<div id="place"></div>
-<div id="hint"></div>
 <div id="fade"></div>
 <div id="title" class="overlay" hidden>
   <div>
@@ -103,11 +101,13 @@ body.touch #hint { bottom: calc(190px + var(--sab)); }
 <div id="pause" class="overlay" hidden>
   <div class="card">
     <h2>Resting</h2>
+    <p class="where" id="where"></p>
     <label>Music <input id="volMusic" type="range" min="0" max="100" value="85"></label>
     <label>Sounds <input id="volFx" type="range" min="0" max="100" value="80"></label>
     <label>Time of day <input id="tod" type="range" min="0" max="100" value="60"></label>
     <div class="row"><button class="main" id="btnResume">Carry on</button></div>
-    <small>Skate anywhere. Stand still on a bench to listen. Nothing to win, nothing to collect.</small>
+    <ul class="howto" id="howto"></ul>
+    <small>Nothing to win, nothing to collect. Stop on a bench, or just stand still, to listen.</small>
   </div>
 </div>
 
@@ -2815,7 +2815,7 @@ class CellBatch extends StaticBatch {
       g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
       const mesh = new THREE.Mesh(g, materials[name] || materials.plain);
-      if (name === 'water' || name === 'glow' || name === 'lamp') mesh.renderOrder = 3;
+      if (name === 'water' || name === 'glow' || name === 'lamp' || name === 'pool') mesh.renderOrder = 3;
       cellOf(ck).add(mesh);
     }
     for (const key in this.cellLines) {
@@ -2931,6 +2931,8 @@ function cityMaterials() {
   }, { repeat: true }).tex;
   M.ground = new THREE.MeshToonMaterial({ vertexColors: true, map: noise, gradientMap: G.grad });
   M.far = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // pools of lamplight on the ground (only visible at night)
+  M.pool = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 });
   M.hills = new THREE.MeshLambertMaterial({ vertexColors: true });
   // things lying on the ground are pulled towards the camera so they never flicker into the terrain
   const decal = (map, f = -2) => new THREE.MeshToonMaterial({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: f, polygonOffsetUnits: f * 2 });
@@ -3615,32 +3617,49 @@ function buildMetro(K, M, S, F) {
     q(L(a, hw - 1.3, -1.5), L(b, hw - 1.3, -1.5), L(b, -hw + 1.3, -1.5), L(a, -hw + 1.3, -1.5));   // underside
     q(L(a, hw, -0.6), L(b, hw, -0.6), L(b, hw - 1.3, -1.5), L(a, hw - 1.3, -1.5));
     q(L(a, -hw + 1.3, -1.5), L(b, -hw + 1.3, -1.5), L(b, -hw, -0.6), L(a, -hw, -0.6));
-    // ballast + running rails, painted on top
-    for (const side of [-1, 1]) {
-      const c = side * METRO.trackOff;
-      q(L(a, c - 1.3, 0.04), L(b, c - 1.3, 0.04), L(b, c + 1.3, 0.04), L(a, c + 1.3, 0.04));
-    }
   }
   // split the deck triangles: top/sides go to concrete, ballast strips darker
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
   B.add(g, null, deckCol, 'plain', { outlineT: 0, edges: false });
-  // rails: thin dark strips + hidden grindable rails
-  const railPos = [];
+  // the track bed: ballast with sleepers (textured along the line, in chunks so cells can cull it)
+  const tex = canvasTex(128, 128, (x, w, h) => {
+    const r = U.rng(3); x.fillStyle = '#8f877a'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${40 + r() * 60},${40 + r() * 50},${35 + r() * 40},${0.25 + r() * 0.3})`; x.fillRect(r() * w, r() * h, 2 + r() * 3, 2 + r() * 3); }
+    for (const y of [10, 74]) { x.fillStyle = '#5a4636'; x.fillRect(6, y, w - 12, 40); x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(6, y, w - 12, 5); x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(6, y + 36, w - 12, 4); }
+  }, { repeat: true }).tex;
+  const bedMat = new THREE.MeshToonMaterial({ map: tex, gradientMap: G.grad, color: 0xffffff });
+  for (let c0 = 0; c0 < N; c0 += 40) {
+    const pos2 = [], uv2 = [];
+    for (let i = c0; i < Math.min(N, c0 + 40); i++) {
+      const a = M.pts[i], b = M.pts[(i + 1) % N], va = i * M.step / 1.2, vb = (i + 1) * M.step / 1.2;
+      for (const side of [-1, 1]) {
+        const c = side * METRO.trackOff;
+        pos2.push(...L(a, c - 1.35, 0.12), ...L(b, c - 1.35, 0.12), ...L(b, c + 1.35, 0.12), ...L(a, c - 1.35, 0.12), ...L(b, c + 1.35, 0.12), ...L(a, c + 1.35, 0.12));
+        uv2.push(0, va, 0, vb, 1, vb, 0, va, 1, vb, 1, va);
+      }
+    }
+    const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(pos2, 3)); g2.setAttribute('uv', new THREE.Float32BufferAttribute(uv2, 2)); g2.computeVertexNormals();
+    const mid = M.pts[Math.min(N - 1, c0 + 20)];
+    (W.cellExtras || (W.cellExtras = [])).push({ mesh: new THREE.Mesh(g2, bedMat), x: mid.x, z: mid.z });
+  }
+  // the running rails: shiny heads on dark webs, standing proud of the sleepers
+  const top = [], web = [];
   for (let i = 0; i < N; i++) {
     const a = M.pts[i], b = M.pts[(i + 1) % N];
-    for (const side of [-1, 1]) for (const r of [-0.7, 0.7]) {
-      const c = side * METRO.trackOff + r;
-      railPos.push(...L(a, c - 0.06, 0.2), ...L(b, c - 0.06, 0.2), ...L(b, c + 0.06, 0.2), ...L(a, c - 0.06, 0.2), ...L(b, c + 0.06, 0.2), ...L(a, c + 0.06, 0.2));
+    for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) {
+      const c = side * METRO.trackOff + r, h = 0.36, f = 0.16;
+      top.push(...L(a, c - 0.07, h), ...L(b, c - 0.07, h), ...L(b, c + 0.07, h), ...L(a, c - 0.07, h), ...L(b, c + 0.07, h), ...L(a, c + 0.07, h));
+      web.push(...L(a, c + 0.07, h), ...L(b, c + 0.07, h), ...L(b, c + 0.07, f), ...L(a, c + 0.07, h), ...L(b, c + 0.07, f), ...L(a, c + 0.07, f));
+      web.push(...L(a, c - 0.07, f), ...L(b, c - 0.07, f), ...L(b, c - 0.07, h), ...L(a, c - 0.07, f), ...L(b, c - 0.07, h), ...L(a, c - 0.07, h));
     }
   }
-  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(railPos, 3)); rg.computeVertexNormals();
-  B.add(rg, null, '#3a3a48', 'plain', { outlineT: 0, edges: false });
-  const ball = []; for (let i = 0; i < N; i++) { const a = M.pts[i], b = M.pts[(i + 1) % N]; for (const side of [-1, 1]) { const c = side * METRO.trackOff; ball.push(...L(a, c - 1.2, 0.06), ...L(b, c - 1.2, 0.06), ...L(b, c + 1.2, 0.06), ...L(a, c - 1.2, 0.06), ...L(b, c + 1.2, 0.06), ...L(a, c + 1.2, 0.06)); } }
-  const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(ball, 3)); bg.computeVertexNormals();
-  B.add(bg, null, '#8a8478', 'paving', { outlineT: 0, edges: false });
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); tg.computeVertexNormals();
+  B.add(tg, null, '#e6e9ef', 'plain', { outlineT: 0, edges: false });
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(web, 3)); wg.computeVertexNormals();
+  B.add(wg, null, '#4a4e58', 'plain', { outlineT: 0, edges: false });
   // grindable running rails (in long runs, so grinding carries you far)
-  const run = (side, r) => { const P = []; for (let i = 0; i <= N; i++) { const p = M.pts[i % N]; P.push(L(p, side * METRO.trackOff + r, 0.25)); } return P; };
-  for (const side of [-1, 1]) for (const r of [-0.7, 0.7]) K.rail(run(side, r), { hidden: true, loop: false, round: 0 });
+  const run = (side, r) => { const P = []; for (let i = 0; i <= N; i++) { const p = M.pts[i % N]; P.push(L(p, side * METRO.trackOff + r, 0.38)); } return P; };
+  for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) K.rail(run(side, r), { hidden: true, loop: false, round: 0 });
   // handrails along both edges (grindable; they also stop you skating off)
   const halfI = Math.ceil(METRO.platLen / 2 / M.step) + 2;
   const atStation = (i) => M.stations.some(st => { const d = Math.abs(((i - st.i) % N + N + N / 2) % N - N / 2); return d <= halfI; });
@@ -3710,65 +3729,75 @@ function stationSign(name) {
   }).tex;
 }
 function buildStations(K, M, S, F) {
-  const W = K.W, hw = METRO.deckW / 2;
+  const W = K.W, B = K.B, N = M.N;
   W.stations = [];
+  const IN = 3.95, WIDTH = 4.6, PH = 1.2, CAN = 6.6;      // platform starts right where the train ends
+  const L = (p, o, dy = 0) => [p.x - p.dz * o, p.y + dy, p.z + p.dx * o];
+  const quads = { plat: [], edge: [], side: [], can: [] };
+  const q = (arr, a, b, c, d) => arr.push(...a, ...b, ...c, ...a, ...c, ...d);
   for (const st of M.stations) {
-    const p = M.pts[st.i], yaw = Math.atan2(p.dx, p.dz), half = METRO.platLen / 2;
-    const fx = p.dx, fz = p.dz, rx = -p.dz, rz = p.dx;
-    const at = (along, side) => [p.x + fx * along + rx * side, p.z + fz * along + rz * side];
-    // side platforms, a little higher than the deck, with canopies
+    const p = M.pts[st.i], yaw = Math.atan2(p.dx, p.dz), hn = Math.round(METRO.platLen / 2 / M.step);
+    const idx = (k) => (st.i + k + N) % N;
     for (const sd of [-1, 1]) {
-      const o = sd * (hw + 2.2);
-      const [x0, z0] = at(-half, o), [x1, z1] = at(half, o);
-      S.add(x0, p.y + 1.2, z0, x1, p.y + 1.2, z1, 2.4);
-      const m = new THREE.Matrix4().makeRotationY(yaw);
-      K.B.add(new THREE.BoxGeometry(4.8, 2.6, METRO.platLen), m.clone().setPosition(p.x + rx * o, p.y - 0.1, p.z + rz * o), '#d8d0c0', 'paving', { outlineT: 0.08 });
-      // canopy on posts
-      K.B.add(new THREE.BoxGeometry(5.6, 0.35, METRO.platLen * 0.7), m.clone().setPosition(p.x + rx * (o + sd * 0.3), p.y + 6.6, p.z + rz * (o + sd * 0.3)), st.key === 'central' ? '#e4572e' : '#7aa6b8', 'plain', { outlineT: 0.08 });
-      for (let a = -half * 0.65; a <= half * 0.65; a += 11) { const [px, pz] = at(a, o + sd * 1.8); K.cyl(px, p.y + 1.2, pz, 0.14, 5.4, '#3a3550', { outline: 0.03, seg: 6 }); W.boxes.push({ x0: px - 0.2, y0: p.y + 1.2, z0: pz - 0.2, x1: px + 0.2, y1: p.y + 6.6, z1: pz + 0.2 }); }
-      // signs
-      // name boards on the canopy edge: one facing the tracks, one facing the street
-      const smat = W.signMats || (W.signMats = {}); const sm = smat[st.name] || (smat[st.name] = new THREE.MeshBasicMaterial({ map: stationSign(st.name) }));
-      for (const face of [-1, 1]) {
-        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm);
-        const off = o + sd * (face < 0 ? -2.75 : 3.05);
-        const [sx, sz] = at(face < 0 ? -12 : 12, off); sign.position.set(sx, p.y + 7.6, sz);
-        sign.rotation.y = Math.atan2(rx * sd * face, rz * sd * face); K.scene.add(sign);
+      const oi = sd * IN, oo = sd * (IN + WIDTH), om = sd * (IN + WIDTH / 2);
+      for (let k = -hn; k < hn; k++) {
+        const a = M.pts[idx(k)], b = M.pts[idx(k + 1)];
+        const A = sd > 0 ? [oi, oo] : [oo, oi];
+        q(quads.plat, L(a, A[0], PH), L(b, A[0], PH), L(b, A[1], PH), L(a, A[1], PH));
+        // the yellow line along the edge, the face down to the track, the back wall
+        const e0 = sd * (IN + 0.05), e1 = sd * (IN + 0.45), E = sd > 0 ? [e0, e1] : [e1, e0];
+        q(quads.edge, L(a, E[0], PH + 0.02), L(b, E[0], PH + 0.02), L(b, E[1], PH + 0.02), L(a, E[1], PH + 0.02));
+        if (sd > 0) { q(quads.side, L(a, oi, 0), L(b, oi, 0), L(b, oi, PH), L(a, oi, PH)); q(quads.side, L(a, oo, PH), L(b, oo, PH), L(b, oo, -2.2), L(a, oo, -2.2)); }
+        else { q(quads.side, L(a, oi, PH), L(b, oi, PH), L(b, oi, 0), L(a, oi, 0)); q(quads.side, L(a, oo, -2.2), L(b, oo, -2.2), L(b, oo, PH), L(a, oo, PH)); }
+        S.add(...L(a, om, PH), ...L(b, om, PH), WIDTH / 2);
+        // canopy over the middle two thirds
+        if (Math.abs(k) < hn * 0.7) {
+          const c0 = sd * (IN + 0.3), c1 = sd * (IN + WIDTH + 0.6), C = sd > 0 ? [c0, c1] : [c1, c0];
+          q(quads.can, L(a, C[0], CAN), L(b, C[0], CAN), L(b, C[1], CAN), L(a, C[1], CAN));
+          q(quads.can, L(a, C[1], CAN - 0.3), L(b, C[1], CAN - 0.3), L(b, C[0], CAN - 0.3), L(a, C[0], CAN - 0.3));
+          if (k % 4 === 0) { const [px, , pz] = L(a, sd * (IN + WIDTH - 0.6)); K.cyl(px, p.y + PH, pz, 0.14, CAN - PH, '#3a3550', { outline: 0.03, seg: 6 }); W.boxes.push({ x0: px - 0.2, y0: p.y + PH, z0: pz - 0.2, x1: px + 0.2, y1: p.y + CAN, z1: pz + 0.2 }); }
+        }
+        if (k % 3 === 0) { const [fx, , fz] = L(a, om); F.add(new THREE.BoxGeometry(WIDTH - 0.4, 2, M.step * 3), new THREE.Matrix4().makeRotationY(Math.atan2(a.dx, a.dz)).setPosition(fx, p.y - 0.2, fz), '#c8c0b0'); }
       }
-      // benches
-      for (const a of [-20, 20]) { const [bx, bz] = at(a, o + sd * 1.3); K.bench(bx, bz, Math.abs(fx) > Math.abs(fz), p.y + 1.2, '#c97a3c', false); }
-      F.add(new THREE.BoxGeometry(4.4, 2, METRO.platLen - 2), m.clone().setPosition(p.x + rx * o, p.y - 0.3, p.z + rz * o), '#c8c0b0');
+      // name boards and benches along the platform
+      const smat = W.signMats || (W.signMats = {}); const sm = smat[st.name] || (smat[st.name] = new THREE.MeshBasicMaterial({ map: stationSign(st.name) }));
+      for (const [k, face] of [[-4, -1], [4, 1]]) {
+        const a = M.pts[idx(k)], [sx, , sz] = L(a, sd * (face < 0 ? IN + 0.35 : IN + WIDTH + 0.65), CAN + 0.9);
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm); sign.position.set(sx, p.y + CAN + 0.9, sz);
+        const nx = a.dz * sd * face, nz = -a.dx * sd * face; sign.rotation.y = Math.atan2(nx, nz); K.scene.add(sign);
+      }
+      for (const k of [-8, 8]) { const a = M.pts[idx(k)], [bx, , bz] = L(a, sd * (IN + WIDTH - 1.3)); K.bench(bx, bz, Math.abs(a.dx) > Math.abs(a.dz), p.y + PH, '#c97a3c', false); W.benches.push({ x: bx, y: p.y + PH, z: bz, alongX: Math.abs(a.dx) > Math.abs(a.dz) }); }
     }
-    // ramps down to the street on both sides, heading away from the line
+    // ramps down to the street, leaving each platform end at an angle, away from the line
     const ramps = [];
     for (const sd of [-1, 1]) {
-      const o = sd * (hw + 4.4);
-      // ramp runs along the line from the platform end back down to the ground
-      const startA = half - 4, [sx, sz] = at(sd > 0 ? startA : -startA, o + sd * 1.6);
-      const dirA = sd > 0 ? 1 : -1;
+      const kEnd = sd > 0 ? hn : -hn, e = M.pts[idx(kEnd)], dirA = sd > 0 ? 1 : -1;
+      const tx = e.dx * dirA, tz = e.dz * dirA, ox = -e.dz * sd, oz = e.dx * sd;
+      const ux = tx * 0.86 + ox * 0.5, uz = tz * 0.86 + oz * 0.5;
+      const [sx, , sz] = L(e, sd * (IN + WIDTH / 2), PH);
       let len = 30, gy = 0;
-      for (len = 30; len < 140; len += 4) { const [ex, ez] = at(dirA * (startA + len), o + sd * 1.6); gy = terrainAt(ex, ez); if ((p.y + 1.2 - gy) / len < 0.14) break; }
-      const [ex, ez] = at(dirA * (startA + len), o + sd * 1.6);
-      gy = terrainAt(ex, ez);
-      S.add(sx, p.y + 1.2, sz, ex, gy, ez, 1.8);
-      // its visible deck + side walls + posts
-      const n = Math.ceil(len / 6);
+      for (len = 30; len < 150; len += 4) { gy = terrainAt(sx + ux * len, sz + uz * len); if ((p.y + PH - gy) / len < 0.13) break; }
+      const ex = sx + ux * len, ez = sz + uz * len; gy = terrainAt(ex, ez);
+      S.add(sx, p.y + PH, sz, ex, gy, ez, 1.9);
+      const ryaw = Math.atan2(ux, uz), n = Math.ceil(len / 6);
       for (let k = 0; k < n; k++) {
-        const t0 = k / n, t1 = (k + 1) / n;
-        const ax = U.lerp(sx, ex, t0), az = U.lerp(sz, ez, t0), ay = U.lerp(p.y + 1.2, gy, t0), bx = U.lerp(sx, ex, t1), bz = U.lerp(sz, ez, t1), by = U.lerp(p.y + 1.2, gy, t1);
-        const mid = V3((ax + bx) / 2, (ay + by) / 2 - 0.25, (az + bz) / 2), segL = Math.hypot(bx - ax, bz - az), pitch = Math.atan2(ay - by, segL);
-        const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(dirA > 0 ? pitch : -pitch, yaw, 0, 'YXZ')).setPosition(mid);
-        K.B.add(new THREE.BoxGeometry(3.8, 0.5, segL + 0.05), m, '#cfc7b8', 'paving', { outlineT: 0, edges: false });
+        const t0 = k / n, t1 = (k + 1) / n, ay = U.lerp(p.y + PH, gy, t0), by = U.lerp(p.y + PH, gy, t1);
+        const mid = V3(sx + ux * len * (t0 + t1) / 2, (ay + by) / 2 - 0.25, sz + uz * len * (t0 + t1) / 2), segL = len / n;
+        B.add(new THREE.BoxGeometry(3.9, 0.5, segL + 0.05), new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.atan2(ay - by, segL), ryaw, 0, 'YXZ')).setPosition(mid), '#cfc7b8', 'paving', { outlineT: 0.05, edges: false });
         const g2 = terrainAt(mid.x, mid.z);
-        if (mid.y - g2 > 1.5 && k % 2 === 0) { K.cyl(mid.x, g2 - 0.5, mid.z, 0.5, mid.y - g2, '#b8b0a2', { outline: 0.05, seg: 8 }); W.boxes.push({ x0: mid.x - 0.5, y0: g2 - 1, z0: mid.z - 0.5, x1: mid.x + 0.5, y1: mid.y - 0.6, z1: mid.z + 0.5, tag: 'pillar' }); }
+        if (mid.y - g2 > 1.5 && k % 2 === 0) { K.cyl(mid.x, g2 - 0.5, mid.z, 0.45, mid.y - g2, '#b8b0a2', { outline: 0.05, seg: 8 }); W.boxes.push({ x0: mid.x - 0.45, y0: g2 - 1, z0: mid.z - 0.45, x1: mid.x + 0.45, y1: mid.y - 0.6, z1: mid.z + 0.45, tag: 'pillar' }); }
       }
-      // handrail on the outer edge
-      const rp = []; for (let k = 0; k <= n; k++) { const t = k / n; rp.push([U.lerp(sx, ex, t) + rx * sd * 1.75, U.lerp(p.y + 1.2, gy, t) + 1.0, U.lerp(sz, ez, t) + rz * sd * 1.75]); }
-      K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.3, round: 0, radius: 0.06 });
+      for (const side of [-1, 1]) {
+        const rx = -uz * side * 1.8, rz = ux * side * 1.8, rp = [];
+        for (let k = 0; k <= n; k++) { const t = k / n; rp.push([sx + ux * len * t + rx, U.lerp(p.y + PH, gy, t) + 1.0, sz + uz * len * t + rz]); }
+        K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.3, round: 0, radius: 0.06 });
+      }
       ramps.push({ from: [sx, sz], to: [ex, ez] });
     }
-    W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + 1.2 }));
+    W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 }));
   }
+  const mk = (arr, col, kind) => { if (!arr.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
+  mk(quads.plat, '#d8d0c0', 'paving'); mk(quads.edge, '#e8c84a', 'paint'); mk(quads.side, '#b9b1a2', 'plain'); mk(quads.can, '#7aa6b8', 'plain');
 }
 
 // ---------- sloped slabs you can skate on (viaduct deck, ramps, bridges) ----------
@@ -3881,7 +3910,7 @@ function makeTrains(W, M, scene) {
         if (T.v < 0.5) continue;
         for (const b of T.boxes) {
           const dx = p.x - b.cx, dz = p.z - b.cz, along = dx * b.fx + dz * b.fz, lat = dx * -b.fz + dz * b.fx;
-          if (Math.abs(along) < 8.1 && Math.abs(lat) < 1.75 && p.y < b.top - 0.4 + along * b.grade && p.y + 1.7 > b.cy) return T;
+          if (Math.abs(along) < 8.1 && Math.abs(lat) < 1.62 && p.y < b.top - 0.4 + along * b.grade && p.y + 1.7 > b.cy) return T;
         }
       }
       return null;
@@ -3976,7 +4005,15 @@ function buildCity() {
   const K = makeKit({
     name: 'Rubato', killY: -30, batch: B,
     phys: { friction: 0.5, fastFriction: 0.55, overDecay: 0.6, slopeK: 0.45, drag: 0.0012, climb: 1.6 },
-    buildBatch: (b, W) => { W.cells = b.buildCells(mats); for (const g of W.cells.values()) W.group.add(g); }
+    buildBatch: (b, W) => {
+      W.cells = b.buildCells(mats);
+      for (const e of (W.cellExtras || [])) {
+        const key = Math.floor(e.x / CELL) + ',' + Math.floor(e.z / CELL);
+        let g = W.cells.get(key); if (!g) { g = new THREE.Group(); g.userData = { cx: (Math.floor(e.x / CELL) + 0.5) * CELL, cz: (Math.floor(e.z / CELL) + 0.5) * CELL }; W.cells.set(key, g); }
+        g.add(e.mesh);
+      }
+      for (const g of W.cells.values()) W.group.add(g);
+    }
   });
   const W = K.W;
   W.far = F; W.slabs = S; W.mats = mats; W.sounds = []; W.spots = []; W.benches = []; W.lamps = []; W.npcs = []; W.vehicles = [];
@@ -4189,7 +4226,23 @@ function districtKit(K, S, F) {
     else { B.box(x - 0.32, y + h - 0.1, z - 0.32, x + 0.32, y + h + 0.05, z + 0.32, col, 'plain', { outlineT: 0.02, edges: false }); B.box(x - 0.24, y + h - 0.5, z - 0.24, x + 0.24, y + h - 0.1, z + 0.24, o.glow || '#ffe2a6', 'lamp', { outlineT: 0.02, edges: false }); }
     W.boxes.push({ x0: x - 0.14, y0: y - 1, z0: z - 0.14, x1: x + 0.14, y1: y + h, z1: z + 0.14, tag: 'lamp' });
     W.lamps.push([x, y + h, z]);
+    H.pool(x, z, Math.min(9, 3 + h * 0.9), o.glow === '#ffb36a' ? '#ff9a4a' : '#ffc870', o.y);
     if (o.sound !== false) H.sound(x, y + 1, z, 1.6, o.sound || 'lamp');
+  };
+  // a warm disc of light on whatever is under the lamp (additive: black at the rim adds nothing)
+  const _pc = new THREE.Color(), _pk = new THREE.Color('#000000');
+  H.pool = (x, z, r, col, yFixed) => {
+    const n = 14, pos = [], cols = [], c = _pc.set(col);
+    const y0 = yFixed !== undefined ? yFixed + 0.14 : W.groundAt ? terrainAt(x, z) + 0.14 : terrainAt(x, z) + 0.14;
+    const at = (a, rr) => { const px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr; return [px, yFixed !== undefined ? yFixed + 0.14 : terrainAt(px, pz) + 0.14, pz]; };
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2;
+      pos.push(x, y0, z, ...at(a1, r), ...at(a0, r)); cols.push(c.r, c.g, c.b, 0, 0, 0, 0, 0, 0);
+    }
+    // straight into the batch's pool bucket (its own colours, no shading)
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    const b = B.bucket('pool', x, z), P = g.attributes.position.array;
+    for (let i = 0; i < P.length; i += 3) { b.pos.push(P[i], P[i + 1], P[i + 2]); b.nor.push(0, 1, 0); b.col.push(cols[i], cols[i + 1], cols[i + 2]); b.uv.push(0, 0); }
   };
   H.bench = (x, z, alongX = true, o = {}) => {
     const y = o.y ?? terrainAt(x, z) + 0.02;
@@ -4994,8 +5047,8 @@ const Sky = (() => {
   const S = { phase: 0.6, t: 0, night: 0, sun: V3(), dome: null };
   // keyframes by sun height (-1..1): colours for the dome, fog, light
   const K = [
-    { h: -0.35, top: '#0b1030', mid: '#18224a', hor: '#2c3a66', low: '#141a33', fog: '#1d2748', hemi: ['#5a6aa0', '#1a1a30', 0.42], sun: ['#7a8ad0', 0.15], cloud: '#2a3560' },
-    { h: -0.06, top: '#2a2a62', mid: '#7a4a88', hor: '#ff9a6a', low: '#3a2a50', fog: '#8a6a8a', hemi: ['#b08ab0', '#3a2a50', 0.5], sun: ['#ffa070', 0.45], cloud: '#e08a8a' },
+    { h: -0.35, top: '#101840', mid: '#22305e', hor: '#3a4a7a', low: '#1a2240', fog: '#2c3864', hemi: ['#8a9ad0', '#2c2c4c', 0.66], sun: ['#a8b8f0', 0.36], cloud: '#3a4878' },
+    { h: -0.06, top: '#2a2a62', mid: '#7a4a88', hor: '#ff9a6a', low: '#3a2a50', fog: '#8a6a8a', hemi: ['#b89ac0', '#3a2a50', 0.6], sun: ['#ffa070', 0.48], cloud: '#e08a8a' },
     { h: 0.08, top: '#4a6ab0', mid: '#e89a8a', hor: '#ffc88a', low: '#6a5a7a', fog: '#e8b098', hemi: ['#ffe0c8', '#6a5a7a', 0.6], sun: ['#ffc890', 0.75], cloud: '#ffd0b0' },
     { h: 0.3, top: '#3f7fd0', mid: '#7fb2e8', hor: '#cfe4f0', low: '#8a9ab0', fog: '#b8d0e0', hemi: ['#f4f8ff', '#6a7a5a', 0.56], sun: ['#fff2dc', 0.72], cloud: '#ffffff' },
     { h: 1.0, top: '#2f6fc8', mid: '#6aa8e8', hor: '#c8e2f2', low: '#8a9ab0', fog: '#b0cce0', hemi: ['#ffffff', '#6a7a5a', 0.6], sun: ['#fffaf0', 0.76], cloud: '#ffffff' },
@@ -5077,6 +5130,7 @@ const Sky = (() => {
     const wts = S.weights || { obs: 1 };
     for (const key in wts) { const A = AMB[key], w = wts[key]; if (!A || w < 0.001) continue; lm += A[0] * w; ambC.r += _a.set(A[1]).r * w; ambC.g += _a.g * w; ambC.b += _a.b * w; airC.r += _a.set(A[2]).r * w * A[3]; airC.g += _a.g * w * A[3]; airC.b += _a.b * w * A[3]; air += A[3] * w; wsum += w; }
     if (wsum > 0) { lm /= wsum; ambC.multiplyScalar(1 / wsum); } else { lm = 1; ambC.setRGB(1, 1, 1); }
+    lm = U.lerp(lm, 1, (S.night || 0) * 0.7);       // after dark the places dim less (it's dark enough)
     S.lm = U.damp(S.lm ?? lm, lm, 1.2, dt || 1);
     const fogC = _l.copy(k.fog); if (air > 0) fogC.lerp(airC.multiplyScalar(1 / air), Math.min(0.5, air) * (1 - S.night * 0.7));
     G.scene.fog.color.copy(fogC); G.renderer.setClearColor(fogC);
@@ -5091,6 +5145,7 @@ const Sky = (() => {
     M.wall.emissiveIntensity = S.night * 0.95;
     const wantMap = S.night > 0.55 ? M.wallNight : M.wallDay; if (M.wall.map !== wantMap) { M.wall.map = wantMap; M.wall.needsUpdate = true; }
     if (M.house) M.house.emissiveIntensity = S.night * 0.9;
+    if (M.pool) M.pool.opacity = S.night * 0.9;
     if (M.tower) M.tower.emissiveIntensity = S.night * 0.85;
     if (W.lighthouse) { W.lighthouse.piv.rotation.y += dt * 0.5; W.lighthouse.beam.material.opacity = S.night * 0.22; }
     M.lamp.color.copy(_a.copy(lampDay).lerp(lampNight, S.night)).multiplyScalar(0.75 + S.night * 0.5);
@@ -5350,7 +5405,7 @@ function makeNao() {
 
 // ---------- hooks: the player's moves, answered softly by the music ----------
 const hooks = {
-  jump(q) { Sound.sfx.jump(q !== 'miss'); },
+  jump(q) { Sound.sfx.jump(q !== 'miss'); Game.usedJump = true; },
   push(q) { Sound.sfx.push(q !== 'miss'); },
   trick(q) {
     const b = Game.W.bell, p = Game.player.pos;
@@ -5382,7 +5437,7 @@ function getUp() {
   for (let i = 0; i < W.metro.N; i += 3) { const q = W.metro.pts[i]; if (Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < 7 && Math.abs(q.y - p.pos.y) < 6) { onLine = true; break; } }
   if (onLine || Game.hitByTrain) {
     let best = null, bd = 1e9; for (const st of W.stations) { const d = Math.hypot(st.p.x - p.pos.x, st.p.z - p.pos.z); if (d < bd) { bd = d; best = st; } }
-    const sd = 1, o = METRO.deckW / 2 + 2.2;
+    const sd = 1, o = best.platOff;
     p.pos.set(best.p.x - best.p.dz * o * sd, best.platY, best.p.z + best.p.dx * o * sd); p.yaw = best.yaw;
   } else p.respawn(false);
   p.vel.set(0, 0, 0); p.mode = 'ground'; p.spinX = p.spinY = p.spinZ = 0;
@@ -5433,28 +5488,35 @@ function bindUI() {
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(true); });
 }
 function pause(on) {
-  if (on && Game.state === 'play') { Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100); }
+  if (on && Game.state === 'play') {
+    Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100);
+    const d = PLAN.byKey[Sound.place], R = Sound.REC[Sound.place];
+    $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm` : '';
+    $('howto').innerHTML = HOWTO.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join('');
+  }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }
 }
 
-// ---------- hints: a few words at the start, then nothing ----------
-const HINTS = U.isTouch ? [
-  { text: 'drag on the left to skate', done: () => Game.player.speed > 6 },
-  { text: 'drag on the right to look around', done: () => Math.abs(Game.cam.yaw - Game.player.yaw) > 0.8 },
-  { text: 'tap the big circle to jump — on the beat goes higher', done: () => Game.player.mode === 'air' },
-  { text: 'stop on a bench, or just stand still, to listen', done: () => Game.listen > 0.6, wait: 20 },
-] : [
-  { text: 'W A S D or the arrows to skate', done: () => Game.player.speed > 6 },
-  { text: 'space to jump — on the beat goes higher · shift for a flourish', done: () => Game.player.mode === 'air' },
-  { text: 'drag the mouse to look around', done: () => Math.abs(Game.cam.yaw - Game.player.yaw) > 0.8 },
-  { text: 'stop on a bench, or just stand still, to listen', done: () => Game.listen > 0.6, wait: 20 },
-];
+// ---------- no words on screen: the labels on the circles fade once you've used them ----------
 function updateHints(dt) {
-  if (Game.hintI >= HINTS.length) return;
-  const h = HINTS[Game.hintI]; Game.hintT += dt;
-  if (!Game.hintShown && Game.hintT > (Game.hintI === 0 ? 2.5 : h.wait || 2.2)) { Game.hintShown = true; Game.hintT = 0; $('hint').textContent = h.text; $('hint').classList.add('show'); }
-  if (Game.hintShown && (h.done() || Game.hintT > 12)) { $('hint').classList.remove('show'); Game.hintI++; Game.hintShown = false; Game.hintT = 0; if (Game.hintI >= 3) document.body.classList.add('quiet'); }
+  if (document.body.classList.contains('quiet')) return;
+  Game.hintT += dt;
+  if ((Game.usedJump && Game.player.speed > 4) || Game.hintT > 30) document.body.classList.add('quiet');
 }
+const HOWTO = U.isTouch ? [['Skate', 'drag on the left half'], ['Look', 'drag on the right half'], ['Jump', 'big circle — on the beat goes higher'], ['Flourish', 'small circle (in the air: a trick)'], ['Grind', 'jump onto any rail, ledge or cable'], ['Listen', 'stop on a bench, or stand still']]
+  : [['Skate', 'W A S D or the arrows'], ['Look', 'drag the mouse, or Q / E'], ['Jump', 'space — on the beat goes higher'], ['Flourish', 'shift (in the air: a trick)'], ['Grind', 'jump onto any rail, ledge or cable'], ['Listen', 'stop on a bench, or stand still'], ['Pause', 'Esc']];
+// iOS zooms in on a quick double tap even when zoom is disabled: stop it (and pinches)
+function preventZoom() {
+  const stop = (e) => e.preventDefault();
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, stop, { passive: false });
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  let lastEnd = 0;
+  document.addEventListener('touchend', (e) => { const now = e.timeStamp; if (now - lastEnd < 350 && !e.target.closest('input')) e.preventDefault(); lastEnd = now; }, { passive: false });
+  document.addEventListener('dblclick', stop, { passive: false });
+  window.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+  window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) e.preventDefault(); });
+}
+preventZoom();
 
 // ---------- the world reacting to you ----------
 const _sq = [], _dw = {};
@@ -5578,9 +5640,6 @@ function loop(now) {
     const ground = p.ground;
     Sound.update(dt, { speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
     updateHints(dt);
-    // the name of the place, softly, when you arrive somewhere new
-    if (Sound.place !== Game.lastPlace) { Game.lastPlace = Sound.place; const d = PLAN.byKey[Sound.place]; if (d && Game.t > 3) { $('place').textContent = d.name; $('place').classList.add('show'); Game.placeT = 4.5; } }
-    if (Game.placeT > 0) { Game.placeT -= dt; if (Game.placeT <= 0) $('place').classList.remove('show'); }
   } else if (Game.state === 'title') {
     // a slow flight over the city
     // a slow glide high above the old town and the observatory, looking down the slope to the lake

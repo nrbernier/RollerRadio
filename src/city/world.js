@@ -85,7 +85,15 @@ function buildCity() {
   const K = makeKit({
     name: 'Rubato', killY: -30, batch: B,
     phys: { friction: 0.5, fastFriction: 0.55, overDecay: 0.6, slopeK: 0.45, drag: 0.0012, climb: 1.6 },
-    buildBatch: (b, W) => { W.cells = b.buildCells(mats); for (const g of W.cells.values()) W.group.add(g); }
+    buildBatch: (b, W) => {
+      W.cells = b.buildCells(mats);
+      for (const e of (W.cellExtras || [])) {
+        const key = Math.floor(e.x / CELL) + ',' + Math.floor(e.z / CELL);
+        let g = W.cells.get(key); if (!g) { g = new THREE.Group(); g.userData = { cx: (Math.floor(e.x / CELL) + 0.5) * CELL, cz: (Math.floor(e.z / CELL) + 0.5) * CELL }; W.cells.set(key, g); }
+        g.add(e.mesh);
+      }
+      for (const g of W.cells.values()) W.group.add(g);
+    }
   });
   const W = K.W;
   W.far = F; W.slabs = S; W.mats = mats; W.sounds = []; W.spots = []; W.benches = []; W.lamps = []; W.npcs = []; W.vehicles = [];
