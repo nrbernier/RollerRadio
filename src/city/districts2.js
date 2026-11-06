@@ -129,6 +129,8 @@ function buildMarket(H) {
     for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) K.cyl(px, y, pz, 0.06, 2.6, '#4a3a2a', { outline: 0, seg: 3 });
     const aw = new THREE.BoxGeometry(alongX ? w + 0.6 : d + 1.4, 0.08, alongX ? d + 1.4 : w + 0.6);
     B.add(aw, new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(alongX ? 0.18 : 0, 0, alongX ? 0 : 0.18)).setPosition(x, y + 2.75, z), col, 'plain', { outlineT: 0.04, edges: false });
+    // the awnings are taut canvas: land on one and it throws you up (into a little note)
+    W.boxes.push({ x0: x - (alongX ? w : d + 1.4) / 2, y0: y + 2.55, z0: z - (alongX ? d + 1.4 : w) / 2, x1: x + (alongX ? w : d + 1.4) / 2, y1: y + 2.8, z1: z + (alongX ? d + 1.4 : w) / 2, tag: 'bounce', nocam: true });
     F.box(x0, y, z0, x1, y + 2.6, z1, col);
     H.sound(x, y + 1, z, 2.2, 'crate');
     return y;
@@ -175,6 +177,7 @@ function buildMarket(H) {
         // a coloured awning over the shop front
         const fz = side > 0 ? z0 : z1, dz = side > 0 ? -1 : 1;
         B.box(x + 0.6, bb.hi + 2.8, Math.min(fz, fz + dz * 2.2), x + w - 0.6, bb.hi + 3.0, Math.max(fz, fz + dz * 2.2), pick(r, stallCols), 'plain', { outlineT: 0.03, edges: false });
+        W.boxes.push({ x0: x + 0.6, y0: bb.hi + 2.8, z0: Math.min(fz, fz + dz * 2.2), x1: x + w - 0.6, y1: bb.hi + 3.0, z1: Math.max(fz, fz + dz * 2.2), tag: 'bounce', nocam: true });
         H.reserve([x, z0, x + w, z1]);
       }
       x += w + 0.05;

@@ -30,7 +30,17 @@ const hooks = {
     if (b && Math.hypot(b.x - p.x, b.z - p.z) < 12 && Game.bellCD <= 0) { Sound.sfx.ringBell(); Game.bellCD = 20; }
     Sound.sfx.trick(); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
   },
-  land(impact) { Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
+  land(impact) {
+    const p = Game.player, g = p.ground;
+    if (g && g.tag === 'bounce' && impact > 2.5) {
+      // a canvas awning: back up you go, a little higher each time you keep it going
+      Game.bounceN = Game.t - (Game.bounceT || 0) < 2.5 ? (Game.bounceN || 0) + 1 : 0; Game.bounceT = Game.t;
+      p.mode = 'air'; p.vel.y = U.clamp(impact * 0.82 + 2, 9, 15.5); p.pos.y += 0.05; p.airTime = 0; p.ground = null;
+      Sound.sfx.touch('bounce', Game.bounceN);
+      Game.fx.burst(V3().copy(p.pos).add(V3(0, 0.1, 0)), 5, ['#ffffff', '#ffd23f'], 2, 0.3, 3);
+      return;
+    }
+    Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
   grindStart() { Sound.sfx.land(0.4); },
   grinding() {}, grindEnd() {}, railHop() { Sound.sfx.jump(true); },
   padLaunch() {},

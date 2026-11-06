@@ -192,6 +192,19 @@ const Life = (() => {
     duckIM = new THREE.InstancedMesh(duckG, toon('#ffffff', { noCache: true }), swimSpots.length); duckIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); duckIM.frustumCulled = false; W.group.add(duckIM);
     swimSpots.forEach((d, i) => { duckIM.setColorAt(i, _c.set(d.col)); ducks.push(Object.assign(d, { i, yaw: r() * 6, sp: 0.3 + r() * 0.3, turn: 0, flee: 0, t: r() * 9 })); });
     if (duckIM.instanceColor) duckIM.instanceColor.needsUpdate = true;
+    // gondolas on the cable car
+    if (W.cable) {
+      const cb = W.cable;
+      const gG = mergeParts([
+        [new THREE.CylinderGeometry(0.06, 0.06, 1.2, 4), T4(0, -0.6, 0), '#2a2838'], [new THREE.BoxGeometry(0.5, 0.3, 0.9), T4(0, -0.08, 0), '#2a2838'],
+        [new THREE.BoxGeometry(2.3, 0.2, 2.5), T4(0, -1.3, 0), '#ffffff'], [new THREE.BoxGeometry(2.0, 2.0, 2.2), T4(0, -2.4, 0), '#ffffff'],
+        [new THREE.BoxGeometry(2.04, 0.8, 1.7), T4(0, -2.0, 0), '#bfe0f0'], [new THREE.BoxGeometry(1.5, 0.8, 2.24), T4(0, -2.0, 0), '#bfe0f0'],
+      ]);
+      cb.im = new THREE.InstancedMesh(gG, toon('#ffffff', { noCache: true }), cb.n); cb.im.frustumCulled = false; cb.im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      cb.g = []; for (let i = 0; i < cb.n; i++) { cb.im.setColorAt(i, _c.set(['#e4572e', '#f2c14e', '#2f8f9d', '#f2efe6', '#3e8f86'][i % 5])); cb.g.push({ x: 0, y: 0, z: 0, vx: 0, vz: 0, yaw: 0 }); }
+      cb.hit = { tag: 'lift', vx: 0, vz: 0, gondola: true }; cb.s = 0;
+      W.group.add(cb.im);
+    }
     W.lifeGround = ground;
     const prev = W.groundExtra;
     W.groundExtra = (x, z, yMax, rr) => { const a = prev(x, z, yMax, rr), b = ground(x, z, yMax); return b && (!a || b.y > a.y) ? b : a; };
@@ -225,6 +238,11 @@ const Life = (() => {
   // stand on a long boat (or a cabin of the big wheel)
   function ground(x, z, yMax) {
     let best = null;
+    const cb = W.cable;
+    if (cb && cb.g) for (const g of cb.g) {
+      if (Math.abs(x - g.x) > 1.3 || Math.abs(z - g.z) > 1.3) continue;
+      const y = g.y - 1.2; if (y <= yMax && (!best || y > best.y)) best = { y, hit: cb.hit };
+    }
     const fw = W.ferris;
     if (fw && Math.abs(x - fw.x) < fw.R + 3 && Math.abs(z - fw.z) < 1.4) {
       for (const c of fw.cab) { if (Math.abs(x - c.x) < 1.25 && c.y - 0.6 <= yMax && (!best || c.y - 0.6 > best.y)) best = { y: c.y - 0.62, hit: fw.hit }; }
@@ -328,6 +346,21 @@ const Life = (() => {
       const pp = Game.player.pos; let bc = null, bd = 2;
       for (const c of fw.cab) { const d = Math.abs(pp.x - c.x) + Math.abs(pp.y - (c.y - 0.62)); if (d < bd) { bd = d; bc = c; } }
       if (bc) { const a = Math.atan2(bc.y - fw.y, bc.x - fw.x); fw.hit.vx = -Math.sin(a) * fw.R * fw.w; fw.hit.vz = 0; }
+    }
+    // the cable car
+    const cb = W.cable;
+    if (cb && cb.g) {
+      cb.s += cb.speed * dt;
+      const pp = Game.player.pos; let near = null, nd = 2.5;
+      for (let i = 0; i < cb.n; i++) {
+        const g = cb.g[i], ox = g.x, oz = g.z;
+        cableAt(cb, cb.s + i * (cb.loop / cb.n), g);
+        g.vx = (g.x - ox) / Math.max(dt, 1e-3); g.vz = (g.z - oz) / Math.max(dt, 1e-3);
+        _q.setFromAxisAngle(Y, g.yaw); _m.compose(_v.set(g.x, g.y, g.z), _q, _s.set(1, 1, 1)); cb.im.setMatrixAt(i, _m);
+        const d = Math.abs(pp.x - g.x) + Math.abs(pp.z - g.z) + Math.abs(pp.y - (g.y - 1.2)); if (d < nd) { nd = d; near = g; }
+      }
+      cb.im.instanceMatrix.needsUpdate = true;
+      if (near && Math.abs(near.vx) < 30) { cb.hit.vx = near.vx; cb.hit.vz = near.vz; }
     }
     // canal boats: glide, pause at the ends, turn around
     for (const b of boats) {

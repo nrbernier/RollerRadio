@@ -3543,6 +3543,7 @@ const Sound = (() => {
           case 'container': I.metal(t, deg(i % 5, 0), 0.45, musicOut, 0.9); break;
           case 'rigging': I.steelpan(t, deg((i * 2) % 7, 1), 0.4); break;
           case 'chime': [0, 4, 7].forEach((d, k) => I.bell(t + k * 0.32, deg(d, 1), 0.5, musicOut, 1.8)); break;
+          case 'bounce': { const ct2 = chord(3, 1); I.marimba(t, ct2[i % 3] + 12 * Math.min(2, Math.floor(i / 3)), 0.5); I.kalimba(t + 0.05, ct2[(i + 1) % 3] + 12, 0.25); break; }
           case 'dish': I.bell(t, m + 24, 0.22, musicOut, 3.2); I.bell(t + 0.5, m + 19, 0.12, musicOut, 3.2); break;
           case 'ferris': [0, 2, 4, 7].forEach((d, k) => I.kalimba(t + k * 0.16, deg(d + (i % 3), 1), 0.4)); break;
           default: I.marimba(t, m, 0.4);
@@ -4400,6 +4401,7 @@ function buildDistricts(K, S, F) {
   const H = districtKit(K, S, F); fillKit(H);
   // the canals and lakeshore first: their quays and promenades claim the ground the others avoid
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
+  buildCable(H); lap('cable car');
   buildCanals(H); lap('canals');
   buildLakeshore(H); lap('lakeshore');
   buildBusiness(H); lap('business');
@@ -4873,6 +4875,8 @@ function buildMarket(H) {
     for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) K.cyl(px, y, pz, 0.06, 2.6, '#4a3a2a', { outline: 0, seg: 3 });
     const aw = new THREE.BoxGeometry(alongX ? w + 0.6 : d + 1.4, 0.08, alongX ? d + 1.4 : w + 0.6);
     B.add(aw, new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(alongX ? 0.18 : 0, 0, alongX ? 0 : 0.18)).setPosition(x, y + 2.75, z), col, 'plain', { outlineT: 0.04, edges: false });
+    // the awnings are taut canvas: land on one and it throws you up (into a little note)
+    W.boxes.push({ x0: x - (alongX ? w : d + 1.4) / 2, y0: y + 2.55, z0: z - (alongX ? d + 1.4 : w) / 2, x1: x + (alongX ? w : d + 1.4) / 2, y1: y + 2.8, z1: z + (alongX ? d + 1.4 : w) / 2, tag: 'bounce', nocam: true });
     F.box(x0, y, z0, x1, y + 2.6, z1, col);
     H.sound(x, y + 1, z, 2.2, 'crate');
     return y;
@@ -4919,6 +4923,7 @@ function buildMarket(H) {
         // a coloured awning over the shop front
         const fz = side > 0 ? z0 : z1, dz = side > 0 ? -1 : 1;
         B.box(x + 0.6, bb.hi + 2.8, Math.min(fz, fz + dz * 2.2), x + w - 0.6, bb.hi + 3.0, Math.max(fz, fz + dz * 2.2), pick(r, stallCols), 'plain', { outlineT: 0.03, edges: false });
+        W.boxes.push({ x0: x + 0.6, y0: bb.hi + 2.8, z0: Math.min(fz, fz + dz * 2.2), x1: x + w - 0.6, y1: bb.hi + 3.0, z1: Math.max(fz, fz + dz * 2.2), tag: 'bounce', nocam: true });
         H.reserve([x, z0, x + w, z1]);
       }
       x += w + 0.05;
@@ -5745,6 +5750,87 @@ function buildFerris(H, x, z) {
 }
 
 // ============================================================
+//  the cable car: from the lakeshore lawn up over the canals and the forest to a clearing near the top
+//  of the ridge. The gondolas never stop (jump onto a roof from a station platform); the cables are
+//  long, sagging grinds — ride one all the way down to the lake.
+// ============================================================
+const CABLE = { A: [-880, 1050], B: [-575, -1285], spans: 10, lift: 34, off: 3.6, hang: 3.4, speed: 7, gap: 150 };
+function buildCable(H) {
+  const { K, W, B, F } = H, C = CABLE;
+  const [ax, az] = C.A, [bx, bz] = C.B, L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
+  // keep the corridor clear of houses and trees
+  H.line([C.A, C.B], 9);
+  // tower positions (ends are the stations, lower so the gondolas come within reach)
+  const towers = [];
+  for (let i = 0; i <= C.spans; i++) {
+    const t = i / C.spans, x = ax + (bx - ax) * t, z = az + (bz - az) * t, g = terrainAt(x, z);
+    const end = i === 0 || i === C.spans;
+    towers.push({ x, z, g, y: g + (end ? 4.3 : C.lift), end });
+  }
+  const line = (sd) => towers.map(T => [T.x + nx * C.off * sd, T.y, T.z + nz * C.off * sd]);
+  const dipK = 0.45;
+  // the grindable cables (the rail system draws them and adds the sag)
+  for (const sd of [-1, 1]) K.rail(line(sd), { kind: 'cable', sag: dipK, posts: false, radius: 0.07, color: '#2a2838' });
+  // towers: tapered steel legs, a cross-arm at the top with sheaves
+  for (const T of towers) {
+    if (T.end) continue;
+    const h = T.y - T.g + 0.6, yaw = Math.atan2(ux, uz);
+    B.add(new THREE.CylinderGeometry(0.9, 2.4, h, 4), new THREE.Matrix4().makeRotationY(Math.PI / 4 + yaw).setPosition(T.x, T.g + h / 2 - 0.3, T.z), '#9aa0b4', 'plain', { outlineT: 0.08, edges: false });
+    B.add(new THREE.BoxGeometry(C.off * 2 + 2.4, 0.9, 1.2), new THREE.Matrix4().makeRotationY(yaw).setPosition(T.x, T.y + 0.5, T.z), '#c4523a', 'plain', { outlineT: 0.06, edges: false });
+    for (const sd of [-1, 1]) K.cyl(T.x + nx * C.off * sd, T.y + 0.05, T.z + nz * C.off * sd, 0.55, 0.3, '#2a2838', { outline: 0.02, seg: 10 });
+    W.boxes.push({ x0: T.x - 1.4, y0: T.g - 1, z0: T.z - 1.4, x1: T.x + 1.4, y1: T.y - 1, z1: T.z + 1.4, tag: 'tower' });
+    F.add(new THREE.CylinderGeometry(0.8, 2.2, h, 4), new THREE.Matrix4().makeTranslation(T.x, T.g + h / 2, T.z), '#9aa0b4');
+    H.reserve([T.x - 4, T.z - 4, T.x + 4, T.z + 4]);
+  }
+  // stations: a platform you can reach from a ramp, a roof over the wheel house
+  for (const [k, T] of [[0, towers[0]], [1, towers[C.spans]]]) {
+    const dir = k === 0 ? 1 : -1, cx = T.x - ux * dir * 6, cz = T.z - uz * dir * 6, py = T.g + 1.6;
+    const yaw = Math.atan2(ux, uz), hw = C.off + 3.2;
+    H.patch([cx - 16, cz - 16, cx + 16, cz + 16], '#d8cbb0', 'tiles', 0.08);
+    for (const sd of [-1, 1]) {
+      // a platform under each line, beside the gondola path
+      const px = cx + nx * (C.off + 2.6) * sd, pz = cz + nz * (C.off + 2.6) * sd;
+      K.box(px - 2.2, T.g - 0.3, pz - 2.2, px + 2.2, py, pz + 2.2, '#c4523a', 'plain', { outlineT: 0.05 });
+      K.ramp(px - 2.2, pz + 2.2, px + 2.2, pz + 7, 'z', py, T.g, '#c4523a', false, T.g - 0.3);
+    }
+    // the wheel house roof, high over the turnaround
+    const rx = T.x + ux * dir * 2, rz = T.z + uz * dir * 2;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.cyl(rx + nx * hw * sx + ux * 4 * sz, T.g - 0.2, rz + nz * hw * sx + uz * 4 * sz, 0.3, T.y + 2.6 - T.g, '#e9e4f5', { outline: 0.03, seg: 6 });
+    B.add(new THREE.BoxGeometry(hw * 2 + 1, 0.6, 10), new THREE.Matrix4().makeRotationY(yaw).setPosition(rx, T.y + 2.8, rz), '#3e8f86', 'plain', { outlineT: 0.06, edges: false });
+    H.reserve([cx - 18, cz - 18, cx + 18, cz + 18]);
+    H.standers([[cx + nx * 9, cz + nz * 9, yaw, T.g], [cx - nx * 9 + ux * 3, cz - nz * 9 + uz * 3, yaw + 2, T.g]], k === 0 ? 'lake' : 'park');
+    H.bench(cx - ux * dir * 10, cz - uz * dir * 10, Math.abs(nx) > Math.abs(nz), { view: true });
+  }
+  // the cable's shape, for the gondolas: piecewise segments with the same sag the rail uses
+  const segs = []; let s0 = 0;
+  for (let i = 0; i < towers.length - 1; i++) { const a = towers[i], b = towers[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z, b.y - a.y); segs.push({ a, b, l, s0, dip: dipK * l / 20 }); s0 += l; }
+  const turn = Math.PI * C.off;
+  W.cable = { segs, len: s0, turn, loop: 2 * s0 + 2 * turn, ux, uz, nx, nz, off: C.off, speed: C.speed, n: Math.floor((2 * s0 + 2 * turn) / C.gap), A: towers[0], B: towers[towers.length - 1] };
+}
+// where a gondola is on its loop: up the +side line, round the top wheel, down the -side line, round the bottom
+function cableAt(cb, s, out) {
+  s = ((s % cb.loop) + cb.loop) % cb.loop;
+  let u, sd;
+  if (s < cb.len) { u = s; sd = 1; out.dir = 1; }
+  else if (s < cb.len + cb.turn) {
+    const a = (s - cb.len) / cb.turn * Math.PI, T = cb.B;     // round the top: from +side through the far end to -side
+    out.x = T.x + cb.nx * cb.off * Math.cos(a) + cb.ux * cb.off * Math.sin(a); out.z = T.z + cb.nz * cb.off * Math.cos(a) + cb.uz * cb.off * Math.sin(a);
+    out.y = T.y; out.dir = 0; out.yaw = Math.atan2(cb.ux, cb.uz) + a; return out;
+  } else if (s < 2 * cb.len + cb.turn) { u = 2 * cb.len + cb.turn - s; sd = -1; out.dir = -1; }
+  else {
+    const a = (s - 2 * cb.len - cb.turn) / cb.turn * Math.PI, T = cb.A;
+    out.x = T.x - cb.nx * cb.off * Math.cos(a) - cb.ux * cb.off * Math.sin(a); out.z = T.z - cb.nz * cb.off * Math.cos(a) - cb.uz * cb.off * Math.sin(a);
+    out.y = T.y; out.dir = 0; out.yaw = Math.atan2(cb.ux, cb.uz) + Math.PI + a; return out;
+  }
+  let g = cb.segs[cb.segs.length - 1]; for (const q of cb.segs) if (u <= q.s0 + q.l) { g = q; break; }
+  const t = U.clamp((u - g.s0) / g.l, 0, 1);
+  out.x = U.lerp(g.a.x, g.b.x, t) + cb.nx * cb.off * sd; out.z = U.lerp(g.a.z, g.b.z, t) + cb.nz * cb.off * sd;
+  out.y = U.lerp(g.a.y, g.b.y, t) - 4 * g.dip * t * (1 - t);
+  out.yaw = Math.atan2(cb.ux * sd, cb.uz * sd);
+  return out;
+}
+
+// ============================================================
 //  SKY — a slow day and night (about 20 minutes), mountains across the
 //  lake, stars, lit windows and street lamps after dark
 // ============================================================
@@ -6091,6 +6177,19 @@ const Life = (() => {
     duckIM = new THREE.InstancedMesh(duckG, toon('#ffffff', { noCache: true }), swimSpots.length); duckIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); duckIM.frustumCulled = false; W.group.add(duckIM);
     swimSpots.forEach((d, i) => { duckIM.setColorAt(i, _c.set(d.col)); ducks.push(Object.assign(d, { i, yaw: r() * 6, sp: 0.3 + r() * 0.3, turn: 0, flee: 0, t: r() * 9 })); });
     if (duckIM.instanceColor) duckIM.instanceColor.needsUpdate = true;
+    // gondolas on the cable car
+    if (W.cable) {
+      const cb = W.cable;
+      const gG = mergeParts([
+        [new THREE.CylinderGeometry(0.06, 0.06, 1.2, 4), T4(0, -0.6, 0), '#2a2838'], [new THREE.BoxGeometry(0.5, 0.3, 0.9), T4(0, -0.08, 0), '#2a2838'],
+        [new THREE.BoxGeometry(2.3, 0.2, 2.5), T4(0, -1.3, 0), '#ffffff'], [new THREE.BoxGeometry(2.0, 2.0, 2.2), T4(0, -2.4, 0), '#ffffff'],
+        [new THREE.BoxGeometry(2.04, 0.8, 1.7), T4(0, -2.0, 0), '#bfe0f0'], [new THREE.BoxGeometry(1.5, 0.8, 2.24), T4(0, -2.0, 0), '#bfe0f0'],
+      ]);
+      cb.im = new THREE.InstancedMesh(gG, toon('#ffffff', { noCache: true }), cb.n); cb.im.frustumCulled = false; cb.im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      cb.g = []; for (let i = 0; i < cb.n; i++) { cb.im.setColorAt(i, _c.set(['#e4572e', '#f2c14e', '#2f8f9d', '#f2efe6', '#3e8f86'][i % 5])); cb.g.push({ x: 0, y: 0, z: 0, vx: 0, vz: 0, yaw: 0 }); }
+      cb.hit = { tag: 'lift', vx: 0, vz: 0, gondola: true }; cb.s = 0;
+      W.group.add(cb.im);
+    }
     W.lifeGround = ground;
     const prev = W.groundExtra;
     W.groundExtra = (x, z, yMax, rr) => { const a = prev(x, z, yMax, rr), b = ground(x, z, yMax); return b && (!a || b.y > a.y) ? b : a; };
@@ -6124,6 +6223,11 @@ const Life = (() => {
   // stand on a long boat (or a cabin of the big wheel)
   function ground(x, z, yMax) {
     let best = null;
+    const cb = W.cable;
+    if (cb && cb.g) for (const g of cb.g) {
+      if (Math.abs(x - g.x) > 1.3 || Math.abs(z - g.z) > 1.3) continue;
+      const y = g.y - 1.2; if (y <= yMax && (!best || y > best.y)) best = { y, hit: cb.hit };
+    }
     const fw = W.ferris;
     if (fw && Math.abs(x - fw.x) < fw.R + 3 && Math.abs(z - fw.z) < 1.4) {
       for (const c of fw.cab) { if (Math.abs(x - c.x) < 1.25 && c.y - 0.6 <= yMax && (!best || c.y - 0.6 > best.y)) best = { y: c.y - 0.62, hit: fw.hit }; }
@@ -6228,6 +6332,21 @@ const Life = (() => {
       for (const c of fw.cab) { const d = Math.abs(pp.x - c.x) + Math.abs(pp.y - (c.y - 0.62)); if (d < bd) { bd = d; bc = c; } }
       if (bc) { const a = Math.atan2(bc.y - fw.y, bc.x - fw.x); fw.hit.vx = -Math.sin(a) * fw.R * fw.w; fw.hit.vz = 0; }
     }
+    // the cable car
+    const cb = W.cable;
+    if (cb && cb.g) {
+      cb.s += cb.speed * dt;
+      const pp = Game.player.pos; let near = null, nd = 2.5;
+      for (let i = 0; i < cb.n; i++) {
+        const g = cb.g[i], ox = g.x, oz = g.z;
+        cableAt(cb, cb.s + i * (cb.loop / cb.n), g);
+        g.vx = (g.x - ox) / Math.max(dt, 1e-3); g.vz = (g.z - oz) / Math.max(dt, 1e-3);
+        _q.setFromAxisAngle(Y, g.yaw); _m.compose(_v.set(g.x, g.y, g.z), _q, _s.set(1, 1, 1)); cb.im.setMatrixAt(i, _m);
+        const d = Math.abs(pp.x - g.x) + Math.abs(pp.z - g.z) + Math.abs(pp.y - (g.y - 1.2)); if (d < nd) { nd = d; near = g; }
+      }
+      cb.im.instanceMatrix.needsUpdate = true;
+      if (near && Math.abs(near.vx) < 30) { cb.hit.vx = near.vx; cb.hit.vz = near.vz; }
+    }
     // canal boats: glide, pause at the ends, turn around
     for (const b of boats) {
       if (b.sail) { const u = b.sail.userData; u.a += dt * u.sp * 0.2; b.sail.position.set(u.cx + Math.cos(u.a) * u.r, Math.sin(Game.t * 0.8 + u.a) * 0.15, u.cz + Math.sin(u.a) * u.r * 0.5); b.sail.rotation.y = -u.a + Math.PI; b.sail.rotation.z = Math.sin(Game.t * 0.6 + u.a) * 0.05; continue; }
@@ -6307,7 +6426,17 @@ const hooks = {
     if (b && Math.hypot(b.x - p.x, b.z - p.z) < 12 && Game.bellCD <= 0) { Sound.sfx.ringBell(); Game.bellCD = 20; }
     Sound.sfx.trick(); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
   },
-  land(impact) { Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
+  land(impact) {
+    const p = Game.player, g = p.ground;
+    if (g && g.tag === 'bounce' && impact > 2.5) {
+      // a canvas awning: back up you go, a little higher each time you keep it going
+      Game.bounceN = Game.t - (Game.bounceT || 0) < 2.5 ? (Game.bounceN || 0) + 1 : 0; Game.bounceT = Game.t;
+      p.mode = 'air'; p.vel.y = U.clamp(impact * 0.82 + 2, 9, 15.5); p.pos.y += 0.05; p.airTime = 0; p.ground = null;
+      Sound.sfx.touch('bounce', Game.bounceN);
+      Game.fx.burst(V3().copy(p.pos).add(V3(0, 0.1, 0)), 5, ['#ffffff', '#ffd23f'], 2, 0.3, 3);
+      return;
+    }
+    Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
   grindStart() { Sound.sfx.land(0.4); },
   grinding() {}, grindEnd() {}, railHop() { Sound.sfx.jump(true); },
   padLaunch() {},

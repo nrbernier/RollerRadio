@@ -556,3 +556,84 @@ function buildFerris(H, x, z) {
   H.sound(x, gy + 3, z, 14, 'ferris');
   H.walkers([[[x - 30, z + 14], [x + 30, z + 14]]], 8, 'lake');
 }
+
+// ============================================================
+//  the cable car: from the lakeshore lawn up over the canals and the forest to a clearing near the top
+//  of the ridge. The gondolas never stop (jump onto a roof from a station platform); the cables are
+//  long, sagging grinds — ride one all the way down to the lake.
+// ============================================================
+const CABLE = { A: [-880, 1050], B: [-575, -1285], spans: 10, lift: 34, off: 3.6, hang: 3.4, speed: 7, gap: 150 };
+function buildCable(H) {
+  const { K, W, B, F } = H, C = CABLE;
+  const [ax, az] = C.A, [bx, bz] = C.B, L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
+  // keep the corridor clear of houses and trees
+  H.line([C.A, C.B], 9);
+  // tower positions (ends are the stations, lower so the gondolas come within reach)
+  const towers = [];
+  for (let i = 0; i <= C.spans; i++) {
+    const t = i / C.spans, x = ax + (bx - ax) * t, z = az + (bz - az) * t, g = terrainAt(x, z);
+    const end = i === 0 || i === C.spans;
+    towers.push({ x, z, g, y: g + (end ? 4.3 : C.lift), end });
+  }
+  const line = (sd) => towers.map(T => [T.x + nx * C.off * sd, T.y, T.z + nz * C.off * sd]);
+  const dipK = 0.45;
+  // the grindable cables (the rail system draws them and adds the sag)
+  for (const sd of [-1, 1]) K.rail(line(sd), { kind: 'cable', sag: dipK, posts: false, radius: 0.07, color: '#2a2838' });
+  // towers: tapered steel legs, a cross-arm at the top with sheaves
+  for (const T of towers) {
+    if (T.end) continue;
+    const h = T.y - T.g + 0.6, yaw = Math.atan2(ux, uz);
+    B.add(new THREE.CylinderGeometry(0.9, 2.4, h, 4), new THREE.Matrix4().makeRotationY(Math.PI / 4 + yaw).setPosition(T.x, T.g + h / 2 - 0.3, T.z), '#9aa0b4', 'plain', { outlineT: 0.08, edges: false });
+    B.add(new THREE.BoxGeometry(C.off * 2 + 2.4, 0.9, 1.2), new THREE.Matrix4().makeRotationY(yaw).setPosition(T.x, T.y + 0.5, T.z), '#c4523a', 'plain', { outlineT: 0.06, edges: false });
+    for (const sd of [-1, 1]) K.cyl(T.x + nx * C.off * sd, T.y + 0.05, T.z + nz * C.off * sd, 0.55, 0.3, '#2a2838', { outline: 0.02, seg: 10 });
+    W.boxes.push({ x0: T.x - 1.4, y0: T.g - 1, z0: T.z - 1.4, x1: T.x + 1.4, y1: T.y - 1, z1: T.z + 1.4, tag: 'tower' });
+    F.add(new THREE.CylinderGeometry(0.8, 2.2, h, 4), new THREE.Matrix4().makeTranslation(T.x, T.g + h / 2, T.z), '#9aa0b4');
+    H.reserve([T.x - 4, T.z - 4, T.x + 4, T.z + 4]);
+  }
+  // stations: a platform you can reach from a ramp, a roof over the wheel house
+  for (const [k, T] of [[0, towers[0]], [1, towers[C.spans]]]) {
+    const dir = k === 0 ? 1 : -1, cx = T.x - ux * dir * 6, cz = T.z - uz * dir * 6, py = T.g + 1.6;
+    const yaw = Math.atan2(ux, uz), hw = C.off + 3.2;
+    H.patch([cx - 16, cz - 16, cx + 16, cz + 16], '#d8cbb0', 'tiles', 0.08);
+    for (const sd of [-1, 1]) {
+      // a platform under each line, beside the gondola path
+      const px = cx + nx * (C.off + 2.6) * sd, pz = cz + nz * (C.off + 2.6) * sd;
+      K.box(px - 2.2, T.g - 0.3, pz - 2.2, px + 2.2, py, pz + 2.2, '#c4523a', 'plain', { outlineT: 0.05 });
+      K.ramp(px - 2.2, pz + 2.2, px + 2.2, pz + 7, 'z', py, T.g, '#c4523a', false, T.g - 0.3);
+    }
+    // the wheel house roof, high over the turnaround
+    const rx = T.x + ux * dir * 2, rz = T.z + uz * dir * 2;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.cyl(rx + nx * hw * sx + ux * 4 * sz, T.g - 0.2, rz + nz * hw * sx + uz * 4 * sz, 0.3, T.y + 2.6 - T.g, '#e9e4f5', { outline: 0.03, seg: 6 });
+    B.add(new THREE.BoxGeometry(hw * 2 + 1, 0.6, 10), new THREE.Matrix4().makeRotationY(yaw).setPosition(rx, T.y + 2.8, rz), '#3e8f86', 'plain', { outlineT: 0.06, edges: false });
+    H.reserve([cx - 18, cz - 18, cx + 18, cz + 18]);
+    H.standers([[cx + nx * 9, cz + nz * 9, yaw, T.g], [cx - nx * 9 + ux * 3, cz - nz * 9 + uz * 3, yaw + 2, T.g]], k === 0 ? 'lake' : 'park');
+    H.bench(cx - ux * dir * 10, cz - uz * dir * 10, Math.abs(nx) > Math.abs(nz), { view: true });
+  }
+  // the cable's shape, for the gondolas: piecewise segments with the same sag the rail uses
+  const segs = []; let s0 = 0;
+  for (let i = 0; i < towers.length - 1; i++) { const a = towers[i], b = towers[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z, b.y - a.y); segs.push({ a, b, l, s0, dip: dipK * l / 20 }); s0 += l; }
+  const turn = Math.PI * C.off;
+  W.cable = { segs, len: s0, turn, loop: 2 * s0 + 2 * turn, ux, uz, nx, nz, off: C.off, speed: C.speed, n: Math.floor((2 * s0 + 2 * turn) / C.gap), A: towers[0], B: towers[towers.length - 1] };
+}
+// where a gondola is on its loop: up the +side line, round the top wheel, down the -side line, round the bottom
+function cableAt(cb, s, out) {
+  s = ((s % cb.loop) + cb.loop) % cb.loop;
+  let u, sd;
+  if (s < cb.len) { u = s; sd = 1; out.dir = 1; }
+  else if (s < cb.len + cb.turn) {
+    const a = (s - cb.len) / cb.turn * Math.PI, T = cb.B;     // round the top: from +side through the far end to -side
+    out.x = T.x + cb.nx * cb.off * Math.cos(a) + cb.ux * cb.off * Math.sin(a); out.z = T.z + cb.nz * cb.off * Math.cos(a) + cb.uz * cb.off * Math.sin(a);
+    out.y = T.y; out.dir = 0; out.yaw = Math.atan2(cb.ux, cb.uz) + a; return out;
+  } else if (s < 2 * cb.len + cb.turn) { u = 2 * cb.len + cb.turn - s; sd = -1; out.dir = -1; }
+  else {
+    const a = (s - 2 * cb.len - cb.turn) / cb.turn * Math.PI, T = cb.A;
+    out.x = T.x - cb.nx * cb.off * Math.cos(a) - cb.ux * cb.off * Math.sin(a); out.z = T.z - cb.nz * cb.off * Math.cos(a) - cb.uz * cb.off * Math.sin(a);
+    out.y = T.y; out.dir = 0; out.yaw = Math.atan2(cb.ux, cb.uz) + Math.PI + a; return out;
+  }
+  let g = cb.segs[cb.segs.length - 1]; for (const q of cb.segs) if (u <= q.s0 + q.l) { g = q; break; }
+  const t = U.clamp((u - g.s0) / g.l, 0, 1);
+  out.x = U.lerp(g.a.x, g.b.x, t) + cb.nx * cb.off * sd; out.z = U.lerp(g.a.z, g.b.z, t) + cb.nz * cb.off * sd;
+  out.y = U.lerp(g.a.y, g.b.y, t) - 4 * g.dip * t * (1 - t);
+  out.yaw = Math.atan2(cb.ux * sd, cb.uz * sd);
+  return out;
+}

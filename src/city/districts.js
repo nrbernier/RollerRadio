@@ -196,6 +196,7 @@ function buildDistricts(K, S, F) {
   const H = districtKit(K, S, F); fillKit(H);
   // the canals and lakeshore first: their quays and promenades claim the ground the others avoid
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
+  buildCable(H); lap('cable car');
   buildCanals(H); lap('canals');
   buildLakeshore(H); lap('lakeshore');
   buildBusiness(H); lap('business');
