@@ -378,6 +378,24 @@ const Life = (() => {
       for (const c of fw.cab) { const d = Math.abs(pp.x - c.x) + Math.abs(pp.y - (c.y - 0.62)); if (d < bd) { bd = d; bc = c; } }
       if (bc) { const a = Math.atan2(bc.y - fw.y, bc.x - fw.x); fw.hit.vx = -Math.sin(a) * fw.R * fw.w; fw.hit.vz = 0; }
     }
+    // cabins and gondolas are solid from the side too (their roofs are ground, see ground())
+    const pl2 = Game.player;
+    const pushOut = (cx, cy0, cy1, cz, yaw, hx, hz) => {
+      const pp = pl2.pos, R0 = 0.38;
+      if (pp.y > cy1 - 0.08 || pp.y + 1.7 < cy0) return;
+      const s0 = Math.sin(yaw), c0 = Math.cos(yaw), dx = pp.x - cx, dz = pp.z - cz;
+      const lx = dx * c0 - dz * s0, lz = dx * s0 + dz * c0;          // into the cabin's frame
+      const ox = hx + R0 - Math.abs(lx), oz = hz + R0 - Math.abs(lz);
+      if (ox <= 0 || oz <= 0) return;
+      let nx = 0, nz = 0;
+      if (ox < oz) nx = Math.sign(lx) * ox; else nz = Math.sign(lz) * oz;
+      const wx = nx * c0 + nz * s0, wz = -nx * s0 + nz * c0;           // back to the world
+      pp.x += wx; pp.z += wz;
+      const l = Math.hypot(wx, wz) || 1, vn = (pl2.vel.x * wx + pl2.vel.z * wz) / l;
+      if (vn < 0) { pl2.vel.x -= vn * wx / l; pl2.vel.z -= vn * wz / l; }
+    };
+    if (W.ferris) for (const c of W.ferris.cab) if (Math.abs(c.x - pl2.pos.x) < 4 && Math.abs(c.y - pl2.pos.y) < 6) pushOut(c.x, c.y - 2.85, c.y - 0.64, W.ferris.z, 0, 1.25, 1.35);
+    if (W.cable && W.cable.g) for (const g of W.cable.g) if (Math.abs(g.x - pl2.pos.x) < 4 && Math.abs(g.z - pl2.pos.z) < 4) pushOut(g.x, g.y - 3.4, g.y - 1.2, g.z, g.yaw, 1.15, 1.25);
     // the cable car
     const cb = W.cable;
     if (cb && cb.g) {

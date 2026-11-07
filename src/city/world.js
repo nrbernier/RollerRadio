@@ -76,7 +76,9 @@ function buildCity() {
   pondBowl(P.x, P.z, P.r, P.y);
   const M = planMetro();
   // the gallery: dig the line into the ridge
-  const corridor = []; for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (p.covered || M.pts[(i + 6) % M.N].covered || M.pts[(i - 6 + M.N) % M.N].covered) corridor.push([p.x, p.y, p.z]); else if (corridor.length && corridor[corridor.length - 1] !== null) corridor.push(null); }
+  // (downtown is bored, not dug: only the approaches where the deck runs at or just below the ground are cut)
+  const cut = (p) => p.down ? (!p.covered && p.g > p.y - 1.5 && !inHole(p.x, p.z)) : p.covered;
+  const corridor = []; for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (cut(p) || (!p.down && (M.pts[(i + 6) % M.N].covered || M.pts[(i - 6 + M.N) % M.N].covered))) corridor.push([p.x, p.y, p.z]); else if (corridor.length && corridor[corridor.length - 1] !== null) corridor.push(null); }
   let run = []; for (const c of corridor) { if (c === null) { if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8); run = []; } else run.push(c); } if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8);
   if (typeof prepDistricts === 'function') prepDistricts();
   // station surroundings: a little forecourt where each ramp lands

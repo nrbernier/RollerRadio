@@ -147,7 +147,7 @@ function fillKit(H) {
     H.patch([x - 12, z - 9, x + 12, z + 9], '#d9b98a', 'gravel', 0.07);
     // slide: a ladder tower and a ramp down (rideable)
     K.box(x - 9, y - 0.3, z - 6, x - 7, y + 2.2, z - 4, '#e4572e', 'plain', { outlineT: 0.04 });
-    K.ramp(x - 7, z - 5.8, x - 1, z - 4.2, 'x', 2.2, 0.3, '#f2c14e', false, y - 0.3);
+    K.ramp(x - 7, z - 5.8, x - 1, z - 4.2, 'x', y + 2.2, y + 0.3, '#f2c14e', false, y - 0.3);
     // swings
     for (const s of [-1, 1]) put(BOX, x + 4 + s * 2.4, y + 1.2, z - 4, 0.12, 2.4, 0.12, '#2f5f8a', 'plain', 0.02);
     K.rail([[x + 1.4, y + 2.45, z - 4], [x + 6.6, y + 2.45, z - 4]], { color: '#2f5f8a', postMax: 0 , round: 0, posts: false });

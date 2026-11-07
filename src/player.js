@@ -536,8 +536,20 @@ class CamRig {
     for (const b of (this.W.camBoxes || [])) {
       const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
     }
-    if (tmin < len) want.copy(tgt).addScaledVector(dir, Math.max(0.6, tmin - 0.35));
+    if (tmin < len) want.copy(tgt).addScaledVector(dir, Math.max(0.6, tmin - 0.45));
     if (instant) this.cam.position.copy(want); else this.cam.position.lerp(want, 1 - Math.exp(-14 * dt));
+    // the easing itself must not carry the camera through a wall: check the eased position too
+    if (!instant) {
+      const d2 = _c3.subVectors(this.cam.position, tgt), l2 = d2.length();
+      if (l2 > 0.7) {
+        d2.divideScalar(l2); let t2 = l2;
+        for (const b of this.W.near(Math.min(tgt.x, this.cam.position.x) - 0.5, Math.min(tgt.z, this.cam.position.z) - 0.5, Math.max(tgt.x, this.cam.position.x) + 0.5, Math.max(tgt.z, this.cam.position.z) + 0.5, this._q)) {
+          if (b.nocam || b.hazard) continue;
+          const t = rayBox(tgt, d2, b, l2); if (t !== null && t < t2) t2 = t;
+        }
+        if (t2 < l2) this.cam.position.copy(tgt).addScaledVector(d2, Math.max(0.6, t2 - 0.45));
+      }
+    }
     this.shake = Math.max(0, this.shake - dt * 3);
     const sh = this.shake * 0.15;
     const look = _c4.set(tgt.x + fx * 1.6 + (Math.random() - 0.5) * sh, tgt.y + (Math.random() - 0.5) * sh, tgt.z + fz * 1.6);

@@ -10,7 +10,9 @@ function districtKit(K, S, F) {
   let maxR = 0;
   const block = (x, z, r) => { const e = { x, z, r }; PG.add(e, x - r, z - r, x + r, z + r); if (r > maxR) maxR = r; };
   const M = W.metro;
-  if (M) for (let i = 0; i < M.N; i++) block(M.pts[i].x, M.pts[i].z, METRO.deckW / 2 + 1.5);
+  // (deep under downtown the line doesn't get in the way of anything on the surface)
+  if (M) for (let i = 0; i < M.N; i++) { const p = M.pts[i]; if (p.down && p.covered && p.g > p.y + 8) continue; block(p.x, p.z, METRO.deckW / 2 + 1.5); }
+  for (const st of (W.stations || [])) if (st.court) { const c = st.court; for (let x = c.x0 - 3; x <= c.x1 + 3; x += 6) for (let z = c.z0 - 3; z <= c.z1 + 3; z += 6) block(x, z, 5); }
   for (const st of (W.stations || [])) for (const rp of st.ramps) { const dx = rp.to[0] - rp.from[0], dz = rp.to[1] - rp.from[1], L = Math.hypot(dx, dz); for (let t = 0; t <= L; t += 2) block(rp.from[0] + dx * t / L, rp.from[1] + dz * t / L, 3); }
   for (const r of Object.values(W.roads || {})) for (let i = 0; i < r.pts.length - 1; i++) {
     const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
@@ -296,7 +298,8 @@ function bizBuilding(H, x0, z0, x1, z1, tall, r) {
     // a round tower (glass bands), a thin crown ring and a drum on top
     const rad = Math.min(iw, id) / 2 - 1;
     K.cyl(cx, y - 0.2, cz, rad, tall, col, { kind: r() < 0.6 ? 'tower' : 'grid', seg: 24, outline: 0.16 });
-    W.boxes.push({ x0: cx - rad * 0.86, y0: y - 1, z0: cz - rad * 0.86, x1: cx + rad * 0.86, y1: y + tall, z1: cz + rad * 0.86, tag: 'tower' });
+    // a round tower's footprint, as three boxes (a plus and a square) so walls and camera both respect it
+    for (const [a, b] of [[0.86, 0.86], [0.98, 0.42], [0.42, 0.98]]) W.boxes.push({ x0: cx - rad * a, y0: y - 1, z0: cz - rad * b, x1: cx + rad * a, y1: y + tall, z1: cz + rad * b, tag: 'tower' });
     F.add(new THREE.CylinderGeometry(rad, rad, tall, 12), new THREE.Matrix4().makeTranslation(cx, y + tall / 2, cz), col);
     K.cyl(cx, y + tall - 0.6, cz, rad + 0.3, 0.6, trim, { seg: 24, outline: 0 });
     top = y + tall;
@@ -473,27 +476,59 @@ function buildPark(H) {
   H.busker('flute', -760, -96, 0.6);
 }
 function buildGlasshouse(H, x, z) {
+  // a Victorian palm house: brick plinth, glass between white iron, a barrel roof with a lantern,
+  // and a porch with an arched door at each end — the path runs straight through
   const { K, W, B, F } = H;
-  const y = terrainAt(x, z) + 0.05, w = 22, d = 34;
-  H.patch([x - w / 2 - 4, z - d / 2 - 4, x + w / 2 + 4, z + d / 2 + 4], '#d8cdb5', 'tiles');
-  // glass walls (collide) with a doorway on the south side
-  const glass = '#bfe8e8';
-  const wall = (x0, z0, x1, z1) => { B.box(x0, y, z0, x1, y + 6, z1, glass, 'glass', { outlineT: 0, edges: true }); W.boxes.push({ x0, y0: y - 1, z0, x1, y1: y + 6, z1, nocam: true }); };
-  wall(x - w / 2, z - d / 2, x + w / 2, z - d / 2 + 0.3);
-  wall(x - w / 2, z - d / 2, x - w / 2 + 0.3, z + d / 2);
-  wall(x + w / 2 - 0.3, z - d / 2, x + w / 2, z + d / 2);
-  wall(x - w / 2, z + d / 2 - 0.3, x - 3, z + d / 2); wall(x + 3, z + d / 2 - 0.3, x + w / 2, z + d / 2);
-  // the curved roof as ribs + glass
-  for (let i = 0; i <= 8; i++) { const zz = z - d / 2 + i * d / 8; const pts = []; for (let a = 0; a <= 8; a++) { const t = a / 8 * Math.PI; pts.push(V3(x - Math.cos(t) * w / 2, y + 6 + Math.sin(t) * 5, zz)); } B.add(tubeGeo(pts, 0.12, 5), null, '#f4f1ea', 'plain', { outlineT: 0, edges: false }); }
+  const y = terrainAt(x, z) + 0.05, w = 22, d = 34, wh = 6, dw = 4.4, dh = 4.2;
+  H.patch([x - w / 2 - 5, z - d / 2 - 10, x + w / 2 + 5, z + d / 2 + 10], '#d8cdb5', 'tiles');
+  H.path([[x, z - d / 2 - 40], [x, z - d / 2 - 8]], 3.2, '#cdbf9e'); H.path([[x, z + d / 2 + 8], [x, z + d / 2 + 40]], 3.2, '#cdbf9e');
+  const glass = '#bfe8e8', iron = '#f4f1ea', brick = '#a0583e';
+  const wall = (x0, z0, x1, z1) => {
+    B.box(x0, y, z0, x1, y + 0.8, z1, brick, 'brick', { outlineT: 0.04 });
+    B.box(x0, y + 0.8, z0, x1, y + wh, z1, glass, 'glass', { outlineT: 0, edges: false });
+    B.box(x0 - 0.06, y + wh - 0.25, z0 - 0.06, x1 + 0.06, y + wh, z1 + 0.06, iron, 'plain', { outlineT: 0.03, edges: false });
+    W.boxes.push({ x0, y0: y - 1, z0, x1, y1: y + wh, z1, nocam: true });
+    // mullions every two metres
+    const L = Math.max(x1 - x0, z1 - z0), alongX = x1 - x0 > z1 - z0;
+    for (let t = 0; t <= L + 0.01; t += 2) { const mx = alongX ? x0 + t : (x0 + x1) / 2, mz = alongX ? (z0 + z1) / 2 : z0 + t; B.box(mx - 0.08, y + 0.8, mz - 0.08, mx + 0.08, y + wh, mz + 0.08, iron, 'plain', { outlineT: 0, edges: false }); }
+  };
+  wall(x - w / 2, z - d / 2, x - w / 2 + 0.3, z + d / 2); wall(x + w / 2 - 0.3, z - d / 2, x + w / 2, z + d / 2);
+  for (const zs of [-1, 1]) {
+    const zf = z + zs * d / 2, za = Math.min(zf, zf - zs * 0.3), zb = Math.max(zf, zf - zs * 0.3);
+    wall(x - w / 2, za, x - dw / 2 - 0.6, zb); wall(x + dw / 2 + 0.6, za, x + w / 2, zb);
+    // the end wall above the door, glazed, to the roof line
+    B.box(x - dw / 2 - 0.6, y + dh + 0.6, za, x + dw / 2 + 0.6, y + wh, zb, glass, 'glass', { outlineT: 0, edges: false });
+    // the porch: two posts, an arch of white iron, a little gabled glass roof, steps of tile
+    const pz = zf + zs * 3, pza = Math.min(zf, pz), pzb = Math.max(zf, pz);
+    for (const sx of [-1, 1]) { K.box(x + sx * (dw / 2 + 0.6) - 0.3, y, pza, x + sx * (dw / 2 + 0.6) + 0.3, y + dh + 0.6, pzb, iron, 'plain', { outlineT: 0.05 }); }
+    const arch = []; for (let a = 0; a <= 10; a++) { const t = a / 10 * Math.PI; arch.push(V3(x - Math.cos(t) * (dw / 2 + 0.3), y + dh - 0.6 + Math.sin(t) * 1.2, pz)); }
+    B.add(tubeGeo(arch, 0.16, 6), null, iron, 'plain', { outlineT: 0.03, edges: false });
+    const pr = new THREE.BufferGeometry(); const hw2 = dw / 2 + 1.2, ry = y + dh + 0.6;
+    pr.setAttribute('position', new THREE.Float32BufferAttribute([x - hw2, ry, pza, x, ry + 1.6, pza, x, ry + 1.6, pzb, x - hw2, ry, pza, x, ry + 1.6, pzb, x - hw2, ry, pzb, x, ry + 1.6, pza, x + hw2, ry, pza, x + hw2, ry, pzb, x, ry + 1.6, pza, x + hw2, ry, pzb, x, ry + 1.6, pzb], 3));
+    pr.computeVertexNormals(); B.add(pr, null, '#e8f4f2', 'plain', { outlineT: 0.05, edges: false });
+    B.box(x - hw2, ry - 0.2, pza, x + hw2, ry, pzb, iron, 'plain', { outlineT: 0.04, edges: false });
+    W.boxes.push({ x0: x - hw2, y0: ry - 0.2, z0: pza, x1: x + hw2, y1: ry + 0.4, z1: pzb, tag: 'porch' });
+    H.lamp(x - dw / 2 - 2.4, pz + zs * 1.5, { style: 'globe', h: 3.4, color: '#2a3550', sound: false }); H.lamp(x + dw / 2 + 2.4, pz + zs * 1.5, { style: 'globe', h: 3.4, color: '#2a3550', sound: false });
+  }
+  // the barrel roof: ribs, glass, a ridge lantern
+  for (let i = 0; i <= 8; i++) { const zz = z - d / 2 + i * d / 8; const pts = []; for (let a = 0; a <= 8; a++) { const t = a / 8 * Math.PI; pts.push(V3(x - Math.cos(t) * w / 2, y + wh + Math.sin(t) * 5, zz)); } B.add(tubeGeo(pts, 0.14, 5), null, iron, 'plain', { outlineT: 0, edges: false }); }
   const roof = new THREE.CylinderGeometry(w / 2, w / 2, d, 16, 1, true, -Math.PI / 2, Math.PI);
-  roof.rotateX(Math.PI / 2); roof.scale(1, 1, 1);
+  roof.rotateX(Math.PI / 2);
   const rm = new THREE.Mesh(roof, new THREE.MeshBasicMaterial({ color: 0xcff5f0, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide }));
-  rm.scale.set(1, 5 / (w / 2), 1); rm.position.set(x, y + 6, z); W.group.add(rm);
-  W.camBoxes.push({ x0: x - w / 2, y0: y + 6, z0: z - d / 2, x1: x + w / 2, y1: y + 12, z1: z + d / 2 });
-  // plants inside: palms and flowers
-  for (let i = 0; i < 10; i++) { const px = x + ((i % 2) ? 5 : -5), pz = z - d / 2 + 4 + Math.floor(i / 2) * 6.5; H.tree(px, pz, { y, s: 0.7, h: 3.5, color: ['#4fae6a', '#e07a9a', '#7fcf5a'][i % 3], single: i % 3 === 1, far: false }); }
+  rm.scale.set(1, 5 / (w / 2), 1); rm.position.set(x, y + wh, z); W.group.add(rm);
+  B.box(x - 1.4, y + wh + 5, z - d / 2 + 2, x + 1.4, y + wh + 6.2, z + d / 2 - 2, '#e8f4f2', 'glass', { outlineT: 0, edges: false });
+  B.box(x - 1.6, y + wh + 6.2, z - d / 2 + 1.8, x + 1.6, y + wh + 6.5, z + d / 2 - 1.8, iron, 'plain', { outlineT: 0.04, edges: false });
+  W.camBoxes.push({ x0: x - w / 2, y0: y + wh, z0: z - d / 2, x1: x + w / 2, y1: y + 12, z1: z + d / 2 });
+  // inside: a path through, beds of palms and flowers either side, a little pool in the middle
+  B.box(x - 1.6, y, z - d / 2, x + 1.6, y + 0.04, z + d / 2, '#d8cdb5', 'tiles', { outlineT: 0, edges: false });
+  for (let i = 0; i < 10; i++) { const px = x + ((i % 2) ? 6 : -6), pz = z - d / 2 + 4 + Math.floor(i / 2) * 6.5; H.tree(px, pz, { y, s: 0.7, h: 3.5, color: ['#4fae6a', '#e07a9a', '#7fcf5a'][i % 3], single: i % 3 === 1, far: false }); }
+  const rr = U.rng(55); for (const sx of [-1, 1]) for (let k = 0; k < 6; k++) H.flowerBed(x + sx * 3.4, z - d / 2 + 4 + k * 5.2, 1.0, rr, y);
+  K.cyl(x, y - 0.2, z + 2, 2.2, 0.6, '#a89a82', { outline: 0.05, seg: 14 });
+  B.add(new THREE.CircleGeometry(1.9, 14).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(x, y + 0.45, z + 2), '#5fa8b8', 'plain', { outlineT: 0, edges: false });
+  W.boxes.push({ x0: x - 1.8, y0: y - 1, z0: z + 0.2, x1: x + 1.8, y1: y + 0.4, z1: z + 3.8, tag: 'pool' });
   F.box(x - w / 2, y, z - d / 2, x + w / 2, y + 9, z + d / 2, '#cfeeea');
-  H.bench(x, z + 4, false, { y, view: false });
+  H.bench(x - 2.6, z - 6, false, { y, view: false }); H.bench(x + 2.6, z + 9, false, { y, view: false });
+  H.reserve([x - w / 2 - 5, z - d / 2 - 10, x + w / 2 + 5, z + d / 2 + 10]);
   H.spot('glasshouse', x, z, 20);
 }
 

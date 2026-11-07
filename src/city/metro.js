@@ -4,15 +4,18 @@
 //  (roof) and that knock you off the rails.
 // ============================================================
 // the loop, as drawn on the sketch (cubic Béziers in map units), starting at Hilltop
+// (the joints are smooth: each segment leaves a station the way the last one arrived)
 const METRO_SVG = [
-  [[235, 115], [255, 150], [270, 200], [280, 262]],
-  [[280, 262], [290, 320], [300, 350], [295, 400]],
-  [[295, 400], [280, 425], [240, 445], [205, 440]],
+  [[235, 115], [260, 129], [270, 200], [280, 262]],
+  [[280, 262], [290, 320], [302, 360], [295, 400]],
+  [[295, 400], [290, 428], [240, 445], [205, 440]],
   [[205, 440], [165, 435], [130, 400], [125, 350]],
-  [[125, 350], [122, 310], [170, 290], [195, 265]],
-  [[195, 265], [160, 230], [110, 175], [80, 175]],
-  [[80, 175], [120, 150], [190, 120], [235, 115]],
+  [[125, 350], [122, 310], [195, 320], [195, 265]],     // north into Central, straight through it…
+  [[195, 265], [195, 215], [80, 230], [80, 175]],       // …then west under downtown, and north into Park
+  [[80, 175], [80, 125], [190, 90], [235, 115]],        // north out of Park, round through the ridge to Hilltop
 ];
+// downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
+const DOWNTOWN = [-250, -700, 370, 250];
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96 };
 
 function planMetro() {
@@ -48,11 +51,23 @@ function planMetro() {
   const ground = pts.map(p => terrainAt(p.x, p.z));
   const half = METRO.platLen / 2 / METRO.step;
   const fixed = new Array(N).fill(null);
+  const inDown = (p) => p.x > DOWNTOWN[0] && p.x < DOWNTOWN[2] && p.z > DOWNTOWN[1] && p.z < DOWNTOWN[3];
+  const under = pts.map(inDown);
   for (const st of stations) {
-    let g = -1e9; for (let d = -half; d <= half; d++) g = Math.max(g, ground[(st.i + d + N) % N]);
-    st.y = g + METRO.clear - 1;
+    st.under = under[st.i];
+    let g = st.under ? 1e9 : -1e9; for (let d = -half; d <= half; d++) g = st.under ? Math.min(g, ground[(st.i + d + N) % N]) : Math.max(g, ground[(st.i + d + N) % N]);
+    st.y = st.under ? g - 10 : g + METRO.clear - 1;
     for (let d = -half; d <= half; d++) fixed[(st.i + d + N) % N] = st.y;
+    if (st.under) {
+      // the sunken court over the platforms (on the terrain grid's lines)
+      const sn = (v, o, c) => o + Math.round((v - o) / c) * c, p = pts[st.i];
+      st.hole = [sn(p.x - 16, TER.x0, TER.cell), sn(p.z - 56, TER.z0, TER.cell), sn(p.x + 16, TER.x0, TER.cell), sn(p.z + 56, TER.z0, TER.cell)];
+      TER.holes.push(st.hole);
+    }
   }
+  // the approaches: free to dip below the ground for a few hundred metres either side of downtown
+  const free = new Array(N).fill(false), reach = Math.round(330 / METRO.step);
+  for (let i = 0; i < N; i++) if (under[i]) for (let d = -reach; d <= reach; d++) { const j = (i + d + N) % N; if (!under[j]) free[j] = true; }
   const y = new Array(N).fill(0);
   const ord = stations.slice().sort((a, b) => a.i - b.i);
   for (let q = 0; q < ord.length; q++) {
@@ -66,7 +81,11 @@ function planMetro() {
   const park = stations.find(s => s.key === 'park'), hill = stations.find(s => s.key === 'hilltop');
   const inTunnelSpan = (i) => { const a = park.i + half, b = hill.i - half + N; const ii = i < park.i ? i + N : i; return ii > a && ii < b; };
   for (let pass = 0; pass < 3; pass++) {
-    for (let i = 0; i < N; i++) if (fixed[i] === null && !inTunnelSpan(i)) y[i] = Math.max(y[i], ground[i] + 6);
+    for (let i = 0; i < N; i++) {
+      if (fixed[i] !== null) continue;
+      if (under[i]) y[i] = Math.min(y[i], ground[i] - 10);
+      else if (!inTunnelSpan(i) && !free[i]) y[i] = Math.max(y[i], ground[i] + 6);
+    }
     // smooth (never touching the platforms)
     const y2 = y.slice();
     for (let i = 0; i < N; i++) { if (fixed[i] !== null) continue; let s = 0, c = 0; for (let d = -12; d <= 12; d++) { s += y[(i + d + N) % N]; c++; } y2[i] = s / c; }
@@ -76,7 +95,7 @@ function planMetro() {
   // directions
   for (let i = 0; i < N; i++) { const a = pts[(i - 1 + N) % N], b = pts[(i + 1) % N]; const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); pts[i].dx = dx / l; pts[i].dz = dz / l; }
   // covered parts: the ground is well above the deck
-  for (let i = 0; i < N; i++) pts[i].covered = ground[i] > y[i] + 5;
+  for (let i = 0; i < N; i++) { pts[i].covered = ground[i] > y[i] + 5 && !inHole(pts[i].x, pts[i].z); pts[i].down = under[i] || free[i]; }
   return { pts, L, N, stations, step: L / N };
 }
 
@@ -168,7 +187,7 @@ function buildMetro(K, M, S, F) {
   // pillars (and their far copies), arches over the gallery
   for (let i = 0; i < N; i += 9) {
     const p = M.pts[i];
-    if (p.covered) continue;
+    if (p.covered || inHole(p.x, p.z)) continue;
     const gy = Math.min(terrainAt(p.x - p.dz * 2, p.z + p.dx * 2), terrainAt(p.x + p.dz * 2, p.z - p.dx * 2), terrainAt(p.x, p.z));
     if (p.y - 1.5 - gy < 1.2) continue;
     const m = new THREE.Matrix4().makeRotationY(Math.atan2(p.dx, p.dz)).setPosition(p.x, (gy - 1 + p.y - 1.4) / 2, p.z);
@@ -258,8 +277,9 @@ function buildStations(K, M, S, F) {
       }
       for (const k of [-8, 8]) { const a = M.pts[idx(k)], [bx, , bz] = L(a, sd * (IN + WIDTH - 1.3)); K.bench(bx, bz, Math.abs(a.dx) > Math.abs(a.dz), p.y + PH, '#c97a3c', false); W.benches.push({ x: bx, y: p.y + PH, z: bz, alongX: Math.abs(a.dx) > Math.abs(a.dz) }); }
     }
-    // ramps down to the street, leaving each platform end at an angle, away from the line
     const ramps = [];
+    if (st.under) { sunkenCourt(K, S, st, p, ramps, IN + WIDTH, PH); W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 })); continue; }
+    // ramps down to the street, leaving each platform end at an angle, away from the line
     for (const sd of [-1, 1]) {
       const kEnd = sd > 0 ? hn : -hn, e = M.pts[idx(kEnd)], dirA = sd > 0 ? 1 : -1;
       const tx = e.dx * dirA, tz = e.dz * dirA, ox = -e.dz * sd, oz = e.dx * sd;
@@ -288,6 +308,52 @@ function buildStations(K, M, S, F) {
   }
   const mk = (arr, col, kind) => { if (!arr.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
   mk(quads.plat, '#d8d0c0', 'paving'); mk(quads.edge, '#e8c84a', 'paint'); mk(quads.side, '#b9b1a2', 'plain'); mk(quads.can, '#7aa6b8', 'plain');
+}
+
+// an underground station's court: retaining walls (ledges on top), ramps from the street down to
+// each platform along the long walls, railings round the edge (grindable), lights
+function sunkenCourt(K, S, st, p, ramps, platOut, PH) {
+  const W = K.W, B = K.B, [hx0, hz0, hx1, hz1] = st.hole, py = p.y + PH;
+  const edgeY = (x, z) => terrainAt(x, z);
+  const top = Math.max(edgeY(hx0, hz0), edgeY(hx1, hz0), edgeY(hx0, hz1), edgeY(hx1, hz1)) + 0.4;
+  // walls: from below the deck up to just above the street; their tops are ledges
+  const wc = '#cbbfa6';
+  K.box(hx0 - 1.2, p.y - 3, hz0 - 1.2, hx0, top, hz1 + 1.2, wc, 'paving', { outlineT: 0.06 });
+  K.box(hx1, p.y - 3, hz0 - 1.2, hx1 + 1.2, top, hz1 + 1.2, wc, 'paving', { outlineT: 0.06 });
+  // the end walls open where each ramp comes up from the street
+  const gw = (sd) => { const a = p.x + sd * (platOut - 0.1), b = p.x + sd * (platOut + 4.3); return [Math.min(a, b), Math.max(a, b)]; };
+  const [wa, wb] = gw(-1), [ea, eb] = gw(1);
+  K.box(hx0, p.y - 3, hz0 - 1.2, wa, top, hz0, wc, 'paving', { outlineT: 0.06 }); K.box(wb, p.y - 3, hz0 - 1.2, hx1, top, hz0, wc, 'paving', { outlineT: 0.06 });
+  K.box(hx0, p.y - 3, hz1, ea, top, hz1 + 1.2, wc, 'paving', { outlineT: 0.06 }); K.box(eb, p.y - 3, hz1, hx1, top, hz1 + 1.2, wc, 'paving', { outlineT: 0.06 });
+  // the floor of the court (outside the platforms)
+  B.box(hx0, p.y - 2.2, hz0, hx1, p.y - 1.6, hz1, '#9a9488', 'paving', { outlineT: 0, edges: false });
+  // a ramp along each long wall: down from the street at one end to the platform at the other
+  const drop = top - py, len = Math.min(hz1 - hz0 - 8, Math.max(40, drop / 0.13));
+  for (const sd of [-1, 1]) {
+    const x0 = p.x + sd * (platOut - 0.1), x1 = p.x + sd * (platOut + 4.3), xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+    const zTop = sd < 0 ? hz0 - 1.2 : hz1 + 1.2, zBot = (sd < 0 ? hz0 : hz1) - sd * len;   // west ramp starts at the north end, east at the south
+    const za = Math.min(zTop, zBot), zb = Math.max(zTop, zBot), rt = terrainAt((xa + xb) / 2, zTop + (sd < 0 ? -1 : 1)) + 0.03;
+    K.ramp(xa, za, xb, zb, 'z', sd < 0 ? rt : py, sd < 0 ? py : rt, '#d8d0c0', false, p.y - 2);
+    // and a level landing from the ramp foot to the far end of the platform
+    const zl0 = sd < 0 ? zBot : hz0 + 2, zl1 = sd < 0 ? hz1 - 2 : zBot;
+    if (zl1 - zl0 > 1) K.box(xa, p.y - 2, Math.min(zl0, zl1), xb, py, Math.max(zl0, zl1), '#d8d0c0', 'paving', { outlineT: 0.04 });
+    const rx = sd < 0 ? xa + 0.2 : xb - 0.2, rp = [];
+    for (let k = 0; k <= 12; k++) { const t = k / 12, z = U.lerp(za, zb, t), y = U.lerp(sd < 0 ? rt : py, sd < 0 ? py : rt, t); rp.push([rx, y + 1.0, z]); }
+    K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.3, round: 0, radius: 0.06 });
+    ramps.push({ from: [(xa + xb) / 2, zTop], to: [(xa + xb) / 2, zBot] });
+  }
+  // railings round the court (gaps where the ramps come up)
+  const ry = top + 1.0;
+  const rampGapW = (x) => Math.abs(x - (p.x - platOut - 2.3)) < 2.4 || Math.abs(x - (p.x + platOut + 2.3)) < 2.4;
+  for (const [z, gapX] of [[hz0 - 0.6, p.x - platOut - 2.3], [hz1 + 0.6, p.x + platOut + 2.3]]) {
+    const seg1 = [[hx0 - 0.6, ry, z], [gapX - 2.6, ry, z]], seg2 = [[gapX + 2.6, ry, z], [hx1 + 0.6, ry, z]];
+    for (const sg of [seg1, seg2]) if (Math.abs(sg[1][0] - sg[0][0]) > 2) K.rail(sg, { color: '#e9e4f5', postColor: '#3a3550', round: 0 });
+  }
+  for (const x of [hx0 - 0.6, hx1 + 0.6]) K.rail([[x, ry, hz0 - 0.6], [x, ry, hz1 + 0.6]], { color: '#e9e4f5', postColor: '#3a3550', round: 0 });
+  // lights along the walls
+  for (let z = hz0 + 6; z < hz1 - 4; z += 12) for (const x of [hx0 + 0.15, hx1 - 0.15]) B.box(x - 0.15, py + 3, z - 0.6, x + 0.15, py + 3.4, z + 0.6, '#ffe9b0', 'lamp', { outlineT: 0, edges: false });
+  W.camBoxes = W.camBoxes || [];
+  st.court = { x0: hx0, z0: hz0, x1: hx1, z1: hz1, top };
 }
 
 // ---------- sloped slabs you can skate on (viaduct deck, ramps, bridges) ----------
