@@ -45,6 +45,8 @@ const hooks = {
       Game.fx.burst(V3().copy(p.pos).add(V3(0, 0.1, 0)), 5, ['#ffffff', '#ffd23f'], 2, 0.3, 3);
       return;
     }
+    // landing a run of tricks in front of people: they clap
+    if ((Game.combo || 0) >= 2 && Game.t > (Game.clapCD || 0)) { const n = Life.applaud(p.pos.x, p.pos.z, Game.combo >= 4); if (n >= 2) { Sound.sfx.applause(n); Game.clapCD = Game.t + 6; } }
     Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
   grindStart(r) {
     Sound.sfx.land(0.4); Game.combo = (Game.combo || 0) + 1;
@@ -111,7 +113,9 @@ async function boot() {
   Game.cam = new CamRig(G.camera, W);
   Game.cam.snap(Game.player);
   Sky.init(W, 0.6);
-  Life.init(W);
+  Fauna.init(W); Life.init(W);
+  // the camera's no-go boxes (tree canopies, gallery roofs…), filed in a grid so it only checks nearby ones
+  W.camGrid = makeGrid(32); for (const b of (W.camBoxes || [])) W.camGrid.add(b, b.x0, b.z0, b.x1, b.z1);
   W.soundGrid = makeGrid(32); W.sounds.forEach((s, i) => { s.i = i; W.soundGrid.add(s, s.x - s.r, s.z - s.r, s.x + s.r, s.z + s.r); });
   bindUI();
   if (U.isTouch) document.body.classList.add('touch');
@@ -360,7 +364,7 @@ function loop(now) {
   }
   if (Game.state !== 'paused') {
     for (const d of W.dyn) d.update(dt, bi);
-    Life.update(dt, bi, Game.state === 'play' ? p.pos : G.camera.position);
+    Life.update(dt, bi, Game.state === 'play' ? p.pos : G.camera.position); Fauna.update(dt, bi, Game.state === 'play' ? p.pos : G.camera.position);
     if (Game.state === 'play') { updateWorld(dt, bi); updateGrindHint(dt, bi); }
     Game.fx.update(dt);
     Sky.update(dt, G.camera.position);

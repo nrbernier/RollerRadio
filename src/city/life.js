@@ -4,7 +4,7 @@
 const Life = (() => {
   let W, cars = [], boats = [], flocks = [], pigeons = [], ducks = [], gulls = [];
   let birdIM, duckIM, dogIM;
-  const walkers = [], standers = [], all = [], dogs = [];
+  const walkers = [], standers = [], all = [], dogs = [], actors = [];
   const L = { crowdNear: 0 };
   const STYLE = {
     business: ['#2a2f45', '#3e4a6a', '#6a6a72', '#1f2433', '#8a5a4a', '#c9c2b4', '#2f5f8a', '#e8e2d4', '#7a2f3a'],
@@ -31,9 +31,11 @@ const Life = (() => {
     const torso = merge([
       [new THREE.CylinderGeometry(0.2, 0.25, 0.62, 8), T4(0, 1.12, 0)],
       [new THREE.SphereGeometry(0.235, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.Matrix4().makeScale(1, 0.55, 0.8).setPosition(0, 1.42, 0)],
-      [new THREE.CylinderGeometry(0.065, 0.055, 0.6, 5), T4(-0.27, 1.12, 0, 0, 0, -0.12)],
-      [new THREE.CylinderGeometry(0.065, 0.055, 0.6, 5), T4(0.27, 1.12, 0, 0, 0, 0.12)],
     ]);
+    // an arm hangs from the shoulder (pivot at the origin); the hand is skin-ish at the end
+    const arm = merge([[new THREE.CylinderGeometry(0.065, 0.055, 0.56, 5), T4(0, -0.28, 0)], [new THREE.SphereGeometry(0.06, 5, 4), T4(0, -0.6, 0)]]);
+    // props in hand: a phone, a tour guide's flag on a pole
+    const phone = merge([[new THREE.BoxGeometry(0.08, 0.15, 0.02), T4(0, -0.64, 0.04)]]);
     const head = merge([[new THREE.SphereGeometry(0.17, 10, 8), T4(0, 1.66, 0)], [new THREE.CylinderGeometry(0.07, 0.08, 0.14, 6), T4(0, 1.5, 0)]]);
     const hair = merge([[new THREE.SphereGeometry(0.182, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.Matrix4().makeScale(1, 0.92, 1.05).setPosition(0, 1.67, -0.015)]]);
     // a leg hangs from the hip (pivot at the origin)
@@ -46,6 +48,9 @@ const Life = (() => {
     ]);
     const mk = (g, cnt = n) => { const im = new THREE.InstancedMesh(g, toon('#ffffff', { noCache: true }), cnt); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.count = 0; im.setColorAt(0, _c.set('#ffffff')); W.group.add(im); return im; };
     PM.torso = mk(torso); PM.legL = mk(leg); PM.legR = mk(leg); PM.head = mk(head); PM.hair = mk(hair); PM.sit = mk(sit);
+    PM.armL = mk(arm); PM.armR = mk(arm); PM.prop = mk(phone);
+    const flag = mergeParts([[new THREE.CylinderGeometry(0.02, 0.02, 1.7, 4), T4(0, -0.2, 0), '#3a3550'], [new THREE.BoxGeometry(0.02, 0.32, 0.48), T4(0, 0.5, 0.25), '#ffffff']]);
+    PM.flag = mk(flag, 8);
   }
   function person(style, r, o = {}) {
     const pal = STYLE[style] || STYLE.business;
@@ -59,8 +64,42 @@ const Life = (() => {
     all.push(p);
     return Object.assign(p, o);
   }
+  // the hat owner: runs after it, catches up, puts it on, strolls back, waits for the next gust
+  function hatScript(a, dt) {
+    const h = W.hatChase, x0 = h.x0;
+    let tx = h.x - 2.2, run = 0;
+    if (h.st === 'blow') run = 1;
+    else if (h.st === 'rest') { tx = h.x - 0.6; run = Math.abs(a.x - tx) > 0.3 ? 1 : 0; }
+    else if (h.st === 'carried') { tx = h.x - 0.6; a.gest = a.gest && a.gest.kind === 'cheer' ? a.gest : { kind: 'cheer', t0: Game.t, until: Game.t + 1.6 }; }
+    else if (h.st === 'walkback') { tx = h.x; run = 0.4; }
+    else tx = x0;
+    const dx = tx - a.x; a.x += U.clamp(dx, -dt * 6, dt * 6); a.z = shoreZ(a.x) - 34 - 2.2; a.y = terrainAt(a.x, a.z);
+    a.yaw = Math.abs(dx) > 0.05 ? (dx > 0 ? Math.PI / 2 : -Math.PI / 2) : a.yaw;
+    a.t += dt; return run;
+  }
   const pickStyle = (x, z) => { const d = districtAt(x, z); return d ? d.key : 'business'; };
-  let slot = 0;
+  let slot = 0, flagN = 0;
+  // arm angles (about x: negative is forward/up; about z: out to the side) for a pose or a gesture
+  const _arm = { lx: 0, lz: 0, rx: 0, rz: 0, prop: false };
+  function arms(p, swing, pose) {
+    const a = _arm; a.prop = false;
+    if (pose === 'walk') { a.lx = -swing * 0.9; a.rx = swing * 0.9; a.lz = -0.1; a.rz = 0.1; }
+    else if (pose === 'sit') { a.lx = a.rx = -0.75; a.lz = -0.05; a.rz = 0.05; }
+    else if (pose === 'ground') { a.lx = a.rx = -0.25; a.lz = -0.5; a.rz = 0.5; }
+    else { a.lx = a.rx = 0.04; a.lz = -0.1; a.rz = 0.1; }
+    const g = p.gest, t = Game.t;
+    if (p.flag) { a.rx = -2.75; a.rz = 0.15; }
+    if (p.phone && pose !== 'walk') { a.rx = -1.9; a.rz = 0.35; a.prop = true; if (pose !== 'sit') { a.lx = -0.7; a.lz = -0.3; } }
+    if (g && t < g.until) {
+      const k = Math.min(1, (t - g.t0) * 5, (g.until - t) * 5);
+      if (g.kind === 'wave') { a.rx = U.lerp(a.rx, -2.9, k); a.rz = U.lerp(a.rz, 0.25 + Math.sin(t * 12) * 0.35, k); }
+      else if (g.kind === 'point') { a.rx = U.lerp(a.rx, -1.55, k); a.rz = U.lerp(a.rz, 0.05, k); }
+      else if (g.kind === 'clap') { const c = Math.abs(Math.sin(t * 9)) * 0.3; a.lx = a.rx = U.lerp(a.lx, -1.25, k); a.lz = U.lerp(a.lz, 0.35 - c, k); a.rz = U.lerp(a.rz, -0.35 + c, k); }
+      else if (g.kind === 'cheer') { a.lx = a.rx = U.lerp(a.lx, -2.9, k); a.lz = U.lerp(a.lz, -0.35, k); a.rz = U.lerp(a.rz, 0.35, k); }
+      else if (g.kind === 'taichi') { const u = Math.sin(t * 0.8 + p.ph * 0.1); a.lx = a.rx = -0.4 - (u * 0.5 + 0.5) * 1.3; a.lz = -0.3 - u * 0.4; a.rz = 0.3 + u * 0.4; }
+    }
+    return a;
+  }
   function emit(p, swing, bob, pose) {
     const k = slot++;
     _q.setFromAxisAngle(Y, p.yaw);
@@ -78,6 +117,13 @@ const Life = (() => {
       }
       _m2.makeScale(0, 0, 0); PM.sit.setMatrixAt(k, _m2);
     }
+    // arms from the shoulders
+    const a = arms(p, swing, pose);
+    PM.armL.setColorAt(k, _c.setHex(p.top)); PM.armR.setColorAt(k, _c);
+    _e.set(a.lx, 0, a.lz); _m2.makeRotationFromEuler(_e).setPosition(-0.27, 1.38, 0); PM.armL.setMatrixAt(k, _m3.multiplyMatrices(_m, _m2));
+    _e.set(a.rx, 0, a.rz); _m2.makeRotationFromEuler(_e).setPosition(0.27, 1.38, 0); _m3.multiplyMatrices(_m, _m2); PM.armR.setMatrixAt(k, _m3);
+    if (a.prop) { PM.prop.setMatrixAt(k, _m3); PM.prop.setColorAt(k, _c.set('#1b1a24')); } else { _m2.makeScale(0, 0, 0); PM.prop.setMatrixAt(k, _m2); }
+    if (p.flag && flagN < 8) { _m2.makeTranslation(0, -0.62, 0); PM.flag.setMatrixAt(flagN, _m3.multiply(_m2)); PM.flag.setColorAt(flagN++, _c.set(p.flag)); }
   }
 
   function init(world) {
@@ -123,11 +169,26 @@ const Life = (() => {
       const st = person(pickStyle(x, z), r, { x: x - Math.sin(yaw) * 0.1, z: z - Math.cos(yaw) * 0.1, yaw0: yaw, pose: 'sit', sit: true });
       st.y = b.y + 0.5 - 0.8 * st.sc; standers.push(st); b.half = end;
     }
-    for (const s of standers) s.yaw = s.yaw0;
+    for (const s of standers) { s.yaw = s.yaw0; if (!s.talk && !s.sit && r() < 0.18) s.phone = true; if (s.sit && r() < 0.2) s.phone = true; }
     const busks = (W.spots || []).filter(sp => sp.key.startsWith('busk_'));
     for (const s of standers) s.nearBusk = busks.some(b => Math.hypot(b.x - s.x, b.z - s.z) < 18 && Math.hypot(b.x - s.x, b.z - s.z) > 1.5);
     // a few extra listeners round each busker
     for (const b of busks) for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 4 + r() * 4, x = b.x + Math.cos(a) * d, z = b.z + Math.sin(a) * d; const s = person(pickStyle(x, z), r, { x, z, y: terrainAt(x, z), yaw0: Math.atan2(b.x - x, b.z - z), nearBusk: true }); s.yaw = s.yaw0; standers.push(s); }
+    // ---- little scenes ----
+    // a tour group following a flag up and down the old town's main lane
+    const lane = (W.oldLanes || [])[0];
+    if (lane) {
+      const segs = []; let len = 0; for (let j = 0; j < lane.length - 1; j++) { const l = Math.hypot(lane[j + 1][0] - lane[j][0], lane[j + 1][1] - lane[j][1]); if (l < 0.01) continue; segs.push({ a: lane[j], b: lane[j + 1], l, s0: len }); len += l; }
+      const s0 = len * 0.3;
+      const lead = person('oldtown', r, { segs, len, s: s0, dir: 1, sp: 0.9, off: 0.4, dodge: 0, flag: '#e4572e' }); walkers.push(lead);
+      for (let k = 0; k < 10; k++) walkers.push(person(pick(r, ['lake', 'market', 'park']), r, { segs, len, s: s0 - 1.6 - k * 0.7 - r() * 0.5, dir: 1, sp: 0.9, off: (r() - 0.5) * 2.6, dodge: 0, phone: r() < 0.3 }));
+    }
+    // tai chi at dawn in the park clearing
+    for (let k = 0; k < 8; k++) { const x = -770 + (k % 4) * 2.6, z = -104 + Math.floor(k / 4) * 2.8; const s = person('park', r, { x, z, y: terrainAt(x, z), yaw0: 0.2, gest: { kind: 'taichi', t0: -1, until: 1e9 }, when: () => Sky.phase > 0.2 && Sky.phase < 0.42 }); s.yaw = s.yaw0; standers.push(s); }
+    // a man whose hat blew off, chasing it down the promenade
+    if (W.hatChase) actors.push(Object.assign(person('lake', r, { sp: 0 }), { script: hatScript, x: W.hatChase.x0 - 2 }));
+    // a dog that chases the old-town square's pigeons now and then
+    if (W.bell) { const sq = (W.pigeonSpots || []).reduce((b, p) => Math.hypot(p[0] - W.bell.x, p[1] - W.bell.z) < Math.hypot(b[0] - W.bell.x, b[1] - W.bell.z) ? p : b, [W.bell.x + 10, W.bell.z]); dogs.push({ chase: { x: sq[0], z: sq[1] }, col: '#c8a060', sc: 0.8, x: sq[0] + 8, z: sq[1], y: 0, yaw: 0, t: r() * 20 }); }
     // dogs (one instanced mesh)
     const dogG = mergeParts([
       [new THREE.BoxGeometry(0.26, 0.26, 0.62), T4(0, 0.42, 0), '#ffffff'], [new THREE.BoxGeometry(0.22, 0.22, 0.26), T4(0, 0.6, 0.38), '#ffffff'],
@@ -295,7 +356,7 @@ const Life = (() => {
     if (!W) return;
     const fx = focus.x, fz = focus.z, pl = Game.player;
     // people: everyone within reach is animated and packed into the instanced meshes
-    let crowd = 0; slot = 0;
+    let crowd = 0; slot = 0; flagN = 0;
     const R = Math.min(230, (Game.cellR || 360) * 0.64), cap = PM.torso.instanceMatrix.count;
     for (const w of walkers) {
       w.s += w.sp * dt * w.dir; if (w.s > w.len) { w.s = w.len; w.dir = -1; } else if (w.s < 0) { w.s = 0; w.dir = 1; }
@@ -307,7 +368,7 @@ const Life = (() => {
       w.dodge = U.damp(w.dodge, dp < 3.2 ? (dxp * -_pp.fz + dzp * _pp.fx > 0 ? -1.8 : 1.8) : 0, 4, dt);
       // stepping aside, they make a little sound (a hum, a whistle, a ringtone…); several in a row ripple
       if (dp < 2.6 && pl.speed > 3 && Game.t > (w.cd || 0) && Math.abs(pl.pos.y - w.y) < 2.5) {
-        w.cd = Game.t + 12;
+        w.cd = Game.t + 12; if (Math.random() < 0.25) w.gest = { kind: 'wave', t0: Game.t, until: Game.t + 1.4 };
         if (Game.t > (L.voiceCD || 0)) { Sound.sfx.person(w.style || 'business', (w.ph * 7) | 0); L.voiceCD = Game.t + 0.5; }
         L.passes = (L.passes || []).filter(tt => Game.t - tt < 2.5); L.passes.push(Game.t);
         if (L.passes.length >= 3 && Game.t > (L.rippleCD || 0)) { Sound.sfx.ripple(); L.rippleCD = Game.t + 4; L.passes = []; }
@@ -320,13 +381,23 @@ const Life = (() => {
       emit(w, Math.sin(ph) * (w.jog ? 0.7 : 0.42), Math.abs(Math.cos(ph)) * (w.jog ? 0.09 : 0.035), 'walk');
       if (dp < 12) crowd++;
     }
+    for (const a of actors) {
+      const run = a.script(a, dt);
+      if (Math.abs(a.x - fx) > R || Math.abs(a.z - fz) > R || slot >= cap) continue;
+      const ph = a.t * (run > 0.6 ? 9 : 4);
+      emit(a, run > 0 ? Math.sin(ph) * (run > 0.6 ? 0.75 : 0.4) : 0, run > 0 ? Math.abs(Math.cos(ph)) * 0.08 * run : 0, run > 0 ? 'walk' : 'stand');
+    }
     for (const s of standers) {
       if (Math.abs(s.x - fx) > R || Math.abs(s.z - fz) > R || slot >= cap) continue;
+      if (s.when && !s.when()) continue;
       s.t += dt;
       const ds = Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z);
       if (s.talk) s.yaw = s.yaw0 + Math.sin(s.t * 0.7 + s.ph) * 0.25;
       else if (!s.sit) s.yaw = s.yaw0 + Math.sin(s.t * 0.23 + s.ph) * 0.35;
       if (s.talk && ds < 5 && Game.t > (L.murmurCD || 0)) { Sound.sfx.murmur(); L.murmurCD = Game.t + 7; }
+      // some wave as you go by, and turn to watch you
+      if (ds < 7 && pl.speed > 3 && !s.phone && Game.t > (s.waveCD || 0)) { s.waveCD = Game.t + 20; if (Math.random() < 0.35) s.gest = { kind: 'wave', t0: Game.t, until: Game.t + 1.6 }; }
+      if (s.gest && Game.t < s.gest.until && s.gest.kind !== 'taichi') s.yaw = U.lerp(s.yaw, Math.atan2(pl.pos.x - s.x, pl.pos.z - s.z), 0.1);
       // the music moves them: near a busker they dance, near you (when you stop to listen) they nod along
       let bob = s.talk ? Math.max(0, Math.sin(s.t * 3.1 + s.ph)) * 0.02 : 0;
       const groove = s.nearBusk ? 1 : (Game.listen > 0.4 && ds < 22 ? Game.listen : 0);
@@ -338,11 +409,26 @@ const Life = (() => {
       emit(s, s.nearBusk && !s.sit && bi ? Math.sin(bi.phase * Math.PI * 2) * 0.15 : 0, bob, s.pose === 'sit' ? 'sit' : s.pose === 'ground' ? 'ground' : 'stand');
       if (ds < 12) crowd++;
     }
-    for (const k in PM) { const im = PM[k]; im.count = slot; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+    for (const k in PM) { const im = PM[k]; im.count = k === 'flag' ? flagN : slot; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     L.crowdNear = U.damp(L.crowdNear, Math.min(1, crowd / 8), 2, dt);
     // dogs trot beside their people
     let nd = 0;
+    L.scarers = L.scarers || []; L.scarers.length = 0;
     for (const d of dogs) {
+      if (d.chase) {
+        // every twenty seconds or so: a mad dash round the square, straight through the pigeons
+        if (Math.abs(d.x - fx) > R * 0.7 || Math.abs(d.z - fz) > R * 0.7) continue;
+        d.t += dt; const cyc = d.t % 22, dash = cyc > 16;
+        const a = d.t * (dash ? 1.4 : 0.15), rr = dash ? 7 : 9;
+        const tx = d.chase.x + Math.cos(a) * rr, tz = d.chase.z + Math.sin(a) * rr;
+        const ox = d.x, oz = d.z; d.x = U.damp(d.x, tx, dash ? 6 : 1, dt); d.z = U.damp(d.z, tz, dash ? 6 : 1, dt);
+        if (Math.hypot(d.x - ox, d.z - oz) > 1e-3) d.yaw = Math.atan2(d.x - ox, d.z - oz);
+        d.y = terrainAt(d.x, d.z);
+        if (dash) { L.scarers.push(d); if (cyc < 16.1 && Game.t > (d.cd || 0) && Math.hypot(pl.pos.x - d.x, pl.pos.z - d.z) < 60) { d.cd = Game.t + 15; Sound.sfx.bark(); } }
+        _q.setFromAxisAngle(Y, d.yaw); _m.compose(_v.set(d.x, d.y + (dash ? Math.abs(Math.sin(d.t * 14)) * 0.12 : 0), d.z), _q, _s.setScalar(d.sc));
+        dogIM.setMatrixAt(nd, _m); dogIM.setColorAt(nd, _c.set(d.col)); nd++;
+        continue;
+      }
       const o = d.owner; if (Math.abs(o.x - fx) > R * 0.7 || Math.abs(o.z - fz) > R * 0.7) continue;
       if (Math.hypot(pl.pos.x - d.x, pl.pos.z - d.z) < 4.5 && pl.speed > 2 && Game.t > (d.cd || 0)) { d.cd = Game.t + 9; Sound.sfx.bark(); }
       const fx2 = Math.sin(o.yaw), fz2 = Math.cos(o.yaw);
@@ -460,7 +546,9 @@ const Life = (() => {
     // pigeons scatter as you come through, into a little run of notes
     for (const pg of pigeons) {
       const d = Math.hypot(pl.pos.x - pg.x, pl.pos.z - pg.z);
-      if (pg.fly <= 0 && d < 5 && pl.speed > 3) { pg.fly = 5 + Math.random() * 3; pg.vy = 4 + Math.random() * 2; pg.a = Math.atan2(pg.x - pl.pos.x, pg.z - pl.pos.z) + (Math.random() - 0.5); if (Game.t > (L.flutterCD || 0)) { Sound.sfx.touch('flutter'); L.flutterCD = Game.t + 2.5; } else if (Math.random() < 0.3) Sound.sfx.touch('bird', Math.floor(Math.random() * 5)); }
+      let scared = d < 5 && pl.speed > 3;
+      for (const sc of (L.scarers || [])) if (Math.hypot(sc.x - pg.x, sc.z - pg.z) < 3.5) scared = true;
+      if (pg.fly <= 0 && scared) { pg.fly = 5 + Math.random() * 3; pg.vy = 4 + Math.random() * 2; pg.a = Math.atan2(pg.x - pl.pos.x, pg.z - pl.pos.z) + (Math.random() - 0.5); if (Game.t > (L.flutterCD || 0)) { Sound.sfx.touch('flutter'); L.flutterCD = Game.t + 2.5; } else if (Math.random() < 0.3) Sound.sfx.touch('bird', Math.floor(Math.random() * 5)); }
       if (pg.fly > 0) {
         pg.fly -= dt; pg.vy = Math.max(-1, pg.vy - dt * 1.2);
         pg.x += Math.sin(pg.a) * 6 * dt; pg.z += Math.cos(pg.a) * 6 * dt; pg.m.position.set(pg.x, pg.m.position.y + pg.vy * dt, pg.z); pg.m.scale.y = pg.sc + Math.sin(Game.t * 20) * pg.sc * 0.66;
@@ -481,5 +569,15 @@ const Life = (() => {
     }
     return null;
   }
-  return Object.assign(L, { init, update, hits, walkers, standers });
+  // you landed something: the people nearby clap (kids point and cheer)
+  function applaud(x, z, big) {
+    let n = 0;
+    for (const s of standers) {
+      const d = Math.hypot(s.x - x, s.z - z); if (d > 16 || s.sit && Math.random() < 0.5) continue;
+      s.gest = { kind: s.sc < 0.8 ? 'cheer' : big && Math.random() < 0.3 ? 'cheer' : 'clap', t0: Game.t + Math.random() * 0.2, until: Game.t + 1.8 + Math.random() * 0.8 }; n++;
+    }
+    for (const w of walkers) { if (Math.abs(w.x - x) > 12 || Math.abs(w.z - z) > 12) continue; if (Math.random() < 0.5) w.gest = { kind: w.sc < 0.8 ? 'point' : 'clap', t0: Game.t, until: Game.t + 1.4 }; n++; }
+    return n;
+  }
+  return Object.assign(L, { init, update, hits, walkers, standers, applaud });
 })();

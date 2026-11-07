@@ -86,7 +86,7 @@ function fillKit(H) {
         for (const s of [-0.17, 0.17]) put(BOX, cx + Math.cos(a) * s, y + 0.21, cz - Math.sin(a) * s, 0.04, 0.42, 0.04, '#2a2a32', 'plain', 0, yaw);
         if (r() < (o.busy ?? 0.55)) pts.push([cx - Math.sin(a) * 0.05, cz - Math.cos(a) * 0.05, yaw, y + 0.47, 'sit']);
       }
-      if (o.parasol && r() < 0.8) { put(CYL, x, y + 1.3, z, 0.04, 1.4, 0.04, '#d9d4c8', 'plain', 0); put(CONE, x, y + 2.25, z, 1.5, 0.5, 1.5, pick(r, o.parasol), 'plain', 0.03); }
+      if (o.parasol && r() < 0.8) { put(CYL, x, y + 1.3, z, 0.04, 2.2, 0.04, '#d9d4c8', 'plain', 0); put(CONE, x, y + 2.4, z, 1.1, 0.42, 1.1, pick(r, o.parasol), 'plain', 0.03); }
     }
     if (pts.length) H.standers(pts, style);
     H.sound((x0 + x1) / 2, o.y ?? terrainAt((x0 + x1) / 2, (z0 + z1) / 2), (z0 + z1) / 2, Math.max(x1 - x0, z1 - z0) / 2 + 2, 'clink');

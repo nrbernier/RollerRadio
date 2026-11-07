@@ -107,6 +107,7 @@ function districtKit(K, S, F) {
     blob(x, y + h + r * 0.55, z, r, col);
     if (!o.single) { blob(x + r * 0.55, y + h + r * 0.15, z + r * 0.25, r * 0.66, o.color2 || col); blob(x - r * 0.45, y + h + r * 0.25, z - r * 0.35, r * 0.62, o.color2 || col); }
     W.boxes.push({ x0: x - 0.4 * s, y0: y - 1, z0: z - 0.4 * s, x1: x + 0.4 * s, y1: y + h, z1: z + 0.4 * s, tag: 'tree' });
+    (W.treeList || (W.treeList = [])).push([x, y, z, h]);
     if (!o.tall) W.camBoxes.push({ x0: x - r, y0: y + h, z0: z - r, x1: x + r, y1: y + h + r * 1.4, z1: z + r });
     if (o.far !== false) { _tm.compose(_tv.set(x, y + h + r * 0.55, z), _tq.identity(), _ts.set(r * 0.9, r * 0.72, r * 0.9)); F.addShape(ICOF, _tm, o.farColor || col); }
   };
@@ -445,6 +446,7 @@ function buildPark(H) {
   }
   for (let i = 0; i < 160; i++) { const a = r() * Math.PI * 2, d = pond.r * (0.85 + r() * 0.2), x = pond.x + Math.cos(a) * d, z = pond.z + Math.sin(a) * d; B.add(new THREE.ConeGeometry(0.25, 1.6 + r(), 4), new THREE.Matrix4().makeTranslation(x, pond.y + 0.5, z), '#6f8f4a', 'flat', { outlineT: 0, edges: false }); }
   H.sound(pond.x, pond.y, pond.z, pond.r + 15, 'pond');
+  H.spot('frogs', pond.x, pond.z, pond.r + 30);
   // the glasshouse
   const gh = PLAN.spots.find(s => s.key === 'glasshouse').at;
   buildGlasshouse(H, gh[0], gh[1]);

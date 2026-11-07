@@ -533,7 +533,8 @@ class CamRig {
       if (b.nocam || b.hazard) continue;
       const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
     }
-    for (const b of (this.W.camBoxes || [])) {
+    const cbs = this.W.camGrid ? this.W.camGrid.query(Math.min(tgt.x, want.x) - 0.5, Math.min(tgt.z, want.z) - 0.5, Math.max(tgt.x, want.x) + 0.5, Math.max(tgt.z, want.z) + 0.5, this._cq || (this._cq = [])) : (this.W.camBoxes || []);
+    for (const b of cbs) {
       const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
     }
     if (tmin < len) want.copy(tgt).addScaledVector(dir, Math.max(0.6, tmin - 0.45));
