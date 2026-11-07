@@ -236,7 +236,8 @@ function fillBusiness(H) {
   const pal = ['#d8cfbf', '#c9c2b4'];
   // sidewalk furniture along every street, between the trees and lamps
   let k = 0;
-  for (const x of xs.slice(1, -1)) for (const sd of [-1, 1]) for (let z = R[1] + 20; z < R[3] - 20; z += 9) {
+  for (const sg of (W.bizStreets || [])) for (const sd of [-1, 1]) for (let z = sg.z0 + 12; z < sg.z1 - 12; z += 9) {
+    const x = sg.x;
     if (zs.some(zz => Math.abs(zz - z) < 14)) continue;
     const fx = x + sd * 7;
     const what = (k++) % 6;

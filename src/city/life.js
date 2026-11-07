@@ -199,7 +199,7 @@ const Life = (() => {
     dogIM = new THREE.InstancedMesh(dogG, toon('#ffffff', { noCache: true }), Math.max(1, dogs.length)); dogIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); dogIM.frustumCulled = false; dogIM.count = 0; dogIM.setColorAt(0, _c.set('#ffffff')); W.group.add(dogIM);
     // cars on the big roads: two lanes each way, U-turn at the ends
     const carCols = ['#c4523a', '#2f5f8a', '#e8b84a', '#f2efe6', '#3e8f86', '#2a2838', '#8a5a9e', '#d9779a'];
-    for (const [key, n2] of [['boulevard', 8], ['avenue', 8], ['hill', 3]]) {
+    for (const [key, n2] of [['boulevard', 8], ['avenue', 8], ['hill', 3], ['oblique', 3]]) {
       const road = W.roads[key]; if (!road) continue;
       const P = road.pts; const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
       for (let i = 0; i < n2; i++) {

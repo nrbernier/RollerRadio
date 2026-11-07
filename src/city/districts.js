@@ -221,12 +221,34 @@ function buildBusiness(H) {
   const R = PLAN.byKey.business.rect;
   const xs = [-240, -116, 8, 132, 256, 396], zs = [-996, -870, -744, -618, -492, -366, -240, -114, 12, 138, 240];
   const street = 16, pal = BIZ_PAL;
-  // streets: the grid, laid on the slope
-  for (const x of xs.slice(1, -1)) { groundRibbon(B, [[x, R[1] + 4], [x, R[3] - 4]], street + 6, '#cfc8bb', 'walk', 0.07); const P = groundRibbon(B, [[x, R[1] + 4], [x, R[3] - 4]], street - 4, '#55535f', 'road', 0.1); roadDashes(B, P); W.walkLines = (W.walkLines || []).concat([[[x - street / 2 - 1, R[1] + 10], [x - street / 2 - 1, R[3] - 10]], [[x + street / 2 + 1, R[1] + 10], [x + street / 2 + 1, R[3] - 10]]]); }
-  for (const z of zs.slice(1, -1)) { groundRibbon(B, [[R[0] + 4, z], [R[2] - 4, z]], street + 6, '#cfc8bb', 'walk', 0.07); groundRibbon(B, [[R[0] + 4, z], [R[2] - 4, z]], street - 4, '#55535f', 'road', 0.1); W.walkLines.push([[R[0] + 10, z - street / 2 - 1], [R[2] - 10, z - street / 2 - 1]]); }
-  // Central plaza: around the station
   const cs = PLAN.stations.find(s => s.key === 'central').at;
   const plaza = [cs[0] - 70, cs[1] - 60, cs[0] + 70, cs[1] + 60];
+  // streets: a grid laid on the slope, but not a perfect one — the north–south streets jog sideways
+  // at some crossings (one street at a time), and an oblique avenue cuts up from the plaza
+  const jog = xs.map((x, i) => zs.map((z, j) => {
+    if (i === 0 || i === xs.length - 1 || i === 3 || j === zs.length - 1) return 0;        // edges, and the sky rail's street, stay put
+    const z0 = zs[j], z1 = zs[j + 1]; if (i === 2 && z1 > plaza[1] - 20 && z0 < plaza[3] + 20) return 0;
+    return r() < 0.4 ? (r() < 0.5 ? -1 : 1) * (6 + r() * 7) : 0;
+  }));
+  W.bizStreets = [];
+  W.walkLines = W.walkLines || [];
+  for (let i = 1; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
+    const x = xs[i] + jog[i][j], za = j === 0 ? R[1] + 4 : zs[j] - street / 2, zb = j === zs.length - 2 ? R[3] - 4 : zs[j + 1] + street / 2;
+    groundRibbon(B, [[x, za], [x, zb]], street + 6, '#cfc8bb', 'walk', 0.07); const P = groundRibbon(B, [[x, za], [x, zb]], street - 4, '#55535f', 'road', 0.1); roadDashes(B, P);
+    W.walkLines.push([[x - street / 2 - 1, za + 4], [x - street / 2 - 1, zb - 4]], [[x + street / 2 + 1, za + 4], [x + street / 2 + 1, zb - 4]]);
+    W.bizStreets.push({ x, z0: za, z1: zb });
+  }
+  for (const z of zs.slice(1, -1)) { groundRibbon(B, [[R[0] + 4, z], [R[2] - 4, z]], street + 6, '#cfc8bb', 'walk', 0.07); groundRibbon(B, [[R[0] + 4, z], [R[2] - 4, z]], street - 4, '#55535f', 'road', 0.1); W.walkLines.push([[R[0] + 10, z - street / 2 - 1], [R[2] - 10, z - street / 2 - 1]]); }
+  // the oblique avenue: from the plaza's north-east corner up to the street below Hilltop, tree-lined
+  const ob = [[plaza[2] - 6, plaza[1] + 4], [214, -250], [328, -492]];
+  groundRibbon(B, ob, street + 8, '#cfc8bb', 'walk', 0.075); const OP = groundRibbon(B, ob, street - 4, '#55535f', 'road', 0.105); roadDashes(B, OP);
+  H.line(ob, street / 2 + 4);
+  W.roads.oblique = { pts: ob, width: street - 4, P: OP };
+  for (let k = 0; k < ob.length - 1; k++) {
+    const [ax, az] = ob[k], [bx, bz] = ob[k + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
+    for (const sd of [-1, 1]) W.walkLines.push([[ax - uz * sd * (street / 2 + 2), az + ux * sd * (street / 2 + 2)], [bx - uz * sd * (street / 2 + 2), bz + ux * sd * (street / 2 + 2)]]);
+    for (let t = 8; t < L - 6; t += 14) for (const sd of [-1, 1]) { const tx = ax + ux * t - uz * sd * (street / 2 + 1.5), tz = az + uz * t + ux * sd * (street / 2 + 1.5); if (Math.abs(tx - cs[0]) < 75 && Math.abs(tz - cs[1]) < 65) continue; H.tree(tx, tz, { s: 0.8, color: '#5aa35a', color2: '#4a8f4a' }); }
+  }
   H.patch(plaza, '#d8cfbf', 'tiles', 0.08); H.reserve(plaza);
   // fountain in the plaza
   const fx = cs[0] + 40, fz = cs[1] + 32, fy = terrainAt(fx, fz);
@@ -241,7 +263,7 @@ function buildBusiness(H) {
   buildGarage(H, sp[0] - 22, sp[1] - 16, sp[0] + 22, sp[1] + 16);
   // blocks
   for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
-    const bx0 = xs[i] + street / 2 + 5, bx1 = xs[i + 1] - street / 2 - 5, bz0 = zs[j] + street / 2 + 5, bz1 = zs[j + 1] - street / 2 - 5;
+    const bx0 = xs[i] + jog[i][j] + street / 2 + 5, bx1 = xs[i + 1] + jog[i + 1][j] - street / 2 - 5, bz0 = zs[j] + street / 2 + 5, bz1 = zs[j + 1] - street / 2 - 5;
     if (bx1 - bx0 < 20 || bz1 - bz0 < 20) continue;
     // centrality: taller near Central and the middle of the district
     const cx = (bx0 + bx1) / 2, cz = (bz0 + bz1) / 2, core = Math.exp(-Math.hypot(cx - 60, cz + 280) / 520);
@@ -252,6 +274,11 @@ function buildBusiness(H) {
     for (const [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
+        // cut by the avenue: build on whichever corner still fits, plant the rest
+        const halves = [[x0, z0, (x0 + x1) / 2 - 2, (z0 + z1) / 2 - 2], [(x0 + x1) / 2 + 2, z0, x1, (z0 + z1) / 2 - 2], [x0, (z0 + z1) / 2 + 2, (x0 + x1) / 2 - 2, z1], [(x0 + x1) / 2 + 2, (z0 + z1) / 2 + 2, x1, z1]];
+        let built = 0;
+        for (const q of halves) if (q[2] - q[0] >= 12 && q[3] - q[1] >= 12 && H.clearOf(q[0], q[1], q[2], q[3], 3)) { bizBuilding(H, q[0], q[1], q[2], q[3], 12 + r() * 16 + core * (25 + r() * 40), r); H.reserve(q); built++; }
+        if (built) { for (let k = 0; k < 4; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) { H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); H.reserve([tx - 2, tz - 2, tx + 2, tz + 2]); } } continue; }
         // too close to the viaduct: a small pavilion or trees instead
         if (H.clearOf(x0 + 6, z0 + 6, x1 - 6, z1 - 6, 1) && r() < 0.5) H.bldg(x0 + 6, z0 + 6, x1 - 6, z1 - 6, 6 + r() * 4, pick(r, pal), { trim: '#2a2838' });
         else for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); }
@@ -465,15 +492,7 @@ function buildPark(H) {
     if (tz < -1000 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
     else H.tree(tx, tz, { s: big ? 1.9 + r() * 0.9 : 1.1 + r() * 0.4, h: big ? 6.4 : 4.4, r: 3.4, color: col, color2: dark < 0.5 ? '#36693a' : '#4f8a44', tall: big, trunk: '#5a4232' });
   }
-  // shafts of light through the canopy (soft additive planes)
-  const rayMat = new THREE.MeshBasicMaterial({ color: 0xfff1c0, transparent: true, opacity: 0.08, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
-  W.rayMat = rayMat;
-  const rayParts = [];
-  for (let i = 0; i < 70; i++) {
-    const t = trailPts[Math.floor(r() * trailPts.length)], x = t[0] + (r() - 0.5) * 20, z = t[1] + (r() - 0.5) * 20, y = terrainAt(x, z);
-    rayParts.push([new THREE.PlaneGeometry(2 + r() * 3, 26), T4(x, y + 11, z, 0.35, r() * 6, 0.25), '#ffffff']);
-  }
-  const rays = new THREE.Mesh(mergeParts(rayParts), rayMat); W.group.add(rays);
+  // (shafts of light through the canopy: see Fauna — they follow the sun)
   H.walkers(trails.map(t => t.slice()), 26, 'park');
   H.busker('flute', -760, -96, 0.6);
 }

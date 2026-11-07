@@ -7,7 +7,7 @@
 const Fauna = (() => {
   let W, deer = [], rabbits = [], squirrels = [], heron = null, flies = null, kites = [], kiteLines = null, fish = null, balloon = null, hat = null;
   const IM = {};
-  const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = V3(), _s = V3(), _e = new THREE.Euler(), _c = new THREE.Color();
+  const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = V3(), _s = V3(), _rv = [V3(), V3(), V3(), V3(), V3(), V3(), V3()], _e = new THREE.Euler(), _c = new THREE.Color();
   const Y = V3(0, 1, 0);
   const mkIM = (geo, n, mat) => { const im = new THREE.InstancedMesh(geo, mat || toon('#ffffff', { noCache: true }), Math.max(1, n)); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.setColorAt(0, _c.set('#ffffff')); W.group.add(im); return im; };
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -61,6 +61,38 @@ const Fauna = (() => {
     const dot = canvasTex(32, 32, (x, w, h) => { const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }).tex;
     flies = new THREE.Points(fg, new THREE.PointsMaterial({ map: dot, size: 0.9, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     flies.frustumCulled = false; flies.userData.base = base; W.group.add(flies);
+    // ---- shafts of sunlight, only where the forest is dense: they lean with the sun ----
+    {
+      const PR = PLAN.byKey.park.rect, trees = (W.treeList || []).filter(t => t[0] > PR[0] && t[0] < PR[2] && t[2] > PR[1] && t[2] < PR[3]);
+      const grid = new Map(), key = (x, z) => Math.floor(x / 12) + ',' + Math.floor(z / 12);
+      // (cells of 12 m; 'around' looks two cells out)
+      for (const t of trees) { const k = key(t[0], t[2]); (grid.get(k) || grid.set(k, []).get(k)).push(t); }
+      const around = (x, z, R) => { let n = 0, near = 1e9; for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) for (const t of (grid.get((Math.floor(x / 12) + i) + ',' + (Math.floor(z / 12) + j)) || [])) { const d = Math.hypot(t[0] - x, t[2] - z); if (d < R) n++; if (d < near) near = d; } return [n, near]; };
+      const spots = [];
+      for (let i = 0; i < 8000 && spots.length < 150; i++) {
+        const x = PR[0] + 20 + r() * (PR[2] - PR[0] - 40), z = PR[1] + 20 + r() * (PR[3] - PR[1] - 40);
+        const [n, near] = around(x, z, 20);
+        if (n < 6 || near < 2.5 || near > 8) continue;                 // in a gap between trees, in thick woods
+        if (spots.some(s => Math.abs(s[0] - x) < 8 && Math.abs(s[2] - z) < 8)) continue;
+        spots.push([x, terrainAt(x, z) + 0.05, z, 2.4 + r() * 3.4, r() * 6]);
+      }
+      const tex = canvasTex(64, 128, (x, w, h) => {
+        const gx = x.createLinearGradient(0, 0, w, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, 'rgba(255,255,255,1)'); gx.addColorStop(1, 'rgba(255,255,255,0)');
+        x.fillStyle = gx; x.fillRect(0, 0, w, h);
+        x.globalCompositeOperation = 'destination-in';
+        const gy = x.createLinearGradient(0, 0, 0, h); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.25, 'rgba(0,0,0,.9)'); gy.addColorStop(0.8, 'rgba(0,0,0,.7)'); gy.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = gy; x.fillRect(0, 0, w, h);
+      }).tex;
+      const pg = new THREE.PlaneGeometry(1, 1); pg.translate(0, 0.5, 0);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xfff1c0, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
+      IM.rays = new THREE.InstancedMesh(pg, mat, Math.max(1, spots.length)); IM.rays.frustumCulled = false; IM.rays.instanceMatrix.setUsage(THREE.DynamicDrawUsage); W.group.add(IM.rays);
+      IM.rays.userData.spots = spots; Fauna.raySpots = spots.length;
+      // where each shaft lands: a soft warm pool on the forest floor, stretched away from the sun
+      const pool = canvasTex(64, 64, (x, w, h) => { const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }).tex;
+      const cg = new THREE.PlaneGeometry(1, 1); cg.rotateX(-Math.PI / 2);
+      IM.pools = new THREE.InstancedMesh(cg, new THREE.MeshBasicMaterial({ map: pool, color: 0xffe9a8, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), Math.max(1, spots.length));
+      IM.pools.frustumCulled = false; W.group.add(IM.pools);
+    }
     // ---- kites over the beach, held by kids ----
     const kg = new THREE.BufferGeometry();
     kg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.9, 0, -0.6, 0, 0, 0, -1.1, 0, 0, 0.9, 0, 0, -1.1, 0, 0.6, 0, 0, 0, -1.1, 0, -0.08, -2.6, 0, 0.08, -2.6, 0], 3)); kg.computeVertexNormals();
@@ -194,6 +226,34 @@ const Fauna = (() => {
         h.wings.scale.y = 1; h.wings.rotation.z = 0; h.wings.children; h.wings.position.y = Math.sin(t * 5) * 0.25; h.wings.scale.x = 1 + Math.sin(t * 5) * 0.1;
         if (u >= 1) h.st = 'stand';
       } else { h.g.position.set(h.x, h.y, h.z); h.wings.position.y = -0.35; h.wings.scale.x = 0.25; }
+    }
+    // sun shafts: lean along the sun's direction, turn to face you, fade when the sun is low or gone
+    if (IM.rays) {
+      const sun = Sky.S.sun, el = sun.y, cam = G.camera.position, PR = PLAN.byKey.park.rect;
+      const k = U.clamp((el - 0.1) * 5, 0, 1) * (1 - night), gold = U.clamp((0.5 - el) * 2.5, 0, 1);
+      const inPark = cam.x > PR[0] - 250 && cam.x < PR[2] + 250 && cam.z > PR[1] - 250 && cam.z < PR[3] + 250;
+      IM.rays.material.opacity = 0.5 * k;
+      IM.pools.material.opacity = 0.35 * k;
+      IM.rays.material.color.setRGB(1, 0.95 - 0.13 * gold, 0.75 - 0.3 * gold); IM.pools.material.color.copy(IM.rays.material.color);
+      IM.rays.visible = IM.pools.visible = k > 0.01 && inPark;
+      if (IM.rays.visible) {
+        const a = _v.copy(sun).normalize(), L = 12 / Math.max(0.22, a.y);              // tops out inside the canopy, never in open sky
+        const spots = IM.rays.userData.spots, xa = _rv[0], za = _rv[1], vd = _rv[2], ya = _rv[3], px = _rv[4], pz = _rv[5], up = _rv[6].set(0, 1, 0);
+        const hx = a.x, hz = a.z, hl = Math.hypot(hx, hz) || 1, stretch = U.clamp(1 / Math.max(0.3, a.y), 1, 3);
+        spots.forEach((sp, i) => {
+          const flick = 0.75 + 0.25 * Math.sin(t * 0.3 + sp[4]);
+          vd.set(cam.x - sp[0], 0, cam.z - sp[2]);
+          xa.crossVectors(a, vd).normalize(); za.crossVectors(xa, a).normalize();
+          const w = sp[3] * flick;
+          _m.makeBasis(xa.multiplyScalar(w), ya.copy(a).multiplyScalar(L), za).setPosition(sp[0], sp[1], sp[2]);
+          IM.rays.setMatrixAt(i, _m);
+          // pool: long axis along the sun's bearing
+          const pw = w * 1.3, pl = pw * stretch;
+          _m.makeBasis(px.set(hx / hl * pl, 0, hz / hl * pl), up, pz.set(-hz / hl * pw, 0, hx / hl * pw)).setPosition(sp[0], sp[1] + 0.06, sp[2]);
+          IM.pools.setMatrixAt(i, _m);
+        });
+        IM.rays.instanceMatrix.needsUpdate = true; IM.pools.instanceMatrix.needsUpdate = true;
+      }
     }
     // fireflies
     if (flies) {
