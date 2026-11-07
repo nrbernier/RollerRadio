@@ -3890,6 +3890,8 @@ const Sound = (() => {
           case 'xylo': I.marimba(t, deg(i, 0), 0.75); I.marimba(t, deg(i, 1), 0.25); break;
           case 'tube': I.bell(t, deg(i, 1), 0.45, musicOut, 2.2); break;
           case 'drum': if (i === 0) I.frame(t, 0.9); else if (i === 1) I.doum(t, 0.9); else if (i === 2) I.conga(t, 220, 0.8); else I.conga(t, 330, 0.7); I.sub(t, deg(0, -2) + [0, 7, 12, 16][i], 0.4, 0.4); break;
+          case 'puddle': { const g = gain(musicOut, 0); env(g, t, 0.004, 0.12, 0.2); const f = filt('bandpass', 1300, 1, g); f.frequency.exponentialRampToValueAtTime(500, t + 0.2); noise(t, 0.22, f); I.kalimba(t + 0.05, m + 12, 0.35); break; }
+          case 'mushroom': [0, 2, 4].forEach((d, k) => I.marimba(t + k * 0.09, deg(d + (i % 4), 1) + 12, 0.35 - k * 0.08)); break;
           case 'flutter': for (let j = 0; j < 8; j++) I.shaker(t + j * 0.045, 0.6 - j * 0.05); break;
           case 'quack': I.quack(t + 0.08, 0.6); if (i % 2) I.quack(t + 0.3, 0.45); break;
           case 'clink': I.bell(t, m + 24, 0.12, musicOut, 0.6); I.bell(t + 0.07, m + 28, 0.08, musicOut, 0.5); break;
@@ -5683,16 +5685,45 @@ function fillKit(H) {
   const { K, W, B, F } = H;
   const BOX = prepShape(new THREE.BoxGeometry(1, 1, 1)), CYL = prepShape(new THREE.CylinderGeometry(1, 1, 1, 8));
   const ICO = (() => { const g = flatGeo(new THREE.IcosahedronGeometry(1, 0)); g.computeVertexNormals(); return prepShape(g); })();
-  const CONE = prepShape(new THREE.ConeGeometry(1, 1, 10)), WHEEL = prepShape(new THREE.TorusGeometry(0.32, 0.035, 4, 12));
+  const CONE = prepShape(new THREE.ConeGeometry(1, 1, 10)), FERN = prepShape(flatGeo(new THREE.ConeGeometry(1, 1, 5))), WHEEL = prepShape(new THREE.TorusGeometry(0.32, 0.035, 4, 12));
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = V3(), _s = V3(), _e = new THREE.Euler();
   // one call per little box/cylinder/blob, straight into the cell batch
   const put = H.put = (sh, x, y, z, sx, sy, sz, col, kind = 'plain', ol = 0.03, ry = 0, rx = 0, rz = 0) => {
     _q.setFromEuler(_e.set(rx, ry, rz)); _m.compose(_v.set(x, y, z), _q, _s.set(sx, sy, sz)); B.addShape(sh, _m, col, kind, ol);
   };
-  H.SH = { BOX, CYL, ICO, CONE, WHEEL };
+  H.SH = { BOX, CYL, ICO, CONE, WHEEL, FERN };
   const FLOWERS = ['#e4572e', '#f2c14e', '#d9779a', '#f2efe6', '#8a5a9e', '#ff9a4a'];
   H.FLOWERS = FLOWERS;
 
+  // an organic patch of ground (a noisy ellipse that follows the terrain), instead of a rectangle
+  H.blob = (x, z, rx, rz, color, kind = 'gravel', lift = 0.07, seed = 1) => {
+    const rr = U.rng(seed + ((x * 7 + z * 3) | 0)), ph = [rr() * 6, rr() * 6, rr() * 6], N = 36, rings = 5, pos = [];
+    const R = (a) => 1 + 0.12 * Math.sin(3 * a + ph[0]) + 0.07 * Math.sin(5 * a + ph[1]) + 0.04 * Math.sin(9 * a + ph[2]);
+    const P = (k, i) => { const a = i / N * Math.PI * 2, f = k / rings * R(a), px = x + Math.cos(a) * rx * f, pz = z + Math.sin(a) * rz * f; return [px, terrainAt(px, pz) + lift, pz]; };
+    for (let k = 0; k < rings; k++) for (let i = 0; i < N; i++) {
+      const a = P(k, i), b = P(k, i + 1), c = P(k + 1, i + 1), d = P(k + 1, i);
+      if (k === 0) pos.push(...a, ...c, ...d); else pos.push(...a, ...c, ...d, ...a, ...b, ...c);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    if (g.attributes.normal.array[1] < 0) { const a = g.attributes.position.array; for (let i = 0; i < a.length; i += 9) for (let k = 0; k < 3; k++) { const t = a[i + 3 + k]; a[i + 3 + k] = a[i + 6 + k]; a[i + 6 + k] = t; } g.computeVertexNormals(); }
+    B.add(g, null, color, kind, { outlineT: 0, edges: false });
+  };
+  // a boulder: an irregular lump, sunk into the ground, mossy sometimes; you can land on its top
+  H.rock = (x, z, s, r, o = {}) => {
+    const y = terrainAt(x, z), rx = 0.8 + r() * 0.6, ry = 0.45 + r() * 0.4, rz = 0.8 + r() * 0.6, yaw = r() * 6;
+    const col = o.color || pick(r, ['#8f8a80', '#9a948a', '#7f7a72', '#a39d92', '#8a857a']);
+    put(ICO, x, y + s * ry * 0.3, z, s * rx, s * ry, s * rz, col, 'flat', 0.06, yaw, (r() - 0.5) * 0.3, (r() - 0.5) * 0.3);
+    if (o.moss ?? r() < 0.4) put(ICO, x + (r() - 0.5) * s * 0.3, y + s * ry * 1.05, z + (r() - 0.5) * s * 0.3, s * rx * 0.55, s * ry * 0.3, s * rz * 0.55, pick(r, ['#5f8a45', '#6f9a50', '#4f7a40']), 'flat', 0.03, yaw);
+    const top = y + s * ry * 1.1, hw = s * 0.62;
+    if (top - y > 0.25) W.boxes.push({ x0: x - hw * rx, y0: y - 1, z0: z - hw * rz, x1: x + hw * rx, y1: top, z1: z + hw * rz, tag: 'rock' });
+    return top;
+  };
+  H.stump = (x, z, r) => {
+    const y = terrainAt(x, z), rad = 0.35 + r() * 0.35, h = 0.35 + r() * 0.5;
+    K.cyl(x, y - 0.2, z, rad, h + 0.2, '#6b4a35', { outline: 0.04, seg: 8, r2: rad * 1.25 });
+    K.cyl(x, y + h, z, rad * 0.92, 0.03, '#c9a878', { outline: 0, seg: 8 });
+    W.boxes.push({ x0: x - rad * 0.8, y0: y - 1, z0: z - rad * 0.8, x1: x + rad * 0.8, y1: y + h, z1: z + rad * 0.8, tag: 'stump' });
+  };
   // a raised planter: a ledge to land on and grind along its long edges
   H.planter = (x, z, w, d, o = {}) => {
     const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, [lo, hi] = groundSpan(x0, z0, x1, z1);
@@ -5821,7 +5852,7 @@ function fillKit(H) {
   // playground: slide, swings, a climbing frame, children
   H.playground = (x, z, r, style) => {
     const y = terrainAt(x, z);
-    H.patch([x - 12, z - 9, x + 12, z + 9], '#d9b98a', 'gravel', 0.07);
+    H.blob(x, z, 14, 11, '#d9b98a', 'gravel', 0.07, 3);
     // slide: a ladder tower and a ramp down (rideable)
     K.box(x - 9, y - 0.3, z - 6, x - 7, y + 2.2, z - 4, '#e4572e', 'plain', { outlineT: 0.04 });
     K.ramp(x - 7, z - 5.8, x - 1, z - 4.2, 'x', y + 2.2, y + 0.3, '#f2c14e', false, y - 0.3);
@@ -5953,15 +5984,18 @@ function fillCanalQuarter(H) {
   const row = (x0, x1, zFront, dir, depth) => {
     let x = x0;
     while (x < x1) {
-      const w = 6 + r() * 4.5, d = depth * (0.8 + r() * 0.3);
-      const z0 = dir > 0 ? zFront : zFront - d, z1 = dir > 0 ? zFront + d : zFront;
+      const w = 5.5 + r() * 5.5, d = depth * (0.75 + r() * 0.35);
+      // a little in and out along the street; now and then one set back behind a front garden
+      const back = r() < 0.12 ? 3 + r() * 2 : (r() - 0.5) * 1.6, zf = zFront + dir * back;
+      const z0 = dir > 0 ? zf : zf - d, z1 = dir > 0 ? zf + d : zf;
+      if (back > 2.5) H.flowerBed(x + w / 2, zFront + dir * back * 0.45, Math.min(2, w / 3), r);
       if (H.clearOf(x, z0, x + w, z1, 0.4)) {
         const bb = H.bldg(x, z0, x + w, z1, 8 + r() * 9, pick(r, cols), { trim: '#f2ede2', outline: 0.12, kind: 'house' });
         H.roof(x, z0, x + w, z1, bb.top, 3 + r() * 2.2, pick(r, roofs), true);
         H.frontage(x, x + w, dir > 0 ? z0 : z1, dir, bb.hi, bb.top, r, { shop: 0.35, balcony: 0.35 });
         H.reserve([x, z0, x + w, z1]);
       }
-      x += w + (r() < 0.12 ? 7 : 0.05);
+      x += w + (r() < 0.14 ? 4 + r() * 6 : 0.05);
     }
   };
   row(xA, C.bendX - 6, 404, 1, 13); row(xA, C.bendX - 6, 396, -1, 12);
@@ -6112,7 +6146,8 @@ function fillSouthStrip(H) {
     H.reserve([cx - 16, cz - 10, cx + 16, cz + 10]);
   }
   // allotments: neat beds, sheds, people bending over them
-  for (let x = -1010; x < -660; x += 24) for (let z = z0 + 6; z < z1 - 8; z += 18) {
+  for (let x0a = -1010; x0a < -660; x0a += 22 + r() * 6) for (let z0a = z0 + 6; z0a < z1 - 8; z0a += 16 + r() * 5) {
+    const x = x0a + (r() - 0.5) * 3, z = z0a + (r() - 0.5) * 2;
     if (!H.clearOf(x, z, x + 20, z + 14, 0)) continue;
     const y0 = terrainAt(x + 10, z + 7);
     for (let k = 0; k < 4; k++) H.put(H.SH.BOX, x + 2.5 + k * 4.5, y0 + 0.12, z + 7, 3, 0.25, 11, pick(r, ['#6a4a32', '#5a8a3a', '#7a9a4a', '#6a4a32']), 'plain', 0);
@@ -6239,7 +6274,7 @@ function buildFerris(H, x, z) {
   const { K, W, B } = H;
   const gy = terrainAt(x, z), R = 22, n = 16, ay = gy + 2.2 + 0.6 + R + 0.4;
   H.reserve([x - 26, z - 9, x + 26, z + 9]);
-  H.patch([x - 14, z - 8, x + 14, z + 8], '#d8cbb0', 'tiles', 0.08);
+  H.blob(x, z, 17, 10, '#d8cbb0', 'tiles', 0.08, 9);
   // A-frame legs on both sides of the wheel
   for (const sz of [-3.2, 3.2]) for (const sx of [-1, 1]) K.rod(V3(x + sx * 13, gy, z + sz), V3(x, ay, z + sz * 0.7), 0.45, '#e9e4f5', 0.06);
   K.rod(V3(x, ay, z - 3), V3(x, ay, z + 3), 0.7, '#bdb8ce', 0.06);
@@ -6311,7 +6346,7 @@ function buildCable(H) {
   for (const [k, T] of [[0, towers[0]], [1, towers[C.spans]]]) {
     const dir = k === 0 ? 1 : -1, cx = T.x - ux * dir * 6, cz = T.z - uz * dir * 6, py = T.g + 1.6;
     const yaw = Math.atan2(ux, uz), hw = C.off + 3.2;
-    H.patch([cx - 16, cz - 16, cx + 16, cz + 16], '#d8cbb0', 'tiles', 0.08);
+    H.blob(cx, cz, 18, 18, '#d8cbb0', 'tiles', 0.08, 11);
     for (const sd of [-1, 1]) {
       // a platform under each line, beside the gondola path
       const px = cx + nx * (C.off + 2.6) * sd, pz = cz + nz * (C.off + 2.6) * sd;
@@ -6366,6 +6401,89 @@ function fillExtras(H) {
   vineyards(H, r);
   canalMouth(H, r);
   beachHuts(H, r);
+  wild(H, r);
+}
+
+// the woods and the hills: boulders, stumps, ferns, mushrooms — and along the trails, the odd
+// accident: a rock on the edge, a fallen tree across the way, a dirt kicker, a puddle
+function wild(H, r) {
+  const { K, W, B, S } = H;
+  const PR = PLAN.byKey.park.rect;
+  // the forest floor: ferns and low bushes everywhere between the trunks
+  for (let i = 0; i < 2600; i++) {
+    const x = PR[0] + 6 + r() * (PR[2] - PR[0] - 12), z = PR[1] + 6 + r() * (PR[3] - PR[1] - 12);
+    if (!H.clearOf(x - 0.8, z - 0.8, x + 0.8, z + 0.8, 0)) continue;
+    const y = terrainAt(x, z);
+    if (r() < 0.65) for (let k = 0; k < 2; k++) H.put(H.SH.FERN, x + (r() - 0.5) * 1.2, y + 0.28, z + (r() - 0.5) * 1.2, 0.55 + r() * 0.3, 0.6 + r() * 0.4, 0.55 + r() * 0.3, pick(r, ['#4f7a3a', '#5f8a45', '#3f6a35', '#6a8a3a']), 'flat', 0, r() * 6);
+    else H.put(H.SH.ICO, x, y + 0.35, z, 1.0 + r() * 0.6, 0.55 + r() * 0.2, 1.0 + r() * 0.6, pick(r, ['#3f6a35', '#4a7a3e', '#557f3a']), 'flat', 0.05, r() * 6);
+  }
+  // in among the trees
+  for (let i = 0; i < 1400; i++) {
+    const x = PR[0] + 10 + r() * (PR[2] - PR[0] - 20), z = PR[1] + 10 + r() * (PR[3] - PR[1] - 20);
+    const t = r() * 0.86;
+    if (t < 0.18) { if (!H.clearOf(x - 3, z - 3, x + 3, z + 3, 0.5)) continue; const n = 1 + Math.floor(r() * 4); for (let k = 0; k < n; k++) H.rock(x + (r() - 0.5) * 5, z + (r() - 0.5) * 5, 0.6 + r() * (k === 0 ? 1.6 : 0.8), r); H.reserve([x - 3, z - 3, x + 3, z + 3]); }
+    else if (t < 0.28) { if (!H.clearOf(x - 1, z - 1, x + 1, z + 1, 0.3)) continue; H.stump(x, z, r); H.reserve([x - 1, z - 1, x + 1, z + 1]); }
+    else if (t < 0.8) { if (!H.clearOf(x - 1, z - 1, x + 1, z + 1, 0)) continue; const y = terrainAt(x, z); for (let k = 0; k < 3; k++) H.put(H.SH.FERN, x + (r() - 0.5) * 1.4, y + 0.3, z + (r() - 0.5) * 1.4, 0.5 + r() * 0.3, 0.6 + r() * 0.4, 0.5 + r() * 0.3, pick(r, ['#4f7a3a', '#5f8a45', '#3f6a35']), 'flat', 0); }
+    else if (t < 0.86) {
+      if (!H.clearOf(x - 2, z - 2, x + 2, z + 2, 0)) continue;
+      const y = terrainAt(x, z), n = 5 + Math.floor(r() * 6);
+      for (let k = 0; k < n; k++) { const a = k / n * 6.28, mx = x + Math.cos(a) * 1.3, mz = z + Math.sin(a) * 1.3, my = terrainAt(mx, mz); H.put(H.SH.CYL, mx, my + 0.1, mz, 0.04, 0.2, 0.04, '#f2efe6', 'plain', 0); H.put(H.SH.ICO, mx, my + 0.22, mz, 0.15, 0.08, 0.15, k % 3 ? '#c4523a' : '#e8b84a', 'flat', 0.01); }
+      H.sound(x, y, z, 1.8, 'mushroom');
+    }
+  }
+  // along the trails
+  const lampsNear = (x, z) => (W.lamps || []).some(l => Math.abs(l[0] - x) < 3 && Math.abs(l[2] - z) < 3) || (W.benches || []).some(b => Math.abs(b.x - x) < 3.5 && Math.abs(b.z - z) < 3.5);
+  for (const T of (W.parkTrails || [])) {
+    for (let i = 0; i < T.length - 1; i++) {
+      const [ax, az] = T[i], [bx, bz] = T[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
+      for (let t = 15 + r() * 30; t < L - 12; t += 30 + r() * 45) {
+        const cx = ax + ux * t, cz = az + uz * t, sd = r() < 0.5 ? -1 : 1, kind = r();
+        if (lampsNear(cx, cz)) continue;
+        if (kind < 0.3) { const o = 2.6 + r() * 1.2; H.rock(cx - uz * o * sd, cz + ux * o * sd, 0.9 + r() * 1.0, r); }
+        else if (kind < 0.48) {
+          // a fallen tree right across the trail: jump it, or grind it
+          const len = 8 + r() * 4, sk = (r() - 0.5) * 0.5, dx = -uz * Math.cos(sk) + ux * Math.sin(sk), dz = ux * Math.cos(sk) + uz * Math.sin(sk);
+          const x0 = cx - dx * len / 2, z0 = cz - dz * len / 2, x1 = cx + dx * len / 2, z1 = cz + dz * len / 2, y0 = terrainAt(x0, z0), y1 = terrainAt(x1, z1);
+          K.rod(V3(x0, y0 + 0.38, z0), V3(x1, y1 + 0.38, z1), 0.4, '#6b4a35', 0.05);
+          H.put(H.SH.ICO, x1 + dx * 0.6, y1 + 0.9, z1 + dz * 0.6, 1.4, 1.0, 1.4, '#5a7a3a', 'flat', 0.08);
+          K.rail([[x0 + dx * 0.4, y0 + 0.8, z0 + dz * 0.4], [x1 - dx * 0.4, y1 + 0.8, z1 - dz * 0.4]], { hidden: true });
+          for (let k = 0; k <= 4; k++) { const f = k / 4, lx = U.lerp(x0, x1, f), lz = U.lerp(z0, z1, f); W.boxes.push({ x0: lx - 0.45, y0: Math.min(y0, y1) - 1, z0: lz - 0.45, x1: lx + 0.45, y1: U.lerp(y0, y1, f) + 0.6, z1: lz + 0.45, tag: 'log' }); }
+          H.sound(cx, terrainAt(cx, cz) + 0.6, cz, 2.5, 'plank');
+        }
+        else if (kind < 0.6) { const o = 2.4 + r() * 0.8; H.stump(cx - uz * o * sd, cz + ux * o * sd, r); }
+        else if (kind < 0.78) {
+          // a dirt kicker on the trail
+          const y = terrainAt(cx, cz), ex = cx + ux * 3, ez = cz + uz * 3, ey = terrainAt(ex, ez) + 0.85;
+          S.add(cx, y + 0.02, cz, ex, ey, ez, 1.2);
+          B.add(new THREE.BoxGeometry(2.4, 0.4, 3.1), new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(-Math.atan2(ey - y, 3), Math.atan2(ux, uz), 0, 'YXZ')).setPosition((cx + ex) / 2, (y + ey) / 2 - 0.2, (cz + ez) / 2), '#8a6a48', 'plain', { outlineT: 0.04, edges: false });
+          B.add(new THREE.BoxGeometry(2.4, 0.9, 0.6), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(ex + ux * 0.2, ey - 0.45, ez + uz * 0.2), '#7a5a3a', 'plain', { outlineT: 0.04, edges: false });
+        }
+        else if (kind < 0.9) {
+          // a puddle: it splashes (in key) as you roll through
+          const y = terrainAt(cx, cz); H.blob(cx, cz, 1.6 + r(), 1.1 + r() * 0.6, '#6f8a9a', 'plain', 0.09, i * 31 + (t | 0));
+          H.sound(cx, y, cz, 1.8, 'puddle');
+        }
+        else { const o = 3 + r(); const mx = cx - uz * o * sd, mz = cz + ux * o * sd; for (let k = 0; k < 4; k++) { const px = mx + (r() - 0.5) * 1.5, pz = mz + (r() - 0.5) * 1.5, py = terrainAt(px, pz); H.put(H.SH.CYL, px, py + 0.12, pz, 0.05, 0.24, 0.05, '#f2efe6', 'plain', 0); H.put(H.SH.ICO, px, py + 0.27, pz, 0.18, 0.09, 0.18, '#c4523a', 'flat', 0.01); } H.sound(mx, terrainAt(mx, mz), mz, 2, 'mushroom'); }
+      }
+    }
+  }
+  // the hills: outcrops of rock on the observatory meadow and the ridge
+  const OR = PLAN.byKey.obs.rect;
+  for (let i = 0; i < 70; i++) {
+    const x = OR[0] + 10 + r() * (OR[2] - OR[0] - 20), z = OR[1] + 10 + r() * (OR[3] - OR[1] - 20);
+    if (!H.clearOf(x - 5, z - 5, x + 5, z + 5, 1)) continue;
+    const n = r() < 0.3 ? 4 + Math.floor(r() * 4) : 1;
+    for (let k = 0; k < n; k++) H.rock(x + (r() - 0.5) * 7, z + (r() - 0.5) * 7, 0.7 + r() * (k === 0 ? 2.2 : 1.0), r, { moss: r() < 0.2 });
+    H.reserve([x - 5, z - 5, x + 5, z + 5]);
+  }
+  // driftwood and a few boulders on the beach
+  for (let i = 0; i < 14; i++) {
+    const x = -1000 + r() * 1200, z = shoreZ(x) - 4 - r() * 12;
+    if (!H.clearOf(x - 2, z - 2, x + 2, z + 2, 0)) continue;
+    if (r() < 0.5) H.rock(x, z, 0.8 + r() * 0.9, r, { moss: false, color: pick(r, ['#a39d92', '#b8b0a2']) });
+    else { const a = r() * 3, L = 2.5 + r() * 3, y = terrainAt(x, z); K.rod(V3(x - Math.cos(a) * L / 2, y + 0.18, z - Math.sin(a) * L / 2), V3(x + Math.cos(a) * L / 2, y + 0.18, z + Math.sin(a) * L / 2), 0.18, '#b8a888', 0.03); }
+    H.reserve([x - 2, z - 2, x + 2, z + 2]);
+  }
 }
 
 // giant instruments on the lawn: a xylophone to skate across, chime tubes under a beam you grind,
@@ -6373,7 +6491,7 @@ function fillExtras(H) {
 function musicGarden(H, gx, gz, r) {
   const { K, W, B } = H;
   if (!H.clearOf(gx - 34, gz - 22, gx + 34, gz + 22, 0)) return;
-  H.patch([gx - 30, gz - 18, gx + 30, gz + 18], '#d4c39e', 'gravel', 0.07);
+  H.blob(gx, gz, 33, 21, '#d4c39e', 'gravel', 0.07, 5);
   const rain = ['#e4572e', '#f28c3a', '#f2c14e', '#a8c84a', '#3e8f86', '#2f8f9d', '#4a6ab8', '#8a5a9e'];
   // xylophone: bars rising in pitch from west to east (skate along it and it plays a scale)
   for (let k = 0; k < 15; k++) {
@@ -6413,7 +6531,7 @@ function carousel(H, x, z, r) {
   const { K, W } = H;
   if (!H.clearOf(x - 14, z - 14, x + 14, z + 14, 0)) return;
   const y = terrainAt(x, z);
-  H.patch([x - 13, z - 13, x + 13, z + 13], '#d8cbb0', 'tiles', 0.07);
+  H.blob(x, z, 14, 14, '#d8cbb0', 'tiles', 0.07, 7);
   K.cyl(x, y - 0.3, z, 7.6, 0.55, '#c9a24a', { outline: 0.06, seg: 24 });          // the fixed base
   W.boxes.push({ x0: x - 0.6, y0: y, z0: z - 0.6, x1: x + 0.6, y1: y + 5, z1: z + 0.6, tag: 'column' });
   W.carousel = { x, z, y: y + 0.55, R: 7.2, w: 0.45, a: 0 };
@@ -6429,20 +6547,31 @@ function carousel(H, x, z, r) {
 function vineyards(H, r) {
   const { K, W, B } = H;
   const x0 = 280, x1 = 415, z0 = -1290, z1 = -1105;
-  for (let z = z0; z < z1; z += 11) {
-    const pts = []; for (let x = x0; x <= x1; x += 9) pts.push([x, z]);
-    let ok = true; for (const [px, pz] of pts) if (!H.clearOf(px - 4, pz - 1, px + 4, pz + 1, 0)) { ok = false; break; }
-    if (!ok) continue;
-    H.ledge(pts, { h: 1.1, w: 0.7, color: '#b8ae9a', kind: 'paving', top: '#cfc6b4' });
-    for (let k = 1; k <= 4; k++) {
-      const vz = z + k * 2.1;
-      for (let x = x0 + 2; x < x1 - 2; x += 6) {
-        const y = terrainAt(x + 3, vz);
-        H.put(H.SH.BOX, x + 3, y + 0.35, vz, 5.6, 0.7, 0.12, '#6a5040', 'wood', 0);
-        H.put(H.SH.ICO, x + 3, y + 0.85, vz, 3.1, 0.45, 0.45, pick(r, ['#5f8f3a', '#6f9a42', '#58843a']), 'flat', 0.04);
+  let z = z0;
+  while (z < z1) {
+    const gap = 9 + r() * 5, a0 = x0 + r() * 14, a1 = x1 - r() * 14, ph = r() * 6, amp = 1.5 + r() * 2.5;
+    const wz = (x) => z + Math.sin(x * 0.035 + ph) * amp + Math.sin(x * 0.11 + ph * 2) * 0.6;
+    const pts = []; for (let x = a0; x <= a1; x += 7) pts.push([x, wz(x)]);
+    let ok = true; for (const [px, pz] of pts) if (!H.clearOf(px - 3.5, pz - 1, px + 3.5, pz + 1, 0)) { ok = false; break; }
+    if (ok) {
+      H.ledge(pts, { h: 0.9 + r() * 0.5, w: 0.7, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' });
+      const rows = Math.max(2, Math.floor((gap - 2) / 2.1));
+      for (let k = 1; k <= rows; k++) {
+        let x = a0 + 1 + r() * 4;
+        while (x < a1 - 3) {
+          const len = 3 + r() * 6, xm = x + len / 2, vz = wz(xm) + k * 2.1, y = terrainAt(xm, vz);
+          if (r() > 0.08) {
+            H.put(H.SH.BOX, xm, y + 0.35, vz, len, 0.7, 0.12, '#6a5040', 'wood', 0, Math.atan2(len, (wz(x + len) - wz(x))) - Math.PI / 2);
+            H.put(H.SH.ICO, xm, y + 0.85, vz, len * 0.52, 0.42 + r() * 0.12, 0.45, pick(r, ['#5f8f3a', '#6f9a42', '#58843a', '#7a9a3a']), 'flat', 0.04);
+          }
+          x += len + 0.6 + (r() < 0.1 ? 3 : 0);
+        }
       }
+      // here and there a peach tree or a little stone hut among the rows
+      if (r() < 0.35) { const tx = U.lerp(a0, a1, r()), tz = wz(tx) + gap / 2; H.tree(tx, tz, { s: 0.6, h: 2.4, color: '#7a9a3a', far: false }); }
+      H.reserve([a0 - 1, z - amp - 1, a1 + 1, z + gap]);
     }
-    H.reserve([x0 - 1, z - 1, x1 + 1, z + 10]);
+    z += gap;
   }
   // the winemaker's house at the top, with a little tower
   const hx = 350, hz = z0 - 14;
@@ -6467,7 +6596,7 @@ function canalMouth(H, r) {
   for (const zc of [840, 1130]) {
     const z0 = zc - 40, z1 = zc + 40;
     if (!H.clearOf(x0, z0, x1, z1, 0)) continue;
-    H.patch([x0, z0, x1, z1], '#c9b48e', 'gravel', 0.07);
+    H.blob((x0 + x1) / 2, zc, (x1 - x0) / 2 + 2, 42, '#c9b48e', 'gravel', 0.07, zc);
     for (let k = 0; k < 16; k++) { const tx = k < 8 ? x0 + 2 + (k % 2) * (x1 - x0 - 4) : U.lerp(x0 + 6, x1 - 6, (k - 8) / 7), tz = k < 8 ? U.lerp(z0 + 4, z1 - 4, Math.floor(k / 2) / 3) : (zc === 840 ? z1 - 2 : z0 + 2); H.tree(tx, tz, { s: 0.85, color: pick(r, ['#5f8f45', '#6f9a50', '#7aa04a']) }); }
     if (zc === 840) {
       // the rowing club: a long boathouse with racks of boats, a ramp down, the pontoon
@@ -6510,9 +6639,9 @@ function canalMouth(H, r) {
 function beachHuts(H, r) {
   const { K, W, B } = H;
   const cols = ['#e4572e', '#2f8f9d', '#f2c14e', '#3e8f86', '#d9779a', '#4a6ab8', '#a8c84a'];
-  for (let x = -1010; x < -560; x += 4.2) {
-    if (r() < 0.12) { x += 3; continue; }
-    const z = shoreZ(x) - 24, y = terrainAt(x, z);
+  for (let x = -1010; x < -560; x += 3.6 + r() * 1.6) {
+    if (r() < 0.14) { x += 3 + r() * 6; continue; }
+    const z = shoreZ(x) - 24 + (r() - 0.5) * 1.6, y = terrainAt(x, z);
     if (!H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0)) continue;
     const c = pick(r, cols);
     K.box(x - 1.3, y - 0.2, z - 1.2, x + 1.3, y + 2.3, z + 1.2, '#f2efe6', 'plain', { outlineT: 0.06 });
