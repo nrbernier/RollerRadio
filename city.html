@@ -3841,6 +3841,8 @@ const Sound = (() => {
     ripple() { quant((t, sd) => withKits((k, w) => { const ct = chord(4, 1); for (let i = 0; i < 6; i++) k.lead(t + i * sd * 0.5, ct[i % 4] + 12 * Math.floor(i / 4), 0.5 * w, sd); })); },
     // a group chatting as you come near: a murmured chord
     murmur() { quant((t, sd) => { const ct = chord(3, -1); ct.forEach((m, j) => I.vox(t + j * sd * 0.3, m, 0.25, ['o', 'u', 'a'][j], musicOut, sd * 5)); }); },
+    // a rail within reach: a soft note to say so
+    hint() { quant((t) => withKits((k, w) => k.lead(t, chord(3, 1)[2] + 12, 0.2 * w, 0.2))); },
     bark() { quant((t, sd) => { I.bark(t, 0.6); if (Math.random() < 0.5) I.bark(t + sd * 2, 0.5); }); },
     grindStart(info) { if (ctx) grindBegin(info); },
     grindEnd() { grindFinish(); },
@@ -5513,7 +5515,20 @@ function buildDocks(H) {
       if (k === h - 1) F.box(x - w / 2, y - 0.3, z, x + w / 2, y + (k + 1) * 2.6, z + d, c, 0.2);
     }
     if (r() < 0.25) H.sound(x, y + h * 2.6, z + 1.25, 5, 'container');
+    // the top edges of every stack are grinds: hop from corner to corner up and down the rows
+    const ty = y + h * 2.6 + 0.02;
+    K.rail([[x - w / 2 + 0.25, ty, z + 0.12], [x + w / 2 - 0.25, ty, z + 0.12]], { hidden: true, voice: 'pipe' });
+    K.rail([[x - w / 2 + 0.25, ty, z + d - 0.12], [x + w / 2 - 0.25, ty, z + d - 0.12]], { hidden: true, voice: 'pipe' });
     H.reserve([x - w / 2, z, x + w / 2, z + d]);
+  }
+  // staircases of containers at the front of the yard: 1, 2, 3 high, so you can climb by jumping
+  for (const [cx, cz] of [[640, 618], [780, 618], [920, 618]]) {
+    for (let k = 0; k < 3; k++) {
+      const x0 = cx + k * 4.2, y0 = terrainAt(x0, cz), c = pick(r, ccols);
+      K.box(x0 - 1.25, y0 - 0.3, cz - 6, x0 + 1.25, y0 + (k + 1) * 2.6, cz + 6, c, 'plain', { outlineT: 0.05 });
+      for (const ex of [x0 - 1.13, x0 + 1.13]) K.rail([[ex, y0 + (k + 1) * 2.6 + 0.02, cz - 5.75], [ex, y0 + (k + 1) * 2.6 + 0.02, cz + 5.75]], { hidden: true, voice: 'pipe' });
+    }
+    H.reserve([cx - 2, cz - 7, cx + 11, cz + 7]);
   }
   // a rail siding with freight wagons along the west side
   const rx = 590;
@@ -5538,6 +5553,11 @@ function buildDocks(H) {
   S.add(gx, gy0, QZ - 8, gx, sy, sz0 + 2, 1.6);
   B.add(new THREE.BoxGeometry(3, 0.3, Math.hypot(sz0 + 10 - QZ, sy - gy0)), new THREE.Matrix4().makeRotationX(-Math.atan2(sy - gy0, sz0 + 10 - QZ)).setPosition(gx, (gy0 + sy) / 2 - 0.15, (QZ - 8 + sz0 + 2) / 2), '#c9c2b4', 'plain', { outlineT: 0.04, edges: false });
   K.rail([[sx0 + 1, sy + 1.1, sz1 - 0.5], [sx1 - 1, sy + 1.1, sz1 - 0.5]], { color: '#e9e4f5', postMax: 1.2 });
+  K.rail([[sx0 + 1, sy + 1.1, sz0 + 0.5], [gx - 3, sy + 1.1, sz0 + 0.5]], { color: '#e9e4f5', postMax: 1.2 });
+  K.rail([[gx + 3, sy + 1.1, sz0 + 0.5], [sx1 - 1, sy + 1.1, sz0 + 0.5]], { color: '#e9e4f5', postMax: 1.2 });
+  K.rail([[sx0 + 0.5, sy + 1.1, sz0 + 1], [sx0 + 0.5, sy + 1.1, sz1 - 1]], { color: '#e9e4f5', postMax: 1.2 });
+  // and the container tops on deck
+  for (let x = sx0 + 12; x < sx1 - 50; x += 14) for (const z of [sz0 + 3.12, sz0 + 5.48]) K.rail([[x - 5.8, sy + 2.62, z], [x + 5.8, sy + 2.62, z]], { hidden: true, voice: 'pipe' });
   // harbour cranes along the quay (tall frames), the gantry over the yard
   for (const cx of [560, 960]) {
     const cy = terrainAt(cx, QZ - 8);
@@ -5801,7 +5821,25 @@ function fillKit(H) {
 // ============================================================
 //  the fill itself, district by district
 // ============================================================
+// long lines that tie places together: a guard rail all the way down the hill road from the
+// observatory, then a median ledge down the boulevard to the market
+function fillRoutes(H) {
+  const { K, W } = H;
+  const hill = ROADS.hill.slice().reverse();     // from the observatory end, downhill
+  const side = (pts, off, h) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 3) { const x = ax + ux * t - uz * off, z = az + uz * t + ux * off; out.push([x, terrainAt(x, z) + h, z]); } } return out; };
+  const gr = side(hill, 6.4, 0.85);
+  K.rail(gr.slice(2, -3), { color: '#e9e4f5', postColor: '#5b6078', round: 3 });
+  for (let k = 2; k < gr.length - 3; k += 3) H.sound(gr[k][0], gr[k][1] - 0.8, gr[k][2], 1.6, 'fence');
+  // the boulevard median: a planted ledge with a grind on each edge, gaps for crossing every 140 m
+  const bx = PLAN.boulevardX;
+  for (let z = -700; z < -330; z += 140) {
+    const z1 = Math.min(z + 120, -330);
+    H.ledge([[bx, z], [bx, z1]], { h: 0.55, w: 1.6, color: '#bdb8ae', shrub: '#5a8f4a', top: '#d8d4cc' });
+  }
+}
+
 function fillDistricts(H) {
+  fillRoutes(H);
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[fill] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   fillBusiness(H); lap('business');
   fillCanalQuarter(H); lap('canal quarter');
@@ -7102,6 +7140,54 @@ function preventZoom() {
 }
 preventZoom();
 
+// ---------- hints: a shimmer along the rail you could reach with a jump, and a soft note ----------
+const _hq = [], _hp = V3();
+function railPointAt(r, sg, s, out) {
+  if (sg.i === undefined) r.segs.forEach((q, i) => { q.i = i; });
+  let q = sg, k = sg.i;
+  while (s < q.s0 && k > 0) q = r.segs[--k];
+  while (s > q.s0 + q.len && k < r.segs.length - 1) q = r.segs[++k];
+  const t = U.clamp((s - q.s0) / q.len, 0, 1);
+  return out.copy(q.a).lerp(q.b, t);
+}
+function updateGrindHint(dt, bi) {
+  const W = Game.W, p = Game.player, pos = p.pos;
+  if (!Game.hintPts) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(15 * 3), 3));
+    const dot = canvasTex(64, 64, (x, w, h) => { const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,214,90,.95)'); gr.addColorStop(0.6, 'rgba(255,170,60,.35)'); gr.addColorStop(1, 'rgba(255,150,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }).tex;
+    Game.hintPts = new THREE.Points(g, new THREE.PointsMaterial({ map: dot, color: 0xffffff, size: 0.6, transparent: true, opacity: 0, depthWrite: false }));
+    Game.hintPts.frustumCulled = false; G.scene.add(Game.hintPts); Game.hintA = 0;
+  }
+  let best = null, bd = 7;
+  const sp = Math.hypot(p.vel.x, p.vel.z);
+  if (p.mode !== 'grind' && sp > 3 && !(Game.down > 0)) {
+    const vx = p.vel.x / sp, vz = p.vel.z / sp;
+    for (const sg of W.railGrid.query(pos.x - 7, pos.z - 7, pos.x + 7, pos.z + 7, _hq)) {
+      const a = sg.a, d = sg.dir, len = sg.len;
+      let t = (pos.x - a.x) * d.x + (pos.y - a.y) * d.y + (pos.z - a.z) * d.z; t = U.clamp(t, 0, len);
+      const cx = a.x + d.x * t, cy = a.y + d.y * t, cz = a.z + d.z * t, rx = cx - pos.x, rz = cz - pos.z, dh = Math.hypot(rx, rz), dy = cy - pos.y;
+      if (dh > bd || dy < -1.5 || dy > 3.2 || dh < 0.4) continue;
+      if (dh > 1.5 && (rx * vx + rz * vz) / dh < 0.25) continue;
+      if (sg.r.kind === 'cable' && dy > 2) continue;
+      bd = dh; best = { sg, s: sg.s0 + t };
+    }
+  }
+  const want = best ? 1 : 0;
+  Game.hintA = U.damp(Game.hintA, want, best ? 6 : 3, dt);
+  const m = Game.hintPts.material;
+  m.opacity = Game.hintA * (0.35 + 0.55 * Math.pow(1 - (bi.phase || 0), 2));
+  if (best) {
+    const arr = Game.hintPts.geometry.attributes.position.array, r = best.sg.r;
+    for (let i = 0; i < 15; i++) {
+      const s = U.clamp(best.s + (i - 7) * 0.55 + ((Game.t * 1.1) % 0.55), 0, r.len);
+      railPointAt(r, best.sg, s, _hp); arr[i * 3] = _hp.x; arr[i * 3 + 1] = _hp.y + 0.12; arr[i * 3 + 2] = _hp.z;
+    }
+    Game.hintPts.geometry.attributes.position.needsUpdate = true;
+    if (r !== Game.hintRail && Game.t > (Game.hintCD || 0)) { Sound.sfx.hint(); Game.hintCD = Game.t + 1.5; }
+    Game.hintRail = r;
+  } else if (Game.hintA < 0.05) Game.hintRail = null;
+}
+
 // ---------- the world reacting to you ----------
 const _sq = [], _dw = {};
 function updateWorld(dt, bi) {
@@ -7246,7 +7332,7 @@ function loop(now) {
   if (Game.state !== 'paused') {
     for (const d of W.dyn) d.update(dt, bi);
     Life.update(dt, bi, Game.state === 'play' ? p.pos : G.camera.position);
-    if (Game.state === 'play') updateWorld(dt, bi);
+    if (Game.state === 'play') { updateWorld(dt, bi); updateGrindHint(dt, bi); }
     Game.fx.update(dt);
     Sky.update(dt, G.camera.position);
   }

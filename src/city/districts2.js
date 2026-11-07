@@ -327,7 +327,20 @@ function buildDocks(H) {
       if (k === h - 1) F.box(x - w / 2, y - 0.3, z, x + w / 2, y + (k + 1) * 2.6, z + d, c, 0.2);
     }
     if (r() < 0.25) H.sound(x, y + h * 2.6, z + 1.25, 5, 'container');
+    // the top edges of every stack are grinds: hop from corner to corner up and down the rows
+    const ty = y + h * 2.6 + 0.02;
+    K.rail([[x - w / 2 + 0.25, ty, z + 0.12], [x + w / 2 - 0.25, ty, z + 0.12]], { hidden: true, voice: 'pipe' });
+    K.rail([[x - w / 2 + 0.25, ty, z + d - 0.12], [x + w / 2 - 0.25, ty, z + d - 0.12]], { hidden: true, voice: 'pipe' });
     H.reserve([x - w / 2, z, x + w / 2, z + d]);
+  }
+  // staircases of containers at the front of the yard: 1, 2, 3 high, so you can climb by jumping
+  for (const [cx, cz] of [[640, 618], [780, 618], [920, 618]]) {
+    for (let k = 0; k < 3; k++) {
+      const x0 = cx + k * 4.2, y0 = terrainAt(x0, cz), c = pick(r, ccols);
+      K.box(x0 - 1.25, y0 - 0.3, cz - 6, x0 + 1.25, y0 + (k + 1) * 2.6, cz + 6, c, 'plain', { outlineT: 0.05 });
+      for (const ex of [x0 - 1.13, x0 + 1.13]) K.rail([[ex, y0 + (k + 1) * 2.6 + 0.02, cz - 5.75], [ex, y0 + (k + 1) * 2.6 + 0.02, cz + 5.75]], { hidden: true, voice: 'pipe' });
+    }
+    H.reserve([cx - 2, cz - 7, cx + 11, cz + 7]);
   }
   // a rail siding with freight wagons along the west side
   const rx = 590;
@@ -352,6 +365,11 @@ function buildDocks(H) {
   S.add(gx, gy0, QZ - 8, gx, sy, sz0 + 2, 1.6);
   B.add(new THREE.BoxGeometry(3, 0.3, Math.hypot(sz0 + 10 - QZ, sy - gy0)), new THREE.Matrix4().makeRotationX(-Math.atan2(sy - gy0, sz0 + 10 - QZ)).setPosition(gx, (gy0 + sy) / 2 - 0.15, (QZ - 8 + sz0 + 2) / 2), '#c9c2b4', 'plain', { outlineT: 0.04, edges: false });
   K.rail([[sx0 + 1, sy + 1.1, sz1 - 0.5], [sx1 - 1, sy + 1.1, sz1 - 0.5]], { color: '#e9e4f5', postMax: 1.2 });
+  K.rail([[sx0 + 1, sy + 1.1, sz0 + 0.5], [gx - 3, sy + 1.1, sz0 + 0.5]], { color: '#e9e4f5', postMax: 1.2 });
+  K.rail([[gx + 3, sy + 1.1, sz0 + 0.5], [sx1 - 1, sy + 1.1, sz0 + 0.5]], { color: '#e9e4f5', postMax: 1.2 });
+  K.rail([[sx0 + 0.5, sy + 1.1, sz0 + 1], [sx0 + 0.5, sy + 1.1, sz1 - 1]], { color: '#e9e4f5', postMax: 1.2 });
+  // and the container tops on deck
+  for (let x = sx0 + 12; x < sx1 - 50; x += 14) for (const z of [sz0 + 3.12, sz0 + 5.48]) K.rail([[x - 5.8, sy + 2.62, z], [x + 5.8, sy + 2.62, z]], { hidden: true, voice: 'pipe' });
   // harbour cranes along the quay (tall frames), the gantry over the yard
   for (const cx of [560, 960]) {
     const cy = terrainAt(cx, QZ - 8);

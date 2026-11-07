@@ -169,7 +169,25 @@ function fillKit(H) {
 // ============================================================
 //  the fill itself, district by district
 // ============================================================
+// long lines that tie places together: a guard rail all the way down the hill road from the
+// observatory, then a median ledge down the boulevard to the market
+function fillRoutes(H) {
+  const { K, W } = H;
+  const hill = ROADS.hill.slice().reverse();     // from the observatory end, downhill
+  const side = (pts, off, h) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 3) { const x = ax + ux * t - uz * off, z = az + uz * t + ux * off; out.push([x, terrainAt(x, z) + h, z]); } } return out; };
+  const gr = side(hill, 6.4, 0.85);
+  K.rail(gr.slice(2, -3), { color: '#e9e4f5', postColor: '#5b6078', round: 3 });
+  for (let k = 2; k < gr.length - 3; k += 3) H.sound(gr[k][0], gr[k][1] - 0.8, gr[k][2], 1.6, 'fence');
+  // the boulevard median: a planted ledge with a grind on each edge, gaps for crossing every 140 m
+  const bx = PLAN.boulevardX;
+  for (let z = -700; z < -330; z += 140) {
+    const z1 = Math.min(z + 120, -330);
+    H.ledge([[bx, z], [bx, z1]], { h: 0.55, w: 1.6, color: '#bdb8ae', shrub: '#5a8f4a', top: '#d8d4cc' });
+  }
+}
+
 function fillDistricts(H) {
+  fillRoutes(H);
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[fill] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   fillBusiness(H); lap('business');
   fillCanalQuarter(H); lap('canal quarter');

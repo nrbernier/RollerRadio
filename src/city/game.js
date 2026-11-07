@@ -169,6 +169,54 @@ function preventZoom() {
 }
 preventZoom();
 
+// ---------- hints: a shimmer along the rail you could reach with a jump, and a soft note ----------
+const _hq = [], _hp = V3();
+function railPointAt(r, sg, s, out) {
+  if (sg.i === undefined) r.segs.forEach((q, i) => { q.i = i; });
+  let q = sg, k = sg.i;
+  while (s < q.s0 && k > 0) q = r.segs[--k];
+  while (s > q.s0 + q.len && k < r.segs.length - 1) q = r.segs[++k];
+  const t = U.clamp((s - q.s0) / q.len, 0, 1);
+  return out.copy(q.a).lerp(q.b, t);
+}
+function updateGrindHint(dt, bi) {
+  const W = Game.W, p = Game.player, pos = p.pos;
+  if (!Game.hintPts) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(15 * 3), 3));
+    const dot = canvasTex(64, 64, (x, w, h) => { const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,214,90,.95)'); gr.addColorStop(0.6, 'rgba(255,170,60,.35)'); gr.addColorStop(1, 'rgba(255,150,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }).tex;
+    Game.hintPts = new THREE.Points(g, new THREE.PointsMaterial({ map: dot, color: 0xffffff, size: 0.6, transparent: true, opacity: 0, depthWrite: false }));
+    Game.hintPts.frustumCulled = false; G.scene.add(Game.hintPts); Game.hintA = 0;
+  }
+  let best = null, bd = 7;
+  const sp = Math.hypot(p.vel.x, p.vel.z);
+  if (p.mode !== 'grind' && sp > 3 && !(Game.down > 0)) {
+    const vx = p.vel.x / sp, vz = p.vel.z / sp;
+    for (const sg of W.railGrid.query(pos.x - 7, pos.z - 7, pos.x + 7, pos.z + 7, _hq)) {
+      const a = sg.a, d = sg.dir, len = sg.len;
+      let t = (pos.x - a.x) * d.x + (pos.y - a.y) * d.y + (pos.z - a.z) * d.z; t = U.clamp(t, 0, len);
+      const cx = a.x + d.x * t, cy = a.y + d.y * t, cz = a.z + d.z * t, rx = cx - pos.x, rz = cz - pos.z, dh = Math.hypot(rx, rz), dy = cy - pos.y;
+      if (dh > bd || dy < -1.5 || dy > 3.2 || dh < 0.4) continue;
+      if (dh > 1.5 && (rx * vx + rz * vz) / dh < 0.25) continue;
+      if (sg.r.kind === 'cable' && dy > 2) continue;
+      bd = dh; best = { sg, s: sg.s0 + t };
+    }
+  }
+  const want = best ? 1 : 0;
+  Game.hintA = U.damp(Game.hintA, want, best ? 6 : 3, dt);
+  const m = Game.hintPts.material;
+  m.opacity = Game.hintA * (0.35 + 0.55 * Math.pow(1 - (bi.phase || 0), 2));
+  if (best) {
+    const arr = Game.hintPts.geometry.attributes.position.array, r = best.sg.r;
+    for (let i = 0; i < 15; i++) {
+      const s = U.clamp(best.s + (i - 7) * 0.55 + ((Game.t * 1.1) % 0.55), 0, r.len);
+      railPointAt(r, best.sg, s, _hp); arr[i * 3] = _hp.x; arr[i * 3 + 1] = _hp.y + 0.12; arr[i * 3 + 2] = _hp.z;
+    }
+    Game.hintPts.geometry.attributes.position.needsUpdate = true;
+    if (r !== Game.hintRail && Game.t > (Game.hintCD || 0)) { Sound.sfx.hint(); Game.hintCD = Game.t + 1.5; }
+    Game.hintRail = r;
+  } else if (Game.hintA < 0.05) Game.hintRail = null;
+}
+
 // ---------- the world reacting to you ----------
 const _sq = [], _dw = {};
 function updateWorld(dt, bi) {
@@ -313,7 +361,7 @@ function loop(now) {
   if (Game.state !== 'paused') {
     for (const d of W.dyn) d.update(dt, bi);
     Life.update(dt, bi, Game.state === 'play' ? p.pos : G.camera.position);
-    if (Game.state === 'play') updateWorld(dt, bi);
+    if (Game.state === 'play') { updateWorld(dt, bi); updateGrindHint(dt, bi); }
     Game.fx.update(dt);
     Sky.update(dt, G.camera.position);
   }
