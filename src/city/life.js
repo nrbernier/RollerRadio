@@ -54,7 +54,7 @@ const Life = (() => {
       top: _c.set(pal[Math.floor(r() * pal.length)]).getHex(), pants: _c.set(PANTS[Math.floor(r() * PANTS.length)]).getHex(),
       skin: _c.set(SKIN[Math.floor(r() * SKIN.length)]).getHex(),
       hair: _c.set(r() < 0.12 ? HATS[Math.floor(r() * HATS.length)] : HAIR[Math.floor(r() * HAIR.length)]).getHex(),
-      sc: kid ? 0.62 + r() * 0.1 : 0.9 + r() * 0.16, wide: 0.92 + r() * 0.2, t: r() * 9, x: 0, y: 0, z: 0, yaw: 0, ph: r() * 6,
+      sc: kid ? 0.62 + r() * 0.1 : 0.9 + r() * 0.16, wide: 0.92 + r() * 0.2, t: r() * 9, x: 0, y: 0, z: 0, yaw: 0, ph: r() * 6, style,
     };
     all.push(p);
     return Object.assign(p, o);
@@ -87,7 +87,7 @@ const Life = (() => {
     // sitters on about half the benches (one end each, so there's room for you too)
     const benchSit = [];
     for (const b of W.benches) if (r() < 0.45) { benchSit.push(b); n++; }
-    personMeshes(Math.min(1400, n + 10));
+    personMeshes(Math.min(1500, n + 60));
     for (const e of W.npcs) {
       if (e.kind === 'walk') {
         const paths = e.paths.filter(p => p.length > 1);
@@ -124,6 +124,10 @@ const Life = (() => {
       st.y = b.y + 0.5 - 0.8 * st.sc; standers.push(st); b.half = end;
     }
     for (const s of standers) s.yaw = s.yaw0;
+    const busks = (W.spots || []).filter(sp => sp.key.startsWith('busk_'));
+    for (const s of standers) s.nearBusk = busks.some(b => Math.hypot(b.x - s.x, b.z - s.z) < 18 && Math.hypot(b.x - s.x, b.z - s.z) > 1.5);
+    // a few extra listeners round each busker
+    for (const b of busks) for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 4 + r() * 4, x = b.x + Math.cos(a) * d, z = b.z + Math.sin(a) * d; const s = person(pickStyle(x, z), r, { x, z, y: terrainAt(x, z), yaw0: Math.atan2(b.x - x, b.z - z), nearBusk: true }); s.yaw = s.yaw0; standers.push(s); }
     // dogs (one instanced mesh)
     const dogG = mergeParts([
       [new THREE.BoxGeometry(0.26, 0.26, 0.62), T4(0, 0.42, 0), '#ffffff'], [new THREE.BoxGeometry(0.22, 0.22, 0.26), T4(0, 0.6, 0.38), '#ffffff'],
@@ -301,6 +305,13 @@ const Life = (() => {
       // step aside when you come through
       const dxp = pl.pos.x - w.x, dzp = pl.pos.z - w.z, dp = Math.hypot(dxp, dzp);
       w.dodge = U.damp(w.dodge, dp < 3.2 ? (dxp * -_pp.fz + dzp * _pp.fx > 0 ? -1.8 : 1.8) : 0, 4, dt);
+      // stepping aside, they make a little sound (a hum, a whistle, a ringtone…); several in a row ripple
+      if (dp < 2.6 && pl.speed > 3 && Game.t > (w.cd || 0) && Math.abs(pl.pos.y - w.y) < 2.5) {
+        w.cd = Game.t + 12;
+        if (Game.t > (L.voiceCD || 0)) { Sound.sfx.person(w.style || 'business', (w.ph * 7) | 0); L.voiceCD = Game.t + 0.5; }
+        L.passes = (L.passes || []).filter(tt => Game.t - tt < 2.5); L.passes.push(Game.t);
+        if (L.passes.length >= 3 && Game.t > (L.rippleCD || 0)) { Sound.sfx.ripple(); L.rippleCD = Game.t + 4; L.passes = []; }
+      }
       const ox = -_pp.fz * (w.off + w.dodge), oz = _pp.fx * (w.off + w.dodge);
       w.x = _pp.x + ox; w.z = _pp.z + oz; w.y = w.y0 ?? terrainAt(w.x, w.z);
       w.yaw = Math.atan2(_pp.fx * w.dir, _pp.fz * w.dir);
@@ -312,10 +323,20 @@ const Life = (() => {
     for (const s of standers) {
       if (Math.abs(s.x - fx) > R || Math.abs(s.z - fz) > R || slot >= cap) continue;
       s.t += dt;
+      const ds = Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z);
       if (s.talk) s.yaw = s.yaw0 + Math.sin(s.t * 0.7 + s.ph) * 0.25;
       else if (!s.sit) s.yaw = s.yaw0 + Math.sin(s.t * 0.23 + s.ph) * 0.35;
-      emit(s, 0, s.talk ? Math.max(0, Math.sin(s.t * 3.1 + s.ph)) * 0.02 : 0, s.pose === 'sit' ? 'sit' : s.pose === 'ground' ? 'ground' : 'stand');
-      if (Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z) < 12) crowd++;
+      if (s.talk && ds < 5 && Game.t > (L.murmurCD || 0)) { Sound.sfx.murmur(); L.murmurCD = Game.t + 7; }
+      // the music moves them: near a busker they dance, near you (when you stop to listen) they nod along
+      let bob = s.talk ? Math.max(0, Math.sin(s.t * 3.1 + s.ph)) * 0.02 : 0;
+      const groove = s.nearBusk ? 1 : (Game.listen > 0.4 && ds < 22 ? Game.listen : 0);
+      if (groove > 0 && bi) {
+        const ph = bi.phase * Math.PI * 2;
+        if (s.sit || s.pose === 'ground') bob += Math.max(0, Math.cos(ph)) * 0.025 * groove;
+        else { bob += Math.abs(Math.cos(ph)) * 0.06 * groove; if (s.nearBusk && !s.talk) s.yaw = s.yaw0 + Math.sin(ph * 0.5 + s.ph) * 0.5; }
+      }
+      emit(s, s.nearBusk && !s.sit && bi ? Math.sin(bi.phase * Math.PI * 2) * 0.15 : 0, bob, s.pose === 'sit' ? 'sit' : s.pose === 'ground' ? 'ground' : 'stand');
+      if (ds < 12) crowd++;
     }
     for (const k in PM) { const im = PM[k]; im.count = slot; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     L.crowdNear = U.damp(L.crowdNear, Math.min(1, crowd / 8), 2, dt);
@@ -323,6 +344,7 @@ const Life = (() => {
     let nd = 0;
     for (const d of dogs) {
       const o = d.owner; if (Math.abs(o.x - fx) > R * 0.7 || Math.abs(o.z - fz) > R * 0.7) continue;
+      if (Math.hypot(pl.pos.x - d.x, pl.pos.z - d.z) < 4.5 && pl.speed > 2 && Game.t > (d.cd || 0)) { d.cd = Game.t + 9; Sound.sfx.bark(); }
       const fx2 = Math.sin(o.yaw), fz2 = Math.cos(o.yaw);
       const tx = o.x + fz2 * d.side * 0.9 + fx2 * 1.1, tz = o.z - fx2 * d.side * 0.9 + fz2 * 1.1;
       if (!d.x) { d.x = tx; d.z = tz; }
@@ -338,7 +360,7 @@ const Life = (() => {
       const near = Math.abs(d.x - fx) < 300 && Math.abs(d.z - fz) < 300;
       if (!near) continue;
       const dx = d.x - pl.pos.x, dz = d.z - pl.pos.z, dd = Math.hypot(dx, dz);
-      if (dd < 7) { d.yaw = U.lerp(d.yaw, Math.atan2(dx, dz), 0.1); d.flee = 1.5; }
+      if (dd < 7) { if (d.flee <= 0 && Game.t > (L.quackCD || 0)) { Sound.sfx.touch('quack', d.i); L.quackCD = Game.t + 1.2; } d.yaw = U.lerp(d.yaw, Math.atan2(dx, dz), 0.1); d.flee = 1.5; }
       else if (Math.random() < dt * 0.3) d.turn = (Math.random() - 0.5) * 0.8;
       d.yaw += d.turn * dt; d.flee = Math.max(0, d.flee - dt);
       const v = d.sp * (1 + d.flee * 2) * (0.6 + Math.sin(d.t * 0.5) * 0.4);
@@ -361,6 +383,9 @@ const Life = (() => {
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;
       carKit.write(c.g);
+      // a friendly toot (in key) if you're on the road in front of it
+      { const dx = pl.pos.x - c.x, dz = pl.pos.z - c.z, al = dx * c.fx + dz * c.fz, lat = Math.abs(dx * -c.fz + dz * c.fx);
+        if (al > 2 && al < 14 && lat < 2.5 && Math.abs(pl.pos.y - c.y) < 2 && Game.t > (c.hornCD || 0)) { c.hornCD = Game.t + 10; Sound.sfx.touch('horn'); } }
     }
     if (carKit) carKit.flush();
     // the big wheel
@@ -435,7 +460,7 @@ const Life = (() => {
     // pigeons scatter as you come through, into a little run of notes
     for (const pg of pigeons) {
       const d = Math.hypot(pl.pos.x - pg.x, pl.pos.z - pg.z);
-      if (pg.fly <= 0 && d < 5 && pl.speed > 3) { pg.fly = 5 + Math.random() * 3; pg.vy = 4 + Math.random() * 2; pg.a = Math.atan2(pg.x - pl.pos.x, pg.z - pl.pos.z) + (Math.random() - 0.5); if (Math.random() < 0.4) Sound.sfx.touch('bird', Math.floor(Math.random() * 5)); }
+      if (pg.fly <= 0 && d < 5 && pl.speed > 3) { pg.fly = 5 + Math.random() * 3; pg.vy = 4 + Math.random() * 2; pg.a = Math.atan2(pg.x - pl.pos.x, pg.z - pl.pos.z) + (Math.random() - 0.5); if (Game.t > (L.flutterCD || 0)) { Sound.sfx.touch('flutter'); L.flutterCD = Game.t + 2.5; } else if (Math.random() < 0.3) Sound.sfx.touch('bird', Math.floor(Math.random() * 5)); }
       if (pg.fly > 0) {
         pg.fly -= dt; pg.vy = Math.max(-1, pg.vy - dt * 1.2);
         pg.x += Math.sin(pg.a) * 6 * dt; pg.z += Math.cos(pg.a) * 6 * dt; pg.m.position.set(pg.x, pg.m.position.y + pg.vy * dt, pg.z); pg.m.scale.y = pg.sc + Math.sin(Game.t * 20) * pg.sc * 0.66;
@@ -456,5 +481,5 @@ const Life = (() => {
     }
     return null;
   }
-  return Object.assign(L, { init, update, hits });
+  return Object.assign(L, { init, update, hits, walkers, standers });
 })();

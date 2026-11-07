@@ -53,7 +53,7 @@ function fillKit(H) {
     }
     if (!o.noGrind) K.rail(railPts, { hidden: true, round: 0.5 });
   };
-  H.bin = (x, z, col = '#3a4a3a') => { const y = terrainAt(x, z); put(CYL, x, y + 0.45, z, 0.28, 0.9, 0.28, col, 'plain', 0.03); put(CYL, x, y + 0.92, z, 0.31, 0.06, 0.31, '#2a2a32', 'plain', 0); };
+  H.bin = (x, z, col = '#3a4a3a') => { const y = terrainAt(x, z); H.sound(x, y, z, 1.4, 'bin'); put(CYL, x, y + 0.45, z, 0.28, 0.9, 0.28, col, 'plain', 0.03); put(CYL, x, y + 0.92, z, 0.31, 0.06, 0.31, '#2a2a32', 'plain', 0); };
   // a rack of bikes (hoops and simple bikes leaning in)
   H.bikes = (x, z, alongX, n, r) => {
     const y = terrainAt(x, z), ux = alongX ? 1 : 0, uz = alongX ? 0 : 1;
@@ -89,6 +89,7 @@ function fillKit(H) {
       if (o.parasol && r() < 0.8) { put(CYL, x, y + 1.3, z, 0.04, 1.4, 0.04, '#d9d4c8', 'plain', 0); put(CONE, x, y + 2.25, z, 1.5, 0.5, 1.5, pick(r, o.parasol), 'plain', 0.03); }
     }
     if (pts.length) H.standers(pts, style);
+    H.sound((x0 + x1) / 2, o.y ?? terrainAt((x0 + x1) / 2, (z0 + z1) / 2), (z0 + z1) / 2, Math.max(x1 - x0, z1 - z0) / 2 + 2, 'clink');
   };
   // picnic: a blanket on the grass, people sitting round it
   H.picnic = (x, z, style, r) => {
@@ -339,6 +340,7 @@ function fillLakeshore(H) {
   K.ramp(bx - 2, bz + br - 0.6, bx + 2, bz + br + 4, 'z', by, terrainAt(bx, bz + br + 4), '#e8e2d4', false, by - 2);
   H.reserve([bx - br - 4, bz - br - 4, bx + br + 4, bz + br + 6]);
   H.standers([[bx - 2, bz - 2, 0.6, by], [bx + 2, bz - 3, -0.4, by], [bx, bz + 1, 3.1, by]], 'lake');
+  H.spot('bandstand', bx, bz, 14);
   for (let i = 0; i < 10; i++) { const a = r() * 6.28, d = br + 6 + r() * 10; const x = bx + Math.cos(a) * d, z = bz + Math.sin(a) * d; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0)) H.picnic(x, z, 'lake', r); }
   // groves: clumps of trees with open meadows between
   for (let g = 0; g < 18; g++) {
@@ -434,8 +436,9 @@ function fillObservatory(H) {
   const { K, W, B } = H, r = U.rng(1505);
   const R = PLAN.byKey.obs.rect;
   // radio dishes on the meadow: tilted bowls on pedestals, a rail round each rim
-  for (const [dx, dz, ds] of [[-150, -1340, 9], [-70, -1395, 7], [300, -1330, 8]]) {
+  for (const [dx, dz, ds, remote] of [[-150, -1340, 9, 'market'], [-70, -1395, 7, 'docks'], [300, -1330, 8, 'canals']]) {
     const y = terrainAt(dx, dz);
+    (W.dishes = W.dishes || []).push({ x: dx, z: dz, r: ds, remote });
     K.cyl(dx, y - 0.3, dz, 1.2, 5.3, '#d9d4c8', { outline: 0.05, seg: 10 });
     const tilt = 0.6, yaw = Math.atan2(dx - 90, dz + 1200);
     const dish = new THREE.SphereGeometry(ds, 16, 6, 0, Math.PI * 2, Math.PI * 0.62, Math.PI * 0.38);
@@ -504,7 +507,7 @@ function fillOldTownMarket(H) {
   for (const L of lanes) for (const p of L) if (lanes.filter(M => M !== L && M.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 1)).length) joins.push(p);
   for (const L of lanes.slice(0, 4)) {
     let run = [];
-    const flush = () => { if (run.length > 4) K.rail(run, { color: '#e9e4f5', postColor: '#3a3550', round: 2 }); run = []; };
+    const flush = () => { if (run.length > 4) { K.rail(run, { color: '#e9e4f5', postColor: '#3a3550', round: 2 }); for (let k = 0; k < run.length; k += 2) H.sound(run[k][0], run[k][1] - 0.9, run[k][2], 1.6, 'fence'); } run = []; };
     for (let i = 0; i < L.length - 1; i++) {
       const [ax, az] = L[i], [bx, bz] = L[i + 1], len = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / len, uz = (bz - az) / len;
       for (let t = 0; t < len; t += 3) {

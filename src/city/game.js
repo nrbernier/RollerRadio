@@ -191,6 +191,14 @@ function updateWorld(dt, bi) {
     if (sp.w > 0.01) spots[sp.key] = sp.w;
   }
   for (const k in spots) if (k.startsWith('busk_')) spots[k] *= 0.55 + Game.listen * 0.45;
+  // riding the wheel or a gondola brings its own layer
+  const g = p.ground;
+  Game.ride = U.damp(Game.ride || 0, g && g.ferris && p.mode === 'ground' ? 1 : 0, 1.5, dt); if (Game.ride > 0.02) spots.ferrisride = Game.ride;
+  Game.rideG = U.damp(Game.rideG || 0, g && g.gondola && p.mode === 'ground' ? 1 : 0, 1.5, dt); if (Game.rideG > 0.02) spots.gondolaride = Game.rideG;
+  // a radio dish tunes you in to somewhere else
+  Game.radio = null; let rk = 0;
+  for (const dsh of (W.dishes || [])) { const k = U.clamp(1 - (Math.hypot(dsh.x - pos.x, dsh.z - pos.z) - dsh.r) / 10, 0, 1); if (k > rk) { rk = k; Game.radio = dsh.remote; } }
+  Game.radioK = U.damp(Game.radioK || 0, rk, 1.2, dt); if (Game.radioK > 0.02) spots.radio = Game.radioK;
   Game.spots = spots;
   // a little chime when a train pulls in near you
   for (const T of W.trains) if (T.arrived) { T.arrived = false; const f = metroAt(W.metro, T.s, 0); if (Math.hypot(f.x - pos.x, f.z - pos.z) < 220) Sound.sfx.touch('chime'); }
@@ -287,12 +295,13 @@ function loop(now) {
     else p.syncRig(dt, bi.phase);
     // what the music needs to know
     districtWeights(p.pos.x, p.pos.z, _dw, 140);
+    if (Game.radio && Game.radioK > 0.02) { const k = Game.radioK * 0.75; for (const key in _dw) _dw[key] *= 1 - k; _dw[Game.radio] = (_dw[Game.radio] || 0) + k; }
     Sound.setPlace(_dw, dt); Sky.S.weights = _dw;
     const ground = p.ground;
     // a run of tricks and grinds lasts until you've been back on the ground for a moment
     Game.groundT = p.mode === 'ground' ? (Game.groundT || 0) + dt : 0;
     if (Game.groundT > 0.9) Game.combo = 0;
-    Sound.update(dt, { combo: Game.combo || 0, grindH: p.mode === 'grind' ? p.pos.y - terrainAt(p.pos.x, p.pos.z) : 0, zone: zoneAt(p.pos.x, p.pos.z), dawn: Math.max(0, 1 - Math.abs(Sky.phase - 0.27) / 0.07), speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
+    Sound.update(dt, { alt: p.pos.y - terrainAt(p.pos.x, p.pos.z), combo: Game.combo || 0, grindH: p.mode === 'grind' ? p.pos.y - terrainAt(p.pos.x, p.pos.z) : 0, zone: zoneAt(p.pos.x, p.pos.z), dawn: Math.max(0, 1 - Math.abs(Sky.phase - 0.27) / 0.07), speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
     updateHints(dt);
   } else if (Game.state === 'title') {
     // a slow flight over the city
