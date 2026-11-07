@@ -108,8 +108,8 @@ const Sky = (() => {
     S.phase = (S.phase + dt / DAY * (nightish ? 1.5 : 1)) % 1;
     const a = S.phase * Math.PI * 2 - Math.PI / 2;            // 0.25 → sunrise, 0.5 → noon, 0.75 → sunset
     const sh = Math.sin(a), sx = Math.cos(a);
-    S.sun.set(sx * 0.9, sh, 0.35).normalize();                 // sun rises east (+x), sets west, low over the lake (south)
-    S.sun.set(-Math.cos(S.phase * Math.PI * 2 - Math.PI / 2) * 0.85, sh, 0.45).normalize();
+    // rises in the south-east (+x), arcs over the lake (+z is south), sets south-west: to your right as you face the water
+    S.sun.set(sx * 0.75, sh, 0.95).normalize();
     const k = sample(sh);
     const u = S.dome.material.uniforms;
     u.uTop.value.copy(k.top); u.uMid.value.copy(k.mid); u.uHor.value.copy(k.hor); u.uLow.value.copy(k.low);
