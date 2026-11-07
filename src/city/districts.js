@@ -87,7 +87,7 @@ function districtKit(K, S, F) {
         H.put(H.SH.BOX, cx, fy + 0.55, zf + out * 1.17, w, 0.06, 0.06, '#2a2838', 'plain', 0);
         for (let k = 0; k <= 4; k++) H.put(H.SH.BOX, cx - w / 2 + k * w / 4, fy + 0.3, zf + out * 1.17, 0.04, 0.5, 0.04, '#2a2838', 'plain', 0);
         if (r() < 0.5) H.put(H.SH.ICO, cx + w / 2 - 0.4, fy + 0.35, z, 0.35, 0.3, 0.35, pick(r, H.FLOWERS), 'flat', 0);
-        K.rail([[cx - w / 2 + 0.1, fy + 0.6, zf + out * 1.17], [cx + w / 2 - 0.1, fy + 0.6, zf + out * 1.17]], { hidden: true });
+        K.rail([[cx - w / 2 + 0.1, fy + 0.6, zf + out * 1.17], [cx + w / 2 - 0.1, fy + 0.6, zf + out * 1.17]], { hidden: true, voice: 'balcony' });
       }
     }
   };

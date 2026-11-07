@@ -1820,7 +1820,7 @@ function makeKit(meta) {
       } else {
         P = fillet(P, d.round ?? (kind === 'cable' ? 0 : 2.6), d.loop);
       }
-      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0, hidden: !!d.hidden };
+      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0, hidden: !!d.hidden, voice: d.voice };
       let L = 0;
       for (let i = 0; i < P.length - 1; i++) {
         const a = P[i], b = P[i + 1], len = a.distanceTo(b);
@@ -3258,12 +3258,15 @@ const Sound = (() => {
     waves(t, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.08 * v, t + dur * 0.45); g.gain.linearRampToValueAtTime(0.0001, t + dur); const f = filt('lowpass', 700, 0.5, g); f.frequency.linearRampToValueAtTime(1600, t + dur * 0.45); f.frequency.linearRampToValueAtTime(500, t + dur); noise(t, dur + 0.1, f, 0.6); sends(g, 0.4); },
     vox(t, m, v = 1, vowel = 'a', d = musicOut, dur = 0.3) { if (!voice(dur)) return; const F = { a: [800, 1150, 2900], e: [450, 1900, 2600], o: [450, 800, 2830], u: [325, 700, 2530], i: [300, 2100, 2900] }[vowel]; const g = gain(d, 0); env(g, t, 0.02, 0.22 * v, dur, 0.0001, dur * 0.3); const src = osc('sawtooth', midiF(m) * 0.97, t, dur * 1.4 + 0.1, null); src.frequency.exponentialRampToValueAtTime(midiF(m), t + 0.05); F.forEach((f, i) => src.connect(filt('bandpass', f, 9, gain(g, [1, 0.6, 0.25][i])))); sends(g, 0.4, 0.25); },
     crackle(t, v = 1, d = musicOut) { const g = gain(d, 0); env(g, t, 0.0004, (0.04 + Math.random() * 0.1) * v, 0.004); noise(t, 0.012, filt('highpass', 2400, 0.8, g)); },
+    bird(t, v = 0.5, d = musicOut) { if (!voice(0.4)) return; const n = 2 + Math.floor(Math.random() * 3), f0 = 2600 + Math.random() * 1800; for (let i = 0; i < n; i++) { const tt = t + i * (0.07 + Math.random() * 0.04), g = gain(d, 0); env(g, tt, 0.004, 0.05 * v, 0.06); const o = osc('sine', f0 * (0.9 + Math.random() * 0.2), tt, 0.08, g); o.frequency.exponentialRampToValueAtTime(f0 * (1.2 + Math.random() * 0.5), tt + 0.05); } },
     clack(t, v = 1, d = musicOut) { if (!voice(0.1)) return; const g = gain(d, 0); env(g, t, 0.001, 0.4 * v, 0.06); noise(t, 0.08, filt('bandpass', 1200, 1.4, g)); const o = gain(d, 0); env(o, t, 0.001, 0.25 * v, 0.05); osc('triangle', 180, t, 0.07, o); },
   };
 
   // ---------- scales and harmony ----------
-  const MODES = { major: [0, 2, 4, 5, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10], aeolian: [0, 2, 3, 5, 7, 8, 10], mixolydian: [0, 2, 4, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10], lydian: [0, 2, 4, 6, 7, 9, 11], hijaz: [0, 1, 4, 5, 7, 8, 10], penta: [0, 2, 4, 7, 9] };
-  const H = { root: 62, mode: MODES.dorian, deg: 0, next: null, bell: 0 };   // root as a midi note (D4)
+  const MODES = { major: [0, 2, 4, 5, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10], aeolian: [0, 2, 3, 5, 7, 8, 10], mixolydian: [0, 2, 4, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10], lydian: [0, 2, 4, 6, 7, 9, 11], hijaz: [0, 1, 4, 5, 7, 8, 10], harmonic: [0, 2, 3, 5, 7, 8, 11], penta: [0, 2, 4, 7, 9] };
+  // brightest to darkest: at night a district's mood slides one step down this ladder
+  const DARK = ['lydian', 'major', 'mixolydian', 'dorian', 'aeolian', 'phrygian'];
+  const H = { root: 62, mode: MODES.dorian, modeName: 'dorian', deg: 0, next: null, bell: 0 };   // root as a midi note (D4)
   // midi note for a scale degree (can be negative / beyond 7), relative to the current root
   const deg = (dd, oct = 0) => { const m = H.mode, n = m.length, o = Math.floor(dd / n), k = ((dd % n) + n) % n; return H.root + m[k] + 12 * (o + oct); };
   // chord tones of the current chord (stacked thirds from the chord degree)
@@ -3293,6 +3296,7 @@ const Sound = (() => {
   const REC = {
     business: {   // fast, jazzy, syncopated
       bpm: 124, beats: 4, sub: 4, swing: 0.16, root: 62, mode: 'dorian', rev: 0.25, dly: 0.18,
+      moods: ['dorian', 'mixolydian', 'aeolian'], nightTempo: 0.1, nightGain: 0.9,
       prog: [[0, 7], [3, 7], [1, 7], [4, 7]],      // i9 – IV13 – ii – v (D dorian vamp)
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c, n = 16;
@@ -3300,7 +3304,7 @@ const Sound = (() => {
         // ride cymbal: ding, ding-a-ding (swung)
         if (s % 4 === 0 || s % 8 === 6) I.ride(t, v * (s % 8 === 0 ? 0.9 : 0.6));
         if (s % 8 === 4) I.hat(t, v * 0.35, false);
-        if (st.kick[s]) I.kick(t, v * 0.75, musicOut, 120, 48, 0.24);
+        if (st.kick[s] && c.night < 0.5) I.kick(t, v * 0.75, musicOut, 120, 48, 0.24);          // at night: a trio, no kick
         if ((s === 4 || s === 12)) I.rim(t, v * 0.7);
         if (e > 0.4 && (s % 2 === 1) && r() < 0.18 + c.crowd * 0.5) I.brush(t, v * (0.25 + r() * 0.3));
         if (bar % 8 === 7 && s >= 12) I.snare(t, v * (0.25 + (s - 12) * 0.12));
@@ -3314,13 +3318,14 @@ const Sound = (() => {
         // rhodes comping, charleston-ish
         if (st.comp.includes(s)) I.ep(t, chord(4, 0).map((m, i) => i === 3 ? m - 12 + 12 : m), sd * 1.2, v * 0.8);
         // muted trumpet answers on bars 2 and 4 of every 4 (call & response with the keys)
-        if ((e > 0.55 || c.listen > 0.5) && bar % 2 === 1) for (const [ss, d, l] of st.horn) if (ss === s) I.trumpet(t, nearest(deg(d, 1), chord(4, 1)), l * sd * 0.9, v * 0.8);
+        if ((e > 0.55 - c.night * 0.3 || c.listen > 0.5) && bar % 2 === 1) for (const [ss, d, l] of st.horn) if (ss === s) I.trumpet(t, nearest(deg(d, 1), chord(4, 1)), l * sd * 0.9, v * 0.8);
         // vibes sparkle when the energy is up
         if (e > 0.7 && s % 3 === 0 && r() < 0.3) I.vibes(t, deg(Math.floor(r() * 7), 1), v * 0.5);
       }
     },
     park: {       // slow, wooden, dark: 12/8 under big trees
       bpm: 66, beats: 4, sub: 3, swing: 0, root: 64, mode: 'aeolian', rev: 0.5, dly: 0.25,
+      moods: ['aeolian', 'dorian', 'aeolian', 'mixolydian'], nightTempo: 0.08, nightGain: 0.9,
       prog: [[0, 7], [5, 7], [2, 7], [6, 7], [0, 7], [3, 7], [4, 7], [0, 7]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c;
@@ -3341,6 +3346,7 @@ const Sound = (() => {
     },
     market: {     // bright, busy, 3 against 2
       bpm: 100, beats: 4, sub: 3, swing: 0, root: 57, mode: 'hijaz', rev: 0.2, dly: 0.2,
+      moods: ['hijaz', 'harmonic', 'hijaz', 'phrygian'], nightTempo: 0.12, nightGain: 0.5,
       prog: [[0, 3], [0, 3], [6, 3], [0, 3]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c;
@@ -3351,7 +3357,7 @@ const Sound = (() => {
         if (s === 0 || s === 5 || (s === 8 && e > 0.5)) I.doum(t, v * 0.8);
         else if ((s % 3 === 1 || s % 3 === 2) && r() < 0.55 + e * 0.3) I.tek(t, v * (0.3 + r() * 0.35));
         // claps in twos against the triplet feel (polyrhythm)
-        if (e > 0.45 && (s === 3 || s === 9)) I.clap(t, v * 0.45);
+        if (e > 0.45 && c.night < 0.5 && (s === 3 || s === 9)) I.clap(t, v * 0.45);
         // shaker on every triplet
         I.shaker(t, v * (s % 3 === 0 ? 0.6 : 0.35));
         // bass ostinato
@@ -3359,11 +3365,12 @@ const Sound = (() => {
         // oud-like plucks play a running riff
         for (const [ss, d, l] of st.riff) if (ss === s && (e > 0.3 || bar % 2 === 0)) I.pluck(t, deg(d, 0), v * 0.8, musicOut, 1.1);
         // a call (voice) and the plucks answer
-        if (bar % 4 === 2 + st.callBar && (s === 0 || s === 3 || s === 6) && e > 0.5) I.vox(t, deg([4, 3, 1][s / 3], 0), v * 0.6, 'a', musicOut, sd * 2.5);
+        if (bar % 4 === 2 + st.callBar && (s === 0 || s === 3 || s === 6) && e > 0.5 && c.night < 0.5) I.vox(t, deg([4, 3, 1][s / 3], 0), v * 0.6, 'a', musicOut, sd * 2.5);
       }
     },
     canals: {     // dub: one drop, skank on the offbeat, melodica, deep bass
       bpm: 84, beats: 4, sub: 4, swing: 0.1, root: 55, mode: 'dorian', rev: 0.35, dly: 0.5,
+      moods: ['dorian', 'mixolydian', 'aeolian'], nightTempo: 0.08, nightGain: 1,
       prog: [[0, 3], [0, 3], [3, 3], [4, 3]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c;
@@ -3379,6 +3386,7 @@ const Sound = (() => {
     },
     oldtown: {    // a waltz: accordion oom-pah-pah, glockenspiel tune, pizzicato bass
       bpm: 96, beats: 3, sub: 2, swing: 0, root: 60, mode: 'major', rev: 0.3, dly: 0.12,
+      moods: ['major', 'lydian', 'mixolydian', 'major'], nightTempo: 0.1, nightGain: 0.85,
       prog: [[0, 3], [3, 3], [4, 3], [0, 3], [5, 3], [1, 3], [4, 3], [0, 3]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c;
@@ -3392,6 +3400,7 @@ const Sound = (() => {
     },
     docks: {      // techno: four on the floor, metal on a 7-step loop over 16 (polymeter), acid line
       bpm: 128, beats: 4, sub: 4, swing: 0.02, root: 52, mode: 'phrygian', rev: 0.2, dly: 0.3,
+      moods: ['phrygian', 'aeolian', 'dorian'], nightTempo: -0.02, nightGain: 1.35, nightDark: false,
       prog: [[0, 3], [0, 3], [1, 3], [0, 3]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar, idx } = c;
@@ -3403,10 +3412,13 @@ const Sound = (() => {
         if (e > 0.4) { const a = st.acid[s]; if (a) I.acid(t, deg(a[0], -1), sd * 0.9, v * 0.9, a[1]); }
         if (s % 2 === 1 && e > 0.7) I.hat(t, v * 0.25);
         if (bar % 16 === 15 && s === 0) I.metal(t, deg(0, 0), v * 0.5, musicOut, 2.2);
+        if (c.night > 0.4 && s % 4 === 2) I.sub(t, deg(0, -2), sd * 1.5, v * 0.7 * c.night);       // night: the club opens
+        if (c.night > 0.6 && s % 8 === 4 && bar % 2 === 1) I.pad(t, chord(3, 0), sd * 3, v * 0.6, musicOut, 2.5);
       }
     },
     lake: {       // slow ambient dub: soft kick, rigging pings, long pads, waves
       bpm: 70, beats: 4, sub: 4, swing: 0.05, root: 53, mode: 'lydian', rev: 0.6, dly: 0.45,
+      moods: ['lydian', 'major', 'mixolydian'], nightTempo: 0.08, nightGain: 1,
       prog: [[0, 7], [0, 7], [4, 7], [1, 7]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c;
@@ -3421,6 +3433,7 @@ const Sound = (() => {
     },
     obs: {        // no drums: drones, stars, voices
       bpm: 60, beats: 4, sub: 4, swing: 0, root: 65, mode: 'lydian', rev: 0.85, dly: 0.5,
+      moods: ['lydian', 'major', 'dorian'], nightTempo: 0.05, nightGain: 1.1,
       prog: [[0, 7], [1, 7], [0, 7], [4, 7]],
       play(c) {
         const { s, t, sd, v, r, st, e, bar } = c;
@@ -3461,6 +3474,148 @@ const Sound = (() => {
       else if (inst === 'pan') I.steelpan(c.t, m, w);
       else if (inst === 'flute') I.flute(c.t, m, dur, w);
     }
+  }
+
+  // ---------- how your moves sound, district by district ----------
+  // lead: the voice of grinds and runs · perc: texture under a grind · land · trick · push · bass
+  const KIT = {
+    business: {
+      lead: (t, m, v) => I.vibes(t, m, v * 0.8, musicOut, 0.6),
+      perc: (t, v, i) => i % 2 === 0 ? I.ride(t, v * 0.8) : I.brush(t, v * 0.6),
+      land: (t, v) => { I.ep(t, chord(4, 0), 0.4, v * 1.1); I.kick(t, v * 0.4, musicOut, 110, 48, 0.22); },
+      trick: (t, sd, v, n) => { const ct = chord(4, 1); for (let i = 0; i < 2 + Math.min(n, 4); i++) I.vibes(t + i * sd, ct[i % 4] + 12 * Math.floor(i / 4), v * 0.6, musicOut, 0.5); I.trumpet(t + sd * 3, ct[0], sd * 2, v * 0.55); },
+      push: (t, v) => I.rim(t, v * 0.6),
+      bass: (t, m, d, v) => I.upright(t, m, d, v),
+    },
+    park: {
+      lead: (t, m, v) => I.marimba(t, m, v * 1.1),
+      perc: (t, v) => I.shaker(t, v * 1.2),
+      land: (t, v) => { I.frame(t, v * 0.8); I.kalimba(t, chord(1, 0)[0], v * 0.6); },
+      trick: (t, sd, v, n) => { const ct = chord(4, 1); for (let i = 0; i < 2 + Math.min(n, 3); i++) I.flute(t + i * sd * 0.5, ct[i % 4] + 12, sd * 0.45, v * 0.55); },
+      push: (t, v) => I.woodblock(t, 81, v * 0.5),
+      bass: (t, m, d, v) => I.sub(t, m, d, v * 0.8),
+    },
+    market: {
+      lead: (t, m, v) => I.pluck(t, m, v, musicOut, 1.15),
+      perc: (t, v, i) => i % 2 ? I.tek(t, v * 0.8) : I.shaker(t, v),
+      land: (t, v) => { I.doum(t, v * 0.9); I.pluck(t, chord(1, 0)[0], v * 0.6); },
+      trick: (t, sd, v, n) => { for (let i = 0; i < 3 + Math.min(n, 3); i++) I.pluck(t + i * sd * 0.66, deg(4 - i, 1), v * 0.6); if (n > 1) I.vox(t, deg(4, 0), v * 0.35, 'a', musicOut, sd * 2); },
+      push: (t, v) => I.tek(t, v * 0.6),
+      bass: (t, m, d, v) => I.sub(t, m, d, v * 0.8),
+    },
+    canals: {
+      lead: (t, m, v, dur) => I.melodica(t, m, Math.min(0.7, (dur || 0.2) * 0.95), v * 0.9),
+      perc: (t, v, i) => i % 2 ? I.skank(t, chord(3, 0), v * 0.8) : I.hat(t, v * 0.5),
+      land: (t, v) => { I.kick(t, v * 0.6, musicOut, 110, 45, 0.4); I.rim(t, v * 0.7); },
+      trick: (t, sd, v, n) => { I.skank(t, chord(3, 0), v); I.metal(t + sd * 2, deg(4, 1), v * 0.4, musicOut, 0.8); if (n > 1) I.melodica(t + sd, deg(7, 0), sd * 3, v * 0.6); },
+      push: (t, v) => I.rim(t, v * 0.5),
+      bass: (t, m, d, v) => I.sub(t, m, d, v),
+    },
+    oldtown: {
+      lead: (t, m, v) => I.glock(t, m - 12, v * 0.9),
+      perc: (t, v) => I.brush(t, v * 0.7),
+      land: (t, v) => { I.accordion(t, chord(3, 0), 0.35, v * 1.1); I.upright(t, deg(0, -2), 0.4, v * 0.7); },
+      trick: (t, sd, v, n) => { const ct = chord(3, 1); for (let i = 0; i < 3 + Math.min(n, 3); i++) I.glock(t + i * sd * 0.5, ct[i % 3] + 12 * Math.floor(i / 3) - 12, v * 0.6); },
+      push: (t, v) => I.brush(t, v * 0.5),
+      bass: (t, m, d, v) => I.upright(t, m, d, v),
+    },
+    docks: {
+      lead: (t, m, v, dur) => I.acid(t, m - 12, Math.min(0.3, (dur || 0.12) * 0.9), v * 0.8, Math.random() < 0.3),
+      perc: (t, v, i) => I.hat(t, v * 0.7, i % 4 === 2),
+      land: (t, v) => { I.kick(t, v * 0.7); I.clap(t, v * 0.4); },
+      trick: (t, sd, v, n) => { for (let i = 0; i < 2 + Math.min(n, 4); i++) I.metal(t + i * sd * 0.5, deg(i * 2, 0), v * 0.35, musicOut, 0.3); },
+      push: (t, v) => I.hat(t, v * 0.5),
+      bass: (t, m, d, v) => I.acid(t, m, d * 0.5, v * 0.6, true),
+    },
+    lake: {
+      lead: (t, m, v) => I.steelpan(t, m, v * 0.85),
+      perc: (t, v) => I.shaker(t, v * 0.8),
+      land: (t, v) => { I.softKick(t, v * 0.7); I.steelpan(t, chord(1, 0)[0], v * 0.5); },
+      trick: (t, sd, v, n) => { const ct = chord(4, 1); for (let i = 0; i < 3 + Math.min(n, 3); i++) I.steelpan(t + i * sd * 0.5, ct[i % 4], v * 0.55); },
+      push: (t, v) => I.rim(t, v * 0.35),
+      bass: (t, m, d, v) => I.sub(t, m, d, v * 0.7),
+    },
+    obs: {
+      lead: (t, m, v) => I.bell(t, m, v * 0.7, musicOut, 1.4),
+      perc: (t, v) => { if (Math.random() < 0.5) I.crackle(t, v * 2); },
+      land: (t, v) => I.bell(t, deg(0, -1), v * 0.8, musicOut, 2.5),
+      trick: (t, sd, v, n) => { const ct = chord(4, 1); for (let i = 0; i < 3 + Math.min(n, 3); i++) I.musicbox(t + i * sd * 0.5, ct[i % 4] + 12, v * 0.6); },
+      push: () => {},
+      bass: (t, m, d, v) => I.drone(t, m, d, v * 0.5),
+    },
+  };
+  // the kits of the places you're in, by weight (two at most, at a border)
+  function kits() {
+    const out = []; let tw = 0;
+    for (const k in REC) { const w = REC[k].w; if (w > 0.22 && KIT[k]) { out.push([KIT[k], w]); tw += w; } }
+    if (!out.length) return [[KIT[dom.key] || KIT.park, 1]];
+    out.sort((a, b) => b[1] - a[1]); out.length = Math.min(2, out.length);
+    tw = out.reduce((a, o) => a + o[1], 0);
+    return out.map(([k, w]) => [k, w / tw]);
+  }
+  const withKits = (fn) => { for (const [k, w] of kits()) fn(k, w); };
+
+  // ---------- grinding: every rail plays its own little tune, which grows the longer you hold it ----------
+  const G = { on: false, n: 0, motif: [0], voice: 'rail', h: 0, end: false };
+  function grindBegin(info) {
+    G.on = true; G.end = false; G.n = 0; G.voice = info.voice || 'rail'; G.h = info.h || 0;
+    const r = U.rng(info.seed | 0); let d = Math.floor(r() * 3) * 2; G.motif = [];
+    for (let i = 0; i < 8; i++) { G.motif.push(d); d = U.clamp(d + [-1, 1, 2, -2, 1, -1, 3, 0, 4][Math.floor(r() * 9)], -2, 9); }
+  }
+  function grindFinish() { if (G.on) G.end = true; G.on = false; }
+  function grindStep(c) {
+    if (G.end) {       // the rail ends: a resolving note
+      G.end = false;
+      if (G.n > 3) withKits((k, w) => { k.lead(c.t, nearest(deg(7, Math.min(1, Math.floor(G.h / 4))), chord(3, 0)), 0.7 * w, c.dsd * 4); });
+      return;
+    }
+    if (!G.on || !R.grinding) return;
+    const n = G.n++, sp = R.speed, vc = G.voice, bars = n / (4 * dom.beats);
+    G.h = R.grindH ?? G.h;
+    // the groove under it
+    if (vc === 'metro') { if (c.ds % 2 === 0) I.clack(c.t, c.ds === 0 ? 0.36 : 0.22); if (c.ds === 0 && c.di % 8 === 0) I.sub(c.t, deg(0, -2), c.dsd * 7, 0.4); }
+    else if (vc === 'cable') { if (n % 32 === 0) I.waves(c.t, c.dsd * 30, 0.45); }
+    else if (c.ds % 2 === 0) withKits((k, w) => k.perc && k.perc(c.t, (0.3 + Math.min(0.35, sp / 40)) * w, n >> 1));
+    // how often a note: by speed (and some rails have their own pace)
+    const rate = vc === 'cable' ? 8 : vc === 'balcony' ? 1 : sp < 5 ? 4 : sp < 10 ? 2 : 1;
+    if (n % rate !== 0) return;
+    const j = n / rate, dev = Math.floor(j / 16);
+    const d = G.motif[j % 8] + [0, 2, 4, 1, 3][dev % 5];
+    const oct = U.clamp(Math.floor(G.h / 4), 0, 2);
+    let m = deg(d, oct);
+    if (c.ds === 0) m = nearest(m, chord(4, oct));
+    const v = U.clamp(0.35 + sp / 30, 0.35, 0.8), dur = c.dsd * rate;
+    if (vc === 'cable') { I.pad(c.t, [m - 12, nearest(deg(d + 2, oct - 1), chord(4, oct - 1))], dur * 1.1, 1.4, musicOut, 1 + G.h / 30); I.bell(c.t, m + 12, 0.18, musicOut, 2); return; }
+    if (vc === 'balcony') { I.musicbox(c.t, m + 12, v * 0.7); return; }
+    if (vc === 'pipe') I.metal(c.t, m, v * 0.4, musicOut, 0.35);
+    withKits((k, w) => k.lead(c.t, m, v * w, dur));
+    // after four bars a second voice joins a third above; after two, a bass line
+    if (bars >= 4) withKits((k, w) => k.lead(c.t, nearest(deg(d + 2, oct), chord(4, oct)), v * 0.4 * w, dur));
+    if (bars >= 2 && c.ds === 0 && c.di % 8 === 0) withKits((k, w) => k.bass && k.bass(c.t, chord(1, -2)[0], c.dsd * 7, 0.6 * w));
+  }
+  // a run of tricks and grinds without touching the ground: an extra groove that fades when you stop
+  let comboL = 0;
+  function comboStep(c) {
+    if (comboL < 0.08) return;
+    if (comboL > 0.3) withKits((k, w) => k.perc && k.perc(c.t, comboL * 0.35 * w * (c.ds === 0 ? 1.3 : 0.8), c.di));
+    if (c.ds === 0 && c.di % 4 === 0) withKits((k, w) => k.bass && k.bass(c.t, chord(1, -2)[0], c.dsd * 3, comboL * 0.5 * w));
+  }
+  // dawn: birds; night: a soft bed under the places that don't have one
+  function birdsong(c) {
+    const dawn = R.dawn || 0, wild = (REC.park.w + REC.lake.w + REC.obs.w + REC.oldtown.w * 0.5);
+    if (dawn > 0.05 && Math.random() < 0.09 * dawn * (0.3 + wild)) I.bird(c.t + Math.random() * c.dsd, 0.5 * dawn * (0.4 + wild));
+  }
+
+  // ---------- moods: each place drifts between a few modes; some corners have their own; night darkens ----------
+  const ZONES = {
+    pond: { key: 'park', mode: 'lydian' }, deepwood: { key: 'park', mode: 'phrygian' }, plaza: { key: 'business', mode: 'mixolydian' },
+    square: { key: 'oldtown', mode: 'lydian' }, cellar: { key: 'market', mode: 'harmonic' }, pier: { key: 'lake', mode: 'major' }, yard: { key: 'docks', mode: 'aeolian' },
+  };
+  function moodOf(rc) {
+    const z = R.zone && ZONES[R.zone];
+    let m = z && z.key === rc.key ? z.mode : rc.moods ? rc.moods[(rc.moodI || 0) % rc.moods.length] : rc.mode;
+    if (R.night > 0.6 && rc.nightDark !== false) { const i = DARK.indexOf(m); if (i >= 0 && i < DARK.length - 1) m = DARK[i + 1]; }
+    return m;
   }
   // ---------- the clock ----------
   let dom = REC.obs, harmonyBar = -1, energyT = 0;
@@ -3504,8 +3659,11 @@ const Sound = (() => {
     const domStep = TPB * dom.f / dom.sub, barTicks = domStep * dom.beats * dom.sub;
     if (T % barTicks === 0) {
       const bar = Math.floor(T / barTicks);
-      // switch scale when a new place has taken over
-      if (H.next) { H.root = H.next.root; H.mode = MODES[H.next.mode]; H.next = null; }
+      // a mood change every 16 bars; switch scale when a new place has taken over, or the mood/zone/night asks
+      if (bar % 16 === 0 && bar > 0) dom.moodI = (dom.moodI || 0) + 1;
+      if (H.next) { H.root = H.next.root; H.next = null; }
+      const want = moodOf(dom);
+      if (want !== H.modeName && (bar % 2 === 0 || R.zone)) { H.modeName = want; H.mode = MODES[want]; }
       const p = dom.prog[bar % dom.prog.length]; H.deg = p[0] + (H.bell > 0 ? 3 : 0);
       H.nextDeg = dom.prog[(bar + 1) % dom.prog.length][0];
       harmonyBar = bar;
@@ -3521,7 +3679,8 @@ const Sound = (() => {
       const idx = T / stepT, per = rc.beats * rc.sub, s = idx % per, bar = Math.floor(idx / per);
       let tt = t; if (rc.swing && rc.sub === 4 && s % 2 === 1) tt += rc.swing * stepT * td;
       const night = R.night, listenBoost = 1 + R.listen * 0.15;
-      const c = { s, bar, idx, t: tt, sd: stepT * td, v: Math.pow(rc.w / total, 0.8) * listenBoost, r: rc.r, st: rc.st, e: U.clamp(rc.e * (1 - night * 0.3) + R.listen * 0.25 + Math.min(0.2, R.speed / 80), 0, 1), newPhrase: s === 0 && bar % 8 === 0, listen: R.listen, nextDeg: H.nextDeg, crowd: R.crowd || 0 };
+      const ng = U.lerp(1, rc.nightGain ?? 1, night), ne = rc.key === 'docks' ? night * 0.35 : -night * 0.3;
+      const c = { s, bar, idx, t: tt, sd: stepT * td, v: Math.pow(rc.w / total, 0.8) * listenBoost * ng, r: rc.r, st: rc.st, e: U.clamp(rc.e * (1 + ne) + R.listen * 0.25 + Math.min(0.2, R.speed / 80), 0, 1), night, newPhrase: s === 0 && bar % 8 === 0, listen: R.listen, nextDeg: H.nextDeg, crowd: R.crowd || 0 };
       try { rc.play(c); } catch (e) { console.warn(k, e); }
     }
     // the dominant grid: player layers, spots, train
@@ -3531,16 +3690,13 @@ const Sound = (() => {
       const c = { t, ds, dsub: di, idx: di, dbar, dsd: dstep * td, newPhrase: di % (dom.beats * 32) === 0 };
       for (const k in R.spots) { const w = R.spots[k]; if (w > 0.03 && SPOTS[k]) SPOTS[k](c, w); }
       if (R.train > 0.5 && ds % 2 === 0) I.clack(t, (ds === 0 ? 0.5 : 0.3) * R.train);
-      if (R.grinding && ds % 1 === 0) playGrind(t, di);
+      const gc = { t, ds, di, dsd: dstep * td };
+      grindStep(gc); comboStep(gc); birdsong(gc);
+      // night: a soft pad under the places that have no bed of their own
+      if (ds === 0 && di % (4 * dom.beats * 2) === 0 && R.night > 0.3 && !['lake', 'obs', 'park'].includes(dom.key)) I.pad(t, chord(3, 0), dstep * td * 4 * dom.beats * 2, R.night * 0.5, musicOut, 0.7);
       // quantized one-shots from the world (lamps, bollards, landings…)
       while (queue.length) { const q = queue.shift(); try { q(t, dstep * td); } catch (e) {} }
     }
-  }
-  // what grinding sounds like: an arpeggio on the place's own voice
-  function playGrind(t, i) {
-    const ct = chord(4, 1), m = ct[i % 4] + (Math.floor(i / 4) % 2 ? 12 : 0), k = dom.key, v = 0.55;
-    if (k === 'park') I.marimba(t, m, v); else if (k === 'market') I.pluck(t, m, v * 0.8); else if (k === 'business') I.vibes(t, m, v * 0.7, musicOut, 0.5);
-    else if (k === 'docks') I.acid(t, m - 12, 0.1, v * 0.7, i % 4 === 0); else if (k === 'oldtown') I.glock(t, m - 12, v * 0.7); else if (k === 'lake' || k === 'obs') I.steelpan(t, m, v * 0.6); else I.kalimba(t, m, v);
   }
   const queue = [];
   // play something on the next grid step (so whatever you touch is in time)
@@ -3549,7 +3705,7 @@ const Sound = (() => {
   function start() {
     if (!ctx || clk.playing) return;
     clk.playing = true; clk.next = ctx.currentTime + 0.1; clk.start = clk.next; clk.tick = 0;
-    H.root = dom.root; H.mode = MODES[dom.mode]; clk.bpm = clk.target = dom.bpm * dom.f;
+    H.root = dom.root; H.modeName = moodOf(dom); H.mode = MODES[H.modeName]; clk.bpm = clk.target = dom.bpm * dom.f;
     if (!clk.timer) clk.timer = setInterval(schedule, 25);
   }
   // where you are: district weights (sum 1) → recipe weights, dominant, tempo target, key
@@ -3559,7 +3715,7 @@ const Sound = (() => {
     // hysteresis on who leads
     if (best !== dom && bw > (dom.wt || 0) + 0.18) {
       dom = best;
-      H.next = { root: dom.root, mode: dom.mode };
+      H.next = { root: dom.root };
     }
     // fades: weights glide (so a sudden teleport still crossfades)
     for (const k in REC) {
@@ -3568,7 +3724,7 @@ const Sound = (() => {
       rc.w += (target - rc.w) * (1 - Math.exp(-dt / 1.6));     // about a 1.6 s crossfade
     }
     // night: everything leans slower; the leader sets the tempo
-    clk.target = dom.bpm * dom.f * (1 - R.night * 0.06);
+    clk.target = dom.bpm * dom.f * (1 - R.night * (dom.nightTempo ?? 0.08));
   }
 
   // ---------- knocks: the record scratches, stops, and starts again ----------
@@ -3620,9 +3776,11 @@ const Sound = (() => {
     },
     // soft, musical feedback for moves (no "scores")
     jump(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.01, 0.1, 0.18); const f = filt('bandpass', 700, 1.6, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 2600 : 1600, t + 0.18); noise(t, 0.22, f); },
-    land(h = 1) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.002, 0.22 * Math.min(1.3, h), 0.1); const o = osc('sine', 110, t, 0.13, g); o.frequency.exponentialRampToValueAtTime(50, t + 0.09); if (h > 0.5) quant((tt) => I.softKick(tt, 0.35 * Math.min(1.3, h))); },
-    trick() { quant((t, sd) => { const ct = chord(3, 1); ct.forEach((m, i) => (dom.key === 'park' ? I.kalimba : dom.key === 'market' ? I.pluck : dom.key === 'docks' ? I.glock : I.vibes)(t + i * sd * 0.5, m, 0.45)); }); },
-    push(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.003, onBeat ? 0.12 : 0.07, 0.16); const f = filt('bandpass', 900, 1.5, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 3000 : 1400, t + 0.15); noise(t, 0.18, f); if (onBeat) quant((tt) => I.shaker(tt, 0.7)); },
+    land(h = 1) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.002, 0.22 * Math.min(1.3, h), 0.1); const o = osc('sine', 110, t, 0.13, g); o.frequency.exponentialRampToValueAtTime(50, t + 0.09); if (h > 0.5) quant((tt) => withKits((k, w) => k.land(tt, 0.5 * Math.min(1.3, h) * w))); },
+    trick(n = 0) { quant((t, sd) => withKits((k, w) => k.trick(t, sd, 0.8 * w, n))); },
+    grindStart(info) { if (ctx) grindBegin(info); },
+    grindEnd() { grindFinish(); },
+    push(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.003, onBeat ? 0.12 : 0.07, 0.16); const f = filt('bandpass', 900, 1.5, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 3000 : 1400, t + 0.15); noise(t, 0.18, f); if (onBeat) quant((tt) => withKits((k, w) => k.push(tt, 0.7 * w))); },
     splash(v = 1) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.005, 0.2 * v, 0.3); const f = filt('bandpass', 1400, 0.8, g); f.frequency.exponentialRampToValueAtTime(500, t + 0.3); noise(t, 0.35, f); },
     bubbles() { if (!ctx) return; const t = T0(); for (let i = 0; i < 10; i++) { const tt = t + i * 0.07 + Math.random() * 0.05, g = gain(sfxOut, 0); env(g, tt, 0.002, 0.06, 0.06); const o = osc('sine', 300 + Math.random() * 500, tt, 0.08, g); o.frequency.exponentialRampToValueAtTime(900 + Math.random() * 600, tt + 0.06); } },
     // the world as an instrument
@@ -3643,7 +3801,7 @@ const Sound = (() => {
           case 'container': I.metal(t, deg(i % 5, 0), 0.45, musicOut, 0.9); break;
           case 'rigging': I.steelpan(t, deg((i * 2) % 7, 1), 0.4); break;
           case 'chime': [0, 4, 7].forEach((d, k) => I.bell(t + k * 0.32, deg(d, 1), 0.5, musicOut, 1.8)); break;
-          case 'bounce': { const ct2 = chord(3, 1); I.marimba(t, ct2[i % 3] + 12 * Math.min(2, Math.floor(i / 3)), 0.5); I.kalimba(t + 0.05, ct2[(i + 1) % 3] + 12, 0.25); break; }
+          case 'bounce': { const ct2 = chord(3, 1), mm = ct2[i % 3] + 12 * Math.min(2, Math.floor(i / 3)); withKits((k, w) => k.lead(t, mm, 0.7 * w, 0.2)); I.kalimba(t + 0.05, ct2[(i + 1) % 3] + 12, 0.2); break; }
           case 'dish': I.bell(t, m + 24, 0.22, musicOut, 3.2); I.bell(t + 0.5, m + 19, 0.12, musicOut, 3.2); break;
           case 'ferris': [0, 2, 4, 7].forEach((d, k) => I.kalimba(t + k * 0.16, deg(d + (i % 3), 1), 0.4)); break;
           default: I.marimba(t, m, 0.4);
@@ -3654,12 +3812,16 @@ const Sound = (() => {
     ringBell() { if (!ctx) return; H.bell = 8; const t = T0(); [0, 0.9, 1.8].forEach((o, k) => I.bell(t + o, deg([7, 4, 0][k], -1), 1, sfxOut, 4)); },
   };
 
-  function update(dt, state) { if (!ctx) return; Object.assign(R, state); }
+  function update(dt, state) {
+    if (!ctx) return; Object.assign(R, state);
+    const target = U.clamp(((R.combo || 0) - 1) / 4, 0, 1);
+    comboL += (target - comboL) * (1 - Math.exp(-dt / (target > comboL ? 0.3 : 3)));
+  }
   function setVolume(music, fx) { if (music != null) { S.musicVol = music; if (musicOut) musicOut.gain.setTargetAtTime(music, ctx.currentTime, 0.05); } if (fx != null) { S.sfxVol = fx; if (sfxOut) sfxOut.gain.setTargetAtTime(fx, ctx.currentTime, 0.05); } }
   function suspend(on) { if (!ctx) return; if (on) ctx.suspend(); else ctx.resume(); }
   function debugTap() { if (!ctx) return null; const a = ctx.createAnalyser(); a.fftSize = 2048; master.connect(a); return a; }
   return { init, start, beat, judge, sfx, update, R, setPlace, knock, knocked, resume, quant, setVolume, suspend, debugTap, REC, H, clk,
-    get ready() { return !!ctx; }, get place() { return dom.key; }, get bpm() { return clk.bpm; }, get vol() { return S.musicVol; }, get ctx() { return ctx; } };
+    get ready() { return !!ctx; }, get place() { return dom.key; }, get modeName() { return H.modeName; }, get bpm() { return clk.bpm; }, get vol() { return S.musicVol; }, get ctx() { return ctx; } };
 })();
 
 // ============================================================
@@ -3813,7 +3975,7 @@ function buildMetro(K, M, S, F) {
   B.add(wg, null, '#4a4e58', 'plain', { outlineT: 0, edges: false });
   // grindable running rails (in long runs, so grinding carries you far)
   const run = (side, r) => { const P = []; for (let i = 0; i <= N; i++) { const p = M.pts[i % N]; P.push(L(p, side * METRO.trackOff + r, 0.38)); } return P; };
-  for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) K.rail(run(side, r), { hidden: true, loop: false, round: 0 });
+  for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) K.rail(run(side, r), { hidden: true, loop: false, round: 0, voice: 'metro' });
   // handrails along both edges (grindable; they also stop you skating off)
   const halfI = Math.ceil(METRO.platLen / 2 / M.step) + 2;
   const atStation = (i) => M.stations.some(st => { const d = Math.abs(((i - st.i) % N + N + N / 2) % N - N / 2); return d <= halfI; });
@@ -4398,7 +4560,7 @@ function districtKit(K, S, F) {
         H.put(H.SH.BOX, cx, fy + 0.55, zf + out * 1.17, w, 0.06, 0.06, '#2a2838', 'plain', 0);
         for (let k = 0; k <= 4; k++) H.put(H.SH.BOX, cx - w / 2 + k * w / 4, fy + 0.3, zf + out * 1.17, 0.04, 0.5, 0.04, '#2a2838', 'plain', 0);
         if (r() < 0.5) H.put(H.SH.ICO, cx + w / 2 - 0.4, fy + 0.35, z, 0.35, 0.3, 0.35, pick(r, H.FLOWERS), 'flat', 0);
-        K.rail([[cx - w / 2 + 0.1, fy + 0.6, zf + out * 1.17], [cx + w / 2 - 0.1, fy + 0.6, zf + out * 1.17]], { hidden: true });
+        K.rail([[cx - w / 2 + 0.1, fy + 0.6, zf + out * 1.17], [cx + w / 2 - 0.1, fy + 0.6, zf + out * 1.17]], { hidden: true, voice: 'balcony' });
       }
     }
   };
@@ -6581,7 +6743,8 @@ const hooks = {
   trick(q) {
     const b = Game.W.bell, p = Game.player.pos;
     if (b && Math.hypot(b.x - p.x, b.z - p.z) < 12 && Game.bellCD <= 0) { Sound.sfx.ringBell(); Game.bellCD = 20; }
-    Sound.sfx.trick(); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
+    Game.combo = (Game.combo || 0) + 1;
+    Sound.sfx.trick(Game.combo); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
   },
   land(impact) {
     const p = Game.player, g = p.ground;
@@ -6598,14 +6761,32 @@ const hooks = {
       return;
     }
     Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
-  grindStart() { Sound.sfx.land(0.4); },
-  grinding() {}, grindEnd() {}, railHop() { Sound.sfx.jump(true); },
+  grindStart(r) {
+    Sound.sfx.land(0.4); Game.combo = (Game.combo || 0) + 1;
+    const p0 = r && r.pts[0], pp = Game.player.pos;
+    Sound.sfx.grindStart({ voice: r ? (r.voice || (r.kind === 'cable' ? 'cable' : r.kind === 'pipe' ? 'pipe' : r.hidden ? 'ledge' : 'rail')) : 'rail', seed: p0 ? Math.floor(p0.x * 7.3 + p0.z * 13.1) : 1, h: pp.y - terrainAt(pp.x, pp.z) });
+  },
+  grinding() {}, grindEnd() { Sound.sfx.grindEnd(); }, railHop() { Sound.sfx.jump(true); },
   padLaunch() {},
   bonk() { Game.cam.shake = 0.25; Sound.sfx.land(0.6); },
   fell() { knockDown(null, true); },
   hazard(b) { knockDown(b); },
 };
 
+// corners with their own mood (the music engine knows which mode each one wants)
+let ZONE_LIST = null;
+function zoneAt(x, z) {
+  if (!ZONE_LIST) {
+    const W = Game.W, cs = PLAN.stations.find(s => s.key === 'central').at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
+    ZONE_LIST = [
+      ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -640, -760, 130], ['plaza', cs[0], cs[1], 75],
+      ['cellar', cel[0], cel[1], 22], ['pier', -480, 1420, 70], ['yard', 760, 880, 130],
+    ];
+    if (W.bell) ZONE_LIST.push(['square', W.bell.x, W.bell.z, 45]);
+  }
+  for (const [k, zx, zz, r] of ZONE_LIST) if ((x - zx) * (x - zx) + (z - zz) * (z - zz) < r * r) return k;
+  return null;
+}
 // a knock: the record scratches, you tumble, and the music waits for you
 function knockDown(b, quiet = false) {
   if (Game.state !== 'play' || Game.hazardCD > 0 || Game.down > 0) return;
@@ -6676,7 +6857,7 @@ function pause(on) {
   if (on && Game.state === 'play') {
     Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100);
     const d = PLAN.byKey[Sound.place], R = Sound.REC[Sound.place];
-    $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm` : '';
+    $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm · ${Sound.modeName}` : '';
     $('howto').innerHTML = HOWTO.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join('');
   }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }
@@ -6823,7 +7004,10 @@ function loop(now) {
     districtWeights(p.pos.x, p.pos.z, _dw, 140);
     Sound.setPlace(_dw, dt); Sky.S.weights = _dw;
     const ground = p.ground;
-    Sound.update(dt, { speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
+    // a run of tricks and grinds lasts until you've been back on the ground for a moment
+    Game.groundT = p.mode === 'ground' ? (Game.groundT || 0) + dt : 0;
+    if (Game.groundT > 0.9) Game.combo = 0;
+    Sound.update(dt, { combo: Game.combo || 0, grindH: p.mode === 'grind' ? p.pos.y - terrainAt(p.pos.x, p.pos.z) : 0, zone: zoneAt(p.pos.x, p.pos.z), dawn: Math.max(0, 1 - Math.abs(Sky.phase - 0.27) / 0.07), speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
     updateHints(dt);
   } else if (Game.state === 'title') {
     // a slow flight over the city

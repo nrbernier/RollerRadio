@@ -2865,7 +2865,7 @@ function makeKit(meta) {
       } else {
         P = fillet(P, d.round ?? (kind === 'cable' ? 0 : 2.6), d.loop);
       }
-      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0, hidden: !!d.hidden };
+      const r = { pts: P, segs: [], loop: !!d.loop, endBoost: d.endBoost || 0, kind, minSpeed: d.minSpeed || 0, hidden: !!d.hidden, voice: d.voice };
       let L = 0;
       for (let i = 0; i < P.length - 1; i++) {
         const a = P[i], b = P[i + 1], len = a.distanceTo(b);

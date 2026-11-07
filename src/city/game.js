@@ -28,7 +28,8 @@ const hooks = {
   trick(q) {
     const b = Game.W.bell, p = Game.player.pos;
     if (b && Math.hypot(b.x - p.x, b.z - p.z) < 12 && Game.bellCD <= 0) { Sound.sfx.ringBell(); Game.bellCD = 20; }
-    Sound.sfx.trick(); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
+    Game.combo = (Game.combo || 0) + 1;
+    Sound.sfx.trick(Game.combo); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
   },
   land(impact) {
     const p = Game.player, g = p.ground;
@@ -45,14 +46,32 @@ const hooks = {
       return;
     }
     Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
-  grindStart() { Sound.sfx.land(0.4); },
-  grinding() {}, grindEnd() {}, railHop() { Sound.sfx.jump(true); },
+  grindStart(r) {
+    Sound.sfx.land(0.4); Game.combo = (Game.combo || 0) + 1;
+    const p0 = r && r.pts[0], pp = Game.player.pos;
+    Sound.sfx.grindStart({ voice: r ? (r.voice || (r.kind === 'cable' ? 'cable' : r.kind === 'pipe' ? 'pipe' : r.hidden ? 'ledge' : 'rail')) : 'rail', seed: p0 ? Math.floor(p0.x * 7.3 + p0.z * 13.1) : 1, h: pp.y - terrainAt(pp.x, pp.z) });
+  },
+  grinding() {}, grindEnd() { Sound.sfx.grindEnd(); }, railHop() { Sound.sfx.jump(true); },
   padLaunch() {},
   bonk() { Game.cam.shake = 0.25; Sound.sfx.land(0.6); },
   fell() { knockDown(null, true); },
   hazard(b) { knockDown(b); },
 };
 
+// corners with their own mood (the music engine knows which mode each one wants)
+let ZONE_LIST = null;
+function zoneAt(x, z) {
+  if (!ZONE_LIST) {
+    const W = Game.W, cs = PLAN.stations.find(s => s.key === 'central').at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
+    ZONE_LIST = [
+      ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -640, -760, 130], ['plaza', cs[0], cs[1], 75],
+      ['cellar', cel[0], cel[1], 22], ['pier', -480, 1420, 70], ['yard', 760, 880, 130],
+    ];
+    if (W.bell) ZONE_LIST.push(['square', W.bell.x, W.bell.z, 45]);
+  }
+  for (const [k, zx, zz, r] of ZONE_LIST) if ((x - zx) * (x - zx) + (z - zz) * (z - zz) < r * r) return k;
+  return null;
+}
 // a knock: the record scratches, you tumble, and the music waits for you
 function knockDown(b, quiet = false) {
   if (Game.state !== 'play' || Game.hazardCD > 0 || Game.down > 0) return;
@@ -123,7 +142,7 @@ function pause(on) {
   if (on && Game.state === 'play') {
     Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100);
     const d = PLAN.byKey[Sound.place], R = Sound.REC[Sound.place];
-    $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm` : '';
+    $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm · ${Sound.modeName}` : '';
     $('howto').innerHTML = HOWTO.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join('');
   }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }
@@ -270,7 +289,10 @@ function loop(now) {
     districtWeights(p.pos.x, p.pos.z, _dw, 140);
     Sound.setPlace(_dw, dt); Sky.S.weights = _dw;
     const ground = p.ground;
-    Sound.update(dt, { speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
+    // a run of tricks and grinds lasts until you've been back on the ground for a moment
+    Game.groundT = p.mode === 'ground' ? (Game.groundT || 0) + dt : 0;
+    if (Game.groundT > 0.9) Game.combo = 0;
+    Sound.update(dt, { combo: Game.combo || 0, grindH: p.mode === 'grind' ? p.pos.y - terrainAt(p.pos.x, p.pos.z) : 0, zone: zoneAt(p.pos.x, p.pos.z), dawn: Math.max(0, 1 - Math.abs(Sky.phase - 0.27) / 0.07), speed: p.speed, grinding: p.mode === 'grind', air: p.mode === 'air' && p.airTime > 0.25, airTime: p.airTime, grounded: p.mode === 'ground', listen: Game.listen, night: Sky.night, train: ground && ground.train ? 1 : 0, under: (W.metro && p.ground && p.ground.slab && isCovered(p.pos)) ? 1 : 0, water: Game.swim > 0 ? 1 : 0, spots: Game.spots || {}, crowd: Life.crowdNear });
     updateHints(dt);
   } else if (Game.state === 'title') {
     // a slow flight over the city

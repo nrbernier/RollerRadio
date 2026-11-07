@@ -149,7 +149,7 @@ function buildMetro(K, M, S, F) {
   B.add(wg, null, '#4a4e58', 'plain', { outlineT: 0, edges: false });
   // grindable running rails (in long runs, so grinding carries you far)
   const run = (side, r) => { const P = []; for (let i = 0; i <= N; i++) { const p = M.pts[i % N]; P.push(L(p, side * METRO.trackOff + r, 0.38)); } return P; };
-  for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) K.rail(run(side, r), { hidden: true, loop: false, round: 0 });
+  for (const side of [-1, 1]) for (const r of [-0.72, 0.72]) K.rail(run(side, r), { hidden: true, loop: false, round: 0, voice: 'metro' });
   // handrails along both edges (grindable; they also stop you skating off)
   const halfI = Math.ceil(METRO.platLen / 2 / M.step) + 2;
   const atStation = (i) => M.stations.some(st => { const d = Math.abs(((i - st.i) % N + N + N / 2) % N - N / 2); return d <= halfI; });
