@@ -78,7 +78,7 @@ Rebuild after editing: `python3 build.py`. three.js r149 loads from jsDelivr.
 
 ---
 
-# Rubato — the city (`city.html`)
+# Downtone — the city (`city.html`)
 
 A second game on the same engine: no story, no score, nothing to collect. A hill city that slopes down to a lake, to wander on skates while the music changes with every neighbourhood.
 

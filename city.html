@@ -6,9 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rubato">
+<meta name="apple-mobile-web-app-title" content="Downtone">
 <meta name="theme-color" content="#b0cce0">
-<title>Rubato</title>
+<title>Downtone</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,8 +92,8 @@ body.touch
 <div id="fade"></div>
 <div id="title" class="overlay" hidden>
   <div>
-    <h1>Rubato</h1>
-    <p>a city that keeps changing its tempo</p>
+    <h1>Downtone</h1>
+    <p>a city that keeps changing its tune</p>
     <div class="go">tap to wander</div>
     <div class="small">headphones on</div>
   </div>
@@ -4471,7 +4471,7 @@ function buildCity() {
   const B = new CellBatch(), F = new FarBatch(), S = makeSlabs();
   const mats = cityMaterials();
   const K = makeKit({
-    name: 'Rubato', killY: -30, batch: B,
+    name: 'Downtone', killY: -30, batch: B,
     phys: { friction: 0.5, fastFriction: 0.55, overDecay: 0.6, slopeK: 0.45, drag: 0.0012, climb: 1.6 },
     buildBatch: (b, W) => {
       W.cells = b.buildCells(mats);

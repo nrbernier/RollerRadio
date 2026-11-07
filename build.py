@@ -4,7 +4,7 @@ Offbeat (the story game):
   dist/offbeat.html      -> artifact body (three.js from jsDelivr)
   dist/test.html         -> full document using the local three.js copy (for headless tests)
   index.html             -> standalone page (GitHub Pages serves this)
-Rubato (the city to wander, same engine):
+Downtone (the city to wander, same engine):
   city.html              -> standalone page
   dist/city_test.html    -> local three.js copy, for headless tests
 """
@@ -31,7 +31,7 @@ pwa = ('<link rel="manifest" href="manifest.webmanifest">\n'
 (ROOT / 'index.html').write_text(head + pwa + body(CDN).replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
 print('built', len(body(CDN)) // 1024, 'KB')
 
-# ---------- Rubato: the city ----------
+# ---------- Downtone: the city ----------
 CITY_SHARED = ['core.js', 'characters.js', 'kit.js', 'player.js']
 CITY_ORDER = ['plan.js', 'terrain.js', 'batch.js', 'music.js', 'metro.js', 'world.js', 'districts.js', 'districts2.js', 'fill.js', 'sky.js', 'life.js', 'fauna.js', 'game.js']
 cshell = (ROOT / 'src/city/shell.html').read_text()
@@ -43,7 +43,7 @@ cpwa = ('<link rel="manifest" href="city.webmanifest">\n'
         '<meta name="apple-mobile-web-app-capable" content="yes">\n'
         '<meta name="mobile-web-app-capable" content="yes">\n'
         '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
-        '<meta name="apple-mobile-web-app-title" content="Rubato">\n'
+        '<meta name="apple-mobile-web-app-title" content="Downtone">\n'
         '<meta name="theme-color" content="#b0cce0">\n')
 (ROOT / 'city.html').write_text(head + cpwa + cbody(CDN).replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
 (ROOT / 'dist/city_test.html').write_text(head + cbody('../vendor/three.min.js').replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
