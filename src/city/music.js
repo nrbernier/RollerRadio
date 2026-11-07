@@ -349,6 +349,13 @@ const Sound = (() => {
     },
     // frogs in the reeds: little croaks on the offbeats, a chorus at night
     frogs: (c, w) => { if (c.ds % 2 === 1 && Math.random() < 0.2 + R.night * 0.45) I.croak(c.t, deg([0, 4, 2][c.idx % 3], -1), w * (0.5 + R.night * 0.5)); },
+    // the carousel's fairground organ: oom-pah-pah and a glockenspiel tune
+    carousel: (c, w) => {
+      const st = SPOTS.st; if (!st.organ || c.newPhrase) st.organ = motif(U.rng(c.dbar + 7), 12, 6, 2, 0.15);
+      const b = Math.floor(c.idx / 4), beat3 = b % 3;
+      if (c.ds === 0) { if (beat3 === 0) I.sub(c.t, chord(1, -2)[0], c.dsd * 3, w * 0.8); else I.accordion(c.t, chord(3, 0), c.dsd * 2, w * 0.8); }
+      if (c.ds % 2 === 0) for (const [ss, d] of st.organ) if (ss === (c.idx / 2) % 12) I.glock(c.t, nearest(deg(d, 1), chord(3, 1)), w * 0.7);
+    },
     // riding the wheel: a music box; the cable car: a pad that brightens and climbs with height
     ferrisride: (c, w) => { if (c.ds % 2 === 0) { const ct = chord(4, 2); I.musicbox(c.t, ct[(c.idx / 2) % 4] + (Math.floor(c.idx / 8) % 2 ? 0 : -12), w * 0.6); } },
     gondolaride: (c, w) => {
@@ -744,6 +751,9 @@ const Sound = (() => {
           case 'deer': for (let j = 0; j < 6; j++) I.woodblock(t + j * 0.11, 70 + (j % 3) * 3, 0.3 - j * 0.03); I.flute(t + 0.1, m + 12, 0.25, 0.25); break;
           case 'heron': I.flute(t, m, 0.6, 0.3); I.flute(t + 0.5, m - 5, 0.9, 0.25); for (let j = 0; j < 4; j++) I.brush(t + j * 0.35, 0.4, musicOut, true); break;
           case 'catch': [0, 2, 4, 7].forEach((d, k) => I.steelpan(t + k * 0.12, deg(d, 1), 0.45)); I.vox(t + 0.5, m - 12, 0.3, 'e', musicOut, 0.25); break;
+          case 'xylo': I.marimba(t, deg(i, 0), 0.75); I.marimba(t, deg(i, 1), 0.25); break;
+          case 'tube': I.bell(t, deg(i, 1), 0.45, musicOut, 2.2); break;
+          case 'drum': if (i === 0) I.frame(t, 0.9); else if (i === 1) I.doum(t, 0.9); else if (i === 2) I.conga(t, 220, 0.8); else I.conga(t, 330, 0.7); I.sub(t, deg(0, -2) + [0, 7, 12, 16][i], 0.4, 0.4); break;
           case 'flutter': for (let j = 0; j < 8; j++) I.shaker(t + j * 0.045, 0.6 - j * 0.05); break;
           case 'quack': I.quack(t + 0.08, 0.6); if (i % 2) I.quack(t + 0.3, 0.45); break;
           case 'clink': I.bell(t, m + 24, 0.12, musicOut, 0.6); I.bell(t + 0.07, m + 28, 0.08, musicOut, 0.5); break;

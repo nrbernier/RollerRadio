@@ -90,6 +90,36 @@ const Fauna = (() => {
     W.group.add(hm);
     hat = { m: hm, x0: -900, x1: -560, s: 0, st: 'blow', t: 0 };
     W.hatChase = hat;
+    // ---- the carousel: a turning deck you can ride, horses rising and falling ----
+    const cr = W.carousel;
+    if (cr) {
+      const parts = [
+        [new THREE.CylinderGeometry(cr.R, cr.R, 0.3, 28), T4(0, 0.15, 0), '#e8dcc0'], [new THREE.CylinderGeometry(cr.R + 0.05, cr.R + 0.05, 0.12, 28), T4(0, 0.31, 0), '#c4523a'],
+        [new THREE.CylinderGeometry(0.7, 0.9, 4.4, 10), T4(0, 2.5, 0), '#f2c14e'],
+        [new THREE.ConeGeometry(cr.R + 0.6, 2.4, 16), T4(0, 5.9, 0), '#c4523a'], [new THREE.CylinderGeometry(cr.R + 0.6, cr.R + 0.6, 0.6, 16), T4(0, 4.5, 0), '#f2efe6'],
+        [new THREE.SphereGeometry(0.4, 8, 6), T4(0, 7.3, 0), '#f2c14e'],
+      ];
+      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, rr = i % 2 ? 3.6 : 5.6; parts.push([new THREE.CylinderGeometry(0.05, 0.05, 4.2, 5), T4(Math.cos(a) * rr, 2.4, Math.sin(a) * rr), '#e9e4f5']); }
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; parts.push([new THREE.BoxGeometry(2.6, 0.6, 0.06), T4(Math.cos(a) * (cr.R + 0.62), 4.5, Math.sin(a) * (cr.R + 0.62), 0, -a + Math.PI / 2, 0), i % 2 ? '#c4523a' : '#f2c14e']); }
+      const rot = solid(parts, 0.05); rot.position.set(cr.x, cr.y, cr.z); W.group.add(rot);
+      // bulbs round the canopy (they glow at night)
+      const bl = []; for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; bl.push([new THREE.SphereGeometry(0.12, 5, 4), T4(Math.cos(a) * (cr.R + 0.7), 4.2, Math.sin(a) * (cr.R + 0.7)), i % 2 ? '#ffe9b0' : '#ffd0a0']); }
+      rot.add(new THREE.Mesh(mergeParts(bl), W.mats.lamp));
+      const horse = mergeParts([
+        [new THREE.BoxGeometry(0.34, 0.5, 1.1), T4(0, 0, 0), '#ffffff'], [new THREE.BoxGeometry(0.2, 0.6, 0.22), T4(0, 0.4, 0.45, 0.5, 0, 0), '#ffffff'], [new THREE.BoxGeometry(0.22, 0.24, 0.46), T4(0, 0.7, 0.66), '#ffffff'],
+        ...[[-0.11, 0.38], [0.11, 0.38], [-0.11, -0.38], [0.11, -0.38]].map(([hx, hz]) => [new THREE.BoxGeometry(0.08, 0.55, 0.08), T4(hx, -0.45, hz, hz > 0 ? -0.5 : 0.5, 0, 0), '#ffffff']),
+        [new THREE.BoxGeometry(0.36, 0.08, 0.5), T4(0, 0.27, -0.05), '#c4523a'],
+      ]);
+      IM.horse = mkIM(horse, 12);
+      for (let i = 0; i < 12; i++) IM.horse.setColorAt(i, _c.set(['#f2efe6', '#e8c070', '#c9d2dc', '#f2efe6', '#d9a0a0', '#b8d0b0'][i % 6]));
+      cr.rot = rot; cr.hit = { vx: 0, vz: 0, carousel: true };
+      const prev = W.groundExtra;
+      W.groundExtra = (x, z, yMax, rr2) => {
+        const a2 = prev(x, z, yMax, rr2), dx = x - cr.x, dz = z - cr.z, top = cr.y + 0.32;
+        if (dx * dx + dz * dz < cr.R * cr.R && top <= yMax && (!a2 || top > a2.y)) { cr.hit.vx = cr.w * dz; cr.hit.vz = -cr.w * dx; return { y: top, hit: cr.hit }; }
+        return a2;
+      };
+    }
   }
 
   function update(dt, bi, focus) {
@@ -198,6 +228,16 @@ const Fauna = (() => {
       const b = balloon; b.t += dt;
       if (!b.on && b.t > b.next) { b.on = true; b.t = 0; b.m.visible = true; }
       if (b.on) { b.m.position.set(b.x + Math.sin(b.t * 0.6) * 1.5 + b.t * 0.4, terrainAt(b.x, b.z) + 1.4 + b.t * 1.4, b.z + Math.cos(b.t * 0.5) * 1.2); b.m.rotation.z = Math.sin(b.t) * 0.15; if (b.t > 70) { b.on = false; b.m.visible = false; b.t = 0; b.next = 40 + Math.random() * 30; } }
+    }
+    // the carousel turns; its horses rise and fall
+    const cr = W.carousel;
+    if (cr && cr.rot) {
+      cr.a += cr.w * dt; cr.rot.rotation.y = cr.a;
+      for (let i = 0; i < 12; i++) {
+        const a = i / 12 * Math.PI * 2 - cr.a, rr = i % 2 ? 3.6 : 5.6, x = cr.x + Math.cos(a) * rr, z = cr.z + Math.sin(a) * rr;
+        _q.setFromAxisAngle(Y, Math.PI - i / 12 * Math.PI * 2 + cr.a); _m.compose(_v.set(x, cr.y + 1.6 + Math.sin(t * 2.2 + i * 1.3) * 0.35, z), _q, _s.setScalar(1)); IM.horse.setMatrixAt(i, _m);
+      }
+      IM.horse.instanceMatrix.needsUpdate = true;
     }
     // the hat (its owner is a walker scripted in Life)
     if (hat) {

@@ -197,6 +197,7 @@ function fillDistricts(H) {
   fillPark(H); lap('park');
   fillOldTownMarket(H); lap('old town + market');
   fillDocks(H); lap('docks');
+  fillExtras(H); lap('extras');
 }
 
 function fillBusiness(H) {
@@ -676,4 +677,173 @@ function cableAt(cb, s, out) {
   out.y = U.lerp(g.a.y, g.b.y, t) - 4 * g.dip * t * (1 - t);
   out.yaw = Math.atan2(cb.ux * sd, cb.uz * sd);
   return out;
+}
+
+// ============================================================
+//  MORE PLACES — a music garden by the lake, a carousel, vineyard terraces on the hill,
+//  the canal mouth (rowing club, food trucks, string lights), beach huts
+// ============================================================
+function fillExtras(H) {
+  const r = U.rng(2024);
+  musicGarden(H, -500, 905, r);
+  carousel(H, 250, 288, r);
+  vineyards(H, r);
+  canalMouth(H, r);
+  beachHuts(H, r);
+}
+
+// giant instruments on the lawn: a xylophone to skate across, chime tubes under a beam you grind,
+// drums you bounce on
+function musicGarden(H, gx, gz, r) {
+  const { K, W, B } = H;
+  if (!H.clearOf(gx - 34, gz - 22, gx + 34, gz + 22, 0)) return;
+  H.patch([gx - 30, gz - 18, gx + 30, gz + 18], '#d4c39e', 'gravel', 0.07);
+  const rain = ['#e4572e', '#f28c3a', '#f2c14e', '#a8c84a', '#3e8f86', '#2f8f9d', '#4a6ab8', '#8a5a9e'];
+  // xylophone: bars rising in pitch from west to east (skate along it and it plays a scale)
+  for (let k = 0; k < 15; k++) {
+    const x = gx - 26 + k * 1.7, z = gz - 12, y = terrainAt(x, z), L = 4.6 - k * 0.15;
+    K.box(x - 0.6, y - 0.2, z - L / 2, x + 0.6, y + 0.38, z + L / 2, rain[k % rain.length], 'plain', { outlineT: 0.04 });
+    H.sound(x, y + 0.38, z, 1.0, 'xylo', { deg: k });
+  }
+  B.box(gx - 27, terrainAt(gx, gz - 15) - 0.1, gz - 15, gx - 1, terrainAt(gx, gz - 15) + 0.08, gz - 14.6, '#5a4a3a', 'wood', { outlineT: 0, edges: false });
+  // chime tubes hanging from a beam: grind the beam and they ring in turn
+  const cy = terrainAt(gx + 14, gz - 8), by = cy + 2.6;
+  for (const sx of [gx + 4, gx + 26]) K.box(sx - 0.25, cy - 0.2, gz - 8.25, sx + 0.25, by, gz - 7.75, '#3a3550', 'plain', { outlineT: 0.04 });
+  K.box(gx + 4, by, gz - 8.2, gx + 26, by + 0.3, gz - 7.8, '#3a3550', 'plain', { outlineT: 0.04 });
+  K.rail([[gx + 4.3, by + 0.33, gz - 8], [gx + 25.7, by + 0.33, gz - 8]], { hidden: true, voice: 'balcony' });
+  for (let k = 0; k < 12; k++) {
+    const x = gx + 5.5 + k * 1.7, len = 2.0 - k * 0.1;
+    H.put(H.SH.CYL, x, by - len / 2 - 0.1, gz - 8, 0.09, len, 0.09, '#d9d4ea', 'plain', 0.02);
+    H.sound(x, by, gz - 8, 0.9, 'tube', { deg: k });
+  }
+  // drums: land on the skin and they boom (and throw you up a little)
+  for (const [dx, dz, rad, h, k] of [[gx + 8, gz + 6, 2.2, 0.9, 0], [gx + 14, gz + 10, 1.7, 1.4, 1], [gx + 19, gz + 5, 1.3, 1.9, 2], [gx + 24, gz + 11, 1.0, 2.4, 3]]) {
+    const y = terrainAt(dx, dz);
+    K.cyl(dx, y - 0.2, dz, rad, h + 0.2, rain[(k * 2 + 1) % rain.length], { outline: 0.06, seg: 16 });
+    K.cyl(dx, y + h, dz, rad + 0.08, 0.06, '#f2efe6', { outline: 0.02, seg: 16 });
+    W.boxes.push({ x0: dx - rad * 0.75, y0: y - 1, z0: dz - rad * 0.75, x1: dx + rad * 0.75, y1: y + h + 0.06, z1: dz + rad * 0.75, tag: 'bounce', drum: k, nocam: true });
+  }
+  // an arch over the way in, benches, kids and parents
+  for (const sx of [-1, 1]) K.box(gx - 30 + sx * 2.4 - 0.3, terrainAt(gx - 30, gz) - 0.2, gz - 0.3, gx - 30 + sx * 2.4 + 0.3, terrainAt(gx - 30, gz) + 3.6, gz + 0.3, '#e4572e', 'plain', { outlineT: 0.05 });
+  K.box(gx - 33, terrainAt(gx - 30, gz) + 3.6, gz - 0.4, gx - 27, terrainAt(gx - 30, gz) + 4.1, gz + 0.4, '#f2c14e', 'plain', { outlineT: 0.05 });
+  H.bench(gx - 10, gz + 14, true, { color: '#7a5a3a' }); H.bench(gx + 4, gz + 16, true, { color: '#7a5a3a' });
+  const kids = []; for (let i = 0; i < 7; i++) kids.push([gx - 20 + r() * 44, gz - 4 + r() * 18, r() * 6]);
+  H.standers(kids, 'lake'); W.npcs[W.npcs.length - 1].kids = true;
+  H.reserve([gx - 34, gz - 22, gx + 34, gz + 22]);
+}
+
+// a carousel: the deck turns (ride it), horses rise and fall, a fairground organ plays nearby
+function carousel(H, x, z, r) {
+  const { K, W } = H;
+  if (!H.clearOf(x - 14, z - 14, x + 14, z + 14, 0)) return;
+  const y = terrainAt(x, z);
+  H.patch([x - 13, z - 13, x + 13, z + 13], '#d8cbb0', 'tiles', 0.07);
+  K.cyl(x, y - 0.3, z, 7.6, 0.55, '#c9a24a', { outline: 0.06, seg: 24 });          // the fixed base
+  W.boxes.push({ x0: x - 0.6, y0: y, z0: z - 0.6, x1: x + 0.6, y1: y + 5, z1: z + 0.6, tag: 'column' });
+  W.carousel = { x, z, y: y + 0.55, R: 7.2, w: 0.45, a: 0 };
+  H.spot('carousel', x, z, 30);
+  const ring = []; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; ring.push([x + Math.cos(a) * 10, y + 0.9, z + Math.sin(a) * 10]); }
+  K.rail(ring, { loop: true, color: '#e9e4f5', postColor: '#c4523a', round: 1 });
+  for (let i = 0; i < 8; i++) { const a = r() * 6.28, d = 11 + r() * 2; H.standers([[x + Math.cos(a) * d, z + Math.sin(a) * d, a + Math.PI]], 'business'); }
+  H.reserve([x - 14, z - 14, x + 14, z + 14]);
+}
+
+// Lavaux on the observatory's south slope: dry-stone terrace walls along the contours (long level
+// grinds), rows of vines between, a winemaker's house with a tower, people at work
+function vineyards(H, r) {
+  const { K, W, B } = H;
+  const x0 = 280, x1 = 415, z0 = -1290, z1 = -1105;
+  for (let z = z0; z < z1; z += 11) {
+    const pts = []; for (let x = x0; x <= x1; x += 9) pts.push([x, z]);
+    let ok = true; for (const [px, pz] of pts) if (!H.clearOf(px - 4, pz - 1, px + 4, pz + 1, 0)) { ok = false; break; }
+    if (!ok) continue;
+    H.ledge(pts, { h: 1.1, w: 0.7, color: '#b8ae9a', kind: 'paving', top: '#cfc6b4' });
+    for (let k = 1; k <= 4; k++) {
+      const vz = z + k * 2.1;
+      for (let x = x0 + 2; x < x1 - 2; x += 6) {
+        const y = terrainAt(x + 3, vz);
+        H.put(H.SH.BOX, x + 3, y + 0.35, vz, 5.6, 0.7, 0.12, '#6a5040', 'wood', 0);
+        H.put(H.SH.ICO, x + 3, y + 0.85, vz, 3.1, 0.45, 0.45, pick(r, ['#5f8f3a', '#6f9a42', '#58843a']), 'flat', 0.04);
+      }
+    }
+    H.reserve([x0 - 1, z - 1, x1 + 1, z + 10]);
+  }
+  // the winemaker's house at the top, with a little tower
+  const hx = 350, hz = z0 - 14;
+  if (H.clearOf(hx - 9, hz - 6, hx + 9, hz + 6, 0)) {
+    const bb = H.bldg(hx - 8, hz - 5, hx + 8, hz + 5, 7, '#e6dcc4', { trim: '#8a6a4a', outline: 0.12, kind: 'house' });
+    H.roof(hx - 8, hz - 5, hx + 8, hz + 5, bb.top, 3, '#9a5a3a', true);
+    K.box(hx + 4, bb.hi, hz - 2, hx + 8, bb.top + 6, hz + 2, '#e6dcc4', 'house', { outlineT: 0.1 });
+    B.add(new THREE.ConeGeometry(3, 3.4, 4), new THREE.Matrix4().makeRotationY(Math.PI / 4).setPosition(hx + 6, bb.top + 7.7, hz), '#9a5a3a', 'plain', { outlineT: 0.06, edges: false });
+    H.reserve([hx - 9, hz - 6, hx + 9, hz + 6]);
+    H.cafe(hx - 8, hz + 6, hx + 4, hz + 12, 'obs', r, { table: '#e8dcc0', chair: '#6a4a3a', parasol: ['#f2efe6'] });
+  }
+  // a few people working the rows
+  const pts = []; for (let i = 0; i < 7; i++) pts.push([x0 + 10 + r() * (x1 - x0 - 20), z0 + 4 + Math.floor(r() * 16) * 11 + 3, r() * 6]);
+  H.standers(pts, 'obs');
+}
+
+// the canal mouth: a rowing club, a pontoon along the water, food trucks round picnic tables under
+// strings of lights
+function canalMouth(H, r) {
+  const { K, W, B } = H, C = PLAN.canal, ex = C.bendX + C.half;
+  const x0 = ex + 20, x1 = PLAN.boulevardX - 20;     // (between the quay path and the boulevard)
+  for (const zc of [840, 1130]) {
+    const z0 = zc - 40, z1 = zc + 40;
+    if (!H.clearOf(x0, z0, x1, z1, 0)) continue;
+    H.patch([x0, z0, x1, z1], '#c9b48e', 'gravel', 0.07);
+    for (let k = 0; k < 16; k++) { const tx = k < 8 ? x0 + 2 + (k % 2) * (x1 - x0 - 4) : U.lerp(x0 + 6, x1 - 6, (k - 8) / 7), tz = k < 8 ? U.lerp(z0 + 4, z1 - 4, Math.floor(k / 2) / 3) : (zc === 840 ? z1 - 2 : z0 + 2); H.tree(tx, tz, { s: 0.85, color: pick(r, ['#5f8f45', '#6f9a50', '#7aa04a']) }); }
+    if (zc === 840) {
+      // the rowing club: a long boathouse with racks of boats, a ramp down, the pontoon
+      const bz0 = z0 + 6, bz1 = z0 + 34, bx0 = x0 + 2, bx1 = x0 + 16;
+      const bb = H.bldg(bx0, bz0, bx1, bz1, 6, '#3f5a6a', { trim: '#f2efe6', outline: 0.12, kind: 'house' });
+      H.roof(bx0, bz0, bx1, bz1, bb.top, 2.6, '#c4523a', false);
+      for (let k = 0; k < 4; k++) H.put(H.SH.BOX, bx1 + 2.5, bb.hi + 0.6 + k * 0.5, (bz0 + bz1) / 2, 0.5, 0.12, 14, ['#f2c14e', '#e4572e', '#f2efe6', '#2f8f9d'][k], 'plain', 0.03);
+      K.box(ex - 2.5, C.waterY - 0.2, z0 + 4, ex + 0.3, C.waterY + 0.3, z1 - 4, '#9a7a58', 'wood', { outlineT: 0.04 });
+      for (let z = z0 + 6; z < z1 - 6; z += 8) H.put(H.SH.BOX, ex - 6, C.waterY + 0.15, z, 1.0, 0.25, 6, pick(r, ['#f2efe6', '#e4572e', '#2f8f9d']), 'plain', 0.03);
+      H.standers([[bx1 + 3, bz0 + 3, 1.5], [bx1 + 3, bz0 + 5, 1.8], [ex + 1, z0 + 20, -1.6, C.waterY + 0.3]], 'canals');
+    } else {
+      // food trucks round a square of picnic tables, string lights criss-crossing
+      const trucks = [[x0 + 4, z0 + 8, 0], [x0 + 4, z1 - 14, 0], [x1 - 9, z0 + 10, Math.PI], [x1 - 9, z1 - 16, Math.PI]];
+      for (const [tx, tz] of trucks) {
+        const y = terrainAt(tx, tz), c = pick(r, ['#e4572e', '#f2c14e', '#2f8f9d', '#d9779a', '#8a5a9e']);
+        K.box(tx, y + 0.5, tz, tx + 5, y + 3.1, tz + 7, c, 'plain', { outlineT: 0.08 });
+        H.put(H.SH.BOX, tx + 2.5, y + 2.6, tz + 7.6, 4.6, 0.06, 1.4, '#f2efe6', 'plain', 0.03, 0, 0.25);
+        H.put(H.SH.BOX, tx + 2.5, y + 1.9, tz + 7.02, 3.6, 1.0, 0.05, '#2a2838', 'plain', 0);
+        for (const [wx, wz] of [[tx + 1, tz + 1.5], [tx + 4, tz + 1.5], [tx + 1, tz + 5.5], [tx + 4, tz + 5.5]]) H.put(H.SH.CYL, wx, y + 0.45, wz, 0.45, 0.25, 0.45, '#1b1a24', 'plain', 0.02, 0, 0, Math.PI / 2);
+        H.standers([[tx + 2.5, tz + 9.5, Math.PI], [tx + 1.5, tz + 10.2, Math.PI - 0.4]], 'canals');
+      }
+      const mx = (x0 + x1) / 2, mz = zc;
+      H.cafe(mx - 10, mz - 8, mx + 10, mz + 8, 'canals', r, { table: '#a07a4a', chair: '#7a5a3a', busy: 0.75 });
+      // string lights: sagging lines between poles, bulbs that glow at night
+      const poles = [[x0 + 2, z0 + 2], [x1 - 2, z0 + 2], [x1 - 2, z1 - 2], [x0 + 2, z1 - 2]];
+      for (const [px, pz] of poles) K.cyl(px, terrainAt(px, pz) - 0.2, pz, 0.12, 5.2, '#3a3550', { outline: 0.03, seg: 6 });
+      for (const [a, b] of [[0, 2], [1, 3], [0, 1], [2, 3]]) {
+        const [ax, az] = poles[a], [bx, bz] = poles[b], ya = terrainAt(ax, az) + 5, yb = terrainAt(bx, bz) + 5, L = Math.hypot(bx - ax, bz - az);
+        const pts = []; for (let k = 0; k <= 20; k++) { const t = k / 20; pts.push(V3(U.lerp(ax, bx, t), U.lerp(ya, yb, t) - Math.sin(t * Math.PI) * L * 0.04, U.lerp(az, bz, t))); }
+        B.add(tubeGeo(pts, 0.025, 3), null, '#2a2838', 'plain', { outlineT: 0, edges: false });
+        for (let k = 1; k < 20; k++) { const p = pts[k]; B.add(new THREE.SphereGeometry(0.13, 5, 4), new THREE.Matrix4().makeTranslation(p.x, p.y - 0.15, p.z), pick(r, ['#ffe9b0', '#ffd0a0', '#fff3c4', '#ffb8b0']), 'lamp', { outlineT: 0, edges: false }); }
+      }
+      (W.pigeonSpots = W.pigeonSpots || []).push([mx, mz + 12, 8]);
+    }
+    H.reserve([x0, z0, x1, z1]);
+  }
+}
+
+// a row of striped beach huts along the top of the beach
+function beachHuts(H, r) {
+  const { K, W, B } = H;
+  const cols = ['#e4572e', '#2f8f9d', '#f2c14e', '#3e8f86', '#d9779a', '#4a6ab8', '#a8c84a'];
+  for (let x = -1010; x < -560; x += 4.2) {
+    if (r() < 0.12) { x += 3; continue; }
+    const z = shoreZ(x) - 24, y = terrainAt(x, z);
+    if (!H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0)) continue;
+    const c = pick(r, cols);
+    K.box(x - 1.3, y - 0.2, z - 1.2, x + 1.3, y + 2.3, z + 1.2, '#f2efe6', 'plain', { outlineT: 0.06 });
+    for (let k = 0; k < 3; k++) H.put(H.SH.BOX, x - 0.87 + k * 0.87, y + 1.05, z + 1.22, 0.42, 2.5, 0.04, c, 'plain', 0);
+    H.put(H.SH.BOX, x, y + 0.95, z + 1.25, 0.9, 1.7, 0.04, '#2a2838', 'plain', 0);
+    H.roof(x - 1.3, z - 1.2, x + 1.3, z + 1.2, y + 2.3, 1.0, c, false);
+    if (r() < 0.4) H.standers([[x + (r() - 0.5) * 2, z + 2.2, Math.PI * 0 + (r() - 0.5), y, r() < 0.5 ? 'ground' : undefined]], 'lake');
+    H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]);
+  }
 }

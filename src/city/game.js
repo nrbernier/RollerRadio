@@ -41,7 +41,7 @@ const hooks = {
       const vy = driving ? U.clamp(impact * 0.82 + 2, 9, 15.5) : impact * 0.55;
       if (vy < 3) { Sound.sfx.land(0.3); return; }
       p.mode = 'air'; p.vel.y = vy; p.pos.y += 0.05; p.airTime = 0; p.ground = null;
-      Sound.sfx.touch('bounce', Game.bounceN);
+      Sound.sfx.touch(g.drum !== undefined ? 'drum' : 'bounce', g.drum ?? Game.bounceN);
       Game.fx.burst(V3().copy(p.pos).add(V3(0, 0.1, 0)), 5, ['#ffffff', '#ffd23f'], 2, 0.3, 3);
       return;
     }
@@ -231,7 +231,7 @@ function updateWorld(dt, bi) {
     const d = Math.hypot(s.x - pos.x, s.z - pos.z);
     if (d < s.r && Math.abs(s.y - pos.y) < 4 && s.cd <= 0 && (p.speed > 2.5 || s.kind === 'fountain' || s.kind === 'pond')) {
       s.cd = s.kind === 'fountain' || s.kind === 'pond' ? 2.4 : 1.4;
-      Sound.sfx.touch(s.kind === 'pond' ? 'chime' : s.kind, Game.touchN = (Game.touchN || 0) + 1);
+      Sound.sfx.touch(s.kind === 'pond' ? 'chime' : s.kind, s.deg ?? (Game.touchN = (Game.touchN || 0) + 1));
     }
   }
   // hidden spots: proximity → a local change in the music
