@@ -3,7 +3,7 @@
 // ============================================================
 const GROUND_COLS = {
   park: '#3d5f36', obs: '#6f8f4f', oldtown: '#7c8a56', business: '#a8a398', market: '#b89a72',
-  canals: '#8f8a7c', docks: '#8c877e', lake: '#6c9150'
+  canals: '#7d8a5e', docks: '#8c877e', lake: '#6c9150'
 };
 const _gc = new THREE.Color(), _gc2 = new THREE.Color(), _gw = {};
 function paintGround(x, z, y, steep, out) {

@@ -273,14 +273,16 @@ function fillCanalQuarter(H) {
   row(xA, xB, 646, -1, 11); row(xA, xB, 654, 1, 12); row(xA, xB, 708, -1, 12); row(xA, xB, 716, 1, 12);
   row(xA, xB, 790, -1, 13);
   // gardens and trees in the leftover gaps (courtyards)
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < 1600; i++) {
     const x = xA + r() * (xB - xA), z = 340 + r() * 450;
     if (!H.clearOf(x - 2.5, z - 2.5, x + 2.5, z + 2.5, 0.5)) continue;
     const t = r();
-    if (t < 0.55) H.tree(x, z, { s: 0.7 + r() * 0.4, color: pick(r, ['#5f8f45', '#6f9a50', '#4f7f42', '#8aa04a']) });
-    else if (t < 0.75) H.flowerBed(x, z, 1.6, r);
-    else if (t < 0.85) { H.put(H.SH.BOX, x, terrainAt(x, z) + 1, z, 2.2, 2, 1.6, pick(r, ['#8a6a4a', '#5a6a5a', '#a07a5a']), 'wood', 0.04); }
-    else H.picnic(x, z, 'canals', r);
+    if (t < 0.5) H.tree(x, z, { s: 0.7 + r() * 0.4, color: pick(r, ['#5f8f45', '#6f9a50', '#4f7f42', '#8aa04a']) });
+    else if (t < 0.64) H.flowerBed(x, z, 1.6, r);
+    else if (t < 0.72) { H.put(H.SH.BOX, x, terrainAt(x, z) + 1, z, 2.2, 2, 1.6, pick(r, ['#8a6a4a', '#5a6a5a', '#a07a5a']), 'wood', 0.04); H.put(H.SH.BOX, x, terrainAt(x, z) + 2.1, z, 2.6, 0.2, 2, '#4a3a32', 'plain', 0.03); }
+    else if (t < 0.8) H.picnic(x, z, 'canals', r);
+    else if (t < 0.9) H.bench(x, z, r() < 0.5, { color: '#6a4a3a' });
+    else { const a = r() < 0.5; H.ledge(a ? [[x - 2.4, z], [x + 2.4, z]] : [[x, z - 2.4], [x, z + 2.4]], { h: 0.8, w: 0.9, color: '#4f7f42', kind: 'flat', shrub: '#5a8f4a' }); }
     H.reserve([x - 2.5, z - 2.5, x + 2.5, z + 2.5]);
   }
   // the quay edges: a long stone coping you can grind, broken at the bridges
@@ -497,6 +499,22 @@ function fillOldTownMarket(H) {
     H.reserve([x - 2.5, z - 2.5, x + 2.5, z + 2.5]);
   }
   H.walkers(W.oldLanes || [], 40, 'oldtown');
+  // handrails down the steep lanes: long grinds into town, broken at the junctions
+  const lanes = W.oldLanes || [], joins = [];
+  for (const L of lanes) for (const p of L) if (lanes.filter(M => M !== L && M.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 1)).length) joins.push(p);
+  for (const L of lanes.slice(0, 4)) {
+    let run = [];
+    const flush = () => { if (run.length > 4) K.rail(run, { color: '#e9e4f5', postColor: '#3a3550', round: 2 }); run = []; };
+    for (let i = 0; i < L.length - 1; i++) {
+      const [ax, az] = L[i], [bx, bz] = L[i + 1], len = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / len, uz = (bz - az) / len;
+      for (let t = 0; t < len; t += 3) {
+        const cx = ax + ux * t, cz = az + uz * t, x = cx - uz * 3.0, z = cz + ux * 3.0;
+        if (joins.some(j => Math.hypot(j[0] - cx, j[1] - cz) < 10)) { flush(); continue; }
+        run.push([x, terrainAt(x, z) + 0.95, z]);
+      }
+    }
+    flush();
+  }
 }
 
 function fillDocks(H) {
