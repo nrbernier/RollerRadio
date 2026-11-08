@@ -22,6 +22,5 @@
 
 ## Old town & market: life at roof level
 - Ways up to the roofs, and pathways at roof level to grind along and rest on
-- Fabric shades above shops are great: keep and build on them
-- Ways to jump up, e.g. trampolines / springboards
+- Fabric shades above shops are great: arrange the bouncy shades as stepping stones, so you can bounce from one to the next up to roof level (alongside the other ways up). No trampolines.
 - More grindable things at height, e.g. balconies
