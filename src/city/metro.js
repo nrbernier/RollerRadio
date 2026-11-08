@@ -185,7 +185,10 @@ function buildMetro(K, M, S, F) {
   // the deck you skate on
   for (let i = 0; i < N; i++) { const a = M.pts[i], b = M.pts[(i + 1) % N]; S.add(a.x, a.y, a.z, b.x, b.y, b.z, hw - 0.3); }
   // pillars (and their far copies), arches over the gallery
-  for (let i = 0; i < N; i += 9) {
+  // (never in a traffic lane: where the line crosses a road, the pillar steps to the kerb or the span grows)
+  const onRoad = (x, z) => { for (const k in (W.roads || {})) { const rd = W.roads[k], P = rd.pts; for (let j = 0; j < P.length - 1; j++) { const [ax, az] = P[j], [bx, bz] = P[j + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); if (Math.hypot(ax + dx * u - x, az + dz * u - z) < rd.width / 2 + 1.6) return true; } } return false; };
+  for (let i0 = 0; i0 < N; i0 += 9) {
+    let i = i0; if (onRoad(M.pts[i].x, M.pts[i].z)) { i = -1; for (const o of [3, -3, 5, -5, 7, -7]) { const k = i0 + o; if (k >= 0 && k < N && !onRoad(M.pts[k].x, M.pts[k].z)) { i = k; break; } } if (i < 0) continue; }
     const p = M.pts[i];
     if (p.covered || inHole(p.x, p.z)) continue;
     const gy = Math.min(terrainAt(p.x - p.dz * 2, p.z + p.dx * 2), terrainAt(p.x + p.dz * 2, p.z - p.dx * 2), terrainAt(p.x, p.z));
@@ -194,7 +197,7 @@ function buildMetro(K, M, S, F) {
     const h = p.y - 1.4 - gy + 1;
     K.B.add(new THREE.BoxGeometry(2.6, h, 2.2), m, pillarCol, 'plain', { outlineT: 0.08 });
     W.boxes.push({ x0: p.x - 1.3, y0: gy - 1, z0: p.z - 1.3, x1: p.x + 1.3, y1: p.y - 1.4, z1: p.z + 1.3, tag: 'pillar' });
-    if (i % 18 === 0) F.add(new THREE.BoxGeometry(2.2, h, 1.8), m, pillarCol);
+    if (i0 % 18 === 0) F.add(new THREE.BoxGeometry(2.2, h, 1.8), m, pillarCol);
   }
   // far deck (a simple band)
   const fp = []; for (let i = 0; i < N; i += 4) { const a = M.pts[i], b = M.pts[(i + 4) % N]; const fq = (A, Bb, C, D) => fp.push(...A, ...Bb, ...C, ...A, ...C, ...D); fq(L(a, -hw + 0.4, -0.2), L(b, -hw + 0.4, -0.2), L(b, hw - 0.4, -0.2), L(a, hw - 0.4, -0.2)); fq(L(a, hw - 0.4, -0.2), L(b, hw - 0.4, -0.2), L(b, hw - 0.4, -1.3), L(a, hw - 0.4, -1.3)); fq(L(a, -hw + 0.4, -1.3), L(b, -hw + 0.4, -1.3), L(b, -hw + 0.4, -0.2), L(a, -hw + 0.4, -0.2)); }

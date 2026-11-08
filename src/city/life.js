@@ -129,6 +129,33 @@ const Life = (() => {
   function init(world) {
     W = world;
     const r = U.rng(4242);
+    // walkers' routes: cut out any stretch that runs through a building (or a pillar, a kiosk…), so people
+    // turn back there instead of walking through it; little things (trees, lamps, rocks) they step past
+    const SOFT = new Set(['tree', 'canopy', 'bounce', 'lamp', 'bollard', 'benchleg', 'rock', 'stump', 'log', 'table', 'edge']), _nq = [];
+    const blocked = (x, z, y) => { if (!W.near) return false; _nq.length = 0; for (const b of W.near(x - 0.6, z - 0.6, x + 0.6, z + 0.6, _nq)) { if (b.dyn || SOFT.has(b.tag)) continue; if (x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5 && b.y0 < y + 1.7 && b.y1 > y + 0.3) return true; } return false; };
+    function clearPaths(paths, yFix) {
+      const out = [];
+      for (const P of paths) {
+        const pts = [];                                    // resampled every 0.5 m: [x, z, blocked, isVertex]
+        for (let j = 0; j < P.length - 1; j++) {
+          const [ax, az] = P[j], [bx, bz] = P[j + 1], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.5));
+          for (let k = 0; k < n; k++) { const u = k / n, x = ax + (bx - ax) * u, z = az + (bz - az) * u; pts.push([x, z, blocked(x, z, yFix ?? terrainAt(x, z)), k === 0]); }
+        }
+        const last = P[P.length - 1]; pts.push([last[0], last[1], blocked(last[0], last[1], yFix ?? terrainAt(last[0], last[1])), true]);
+        // a single blocked sample is a graze, not a wall
+        for (let i = 0; i < pts.length;) { if (!pts[i][2]) { i++; continue; } let j = i; while (j < pts.length && pts[j][2]) j++; if (j - i < 2) for (let k = i; k < j; k++) pts[k][2] = false; i = j; }
+        let cur = null;
+        const flush = () => { if (cur && cur.length > 1) { let L = 0; for (let k = 0; k < cur.length - 1; k++) L += Math.hypot(cur[k + 1][0] - cur[k][0], cur[k + 1][1] - cur[k][1]); if (L > 6) out.push(cur); } cur = null; };
+        for (let i = 0; i < pts.length; i++) {
+          const q = pts[i];
+          if (q[2]) { flush(); continue; }
+          if (!cur) cur = [[q[0], q[1]]];
+          else if (q[3] || i === pts.length - 1 || pts[i + 1][2]) cur.push([q[0], q[1]]);
+        }
+        flush();
+      }
+      return out;
+    }
     let n = 0; for (const e of W.npcs) n += e.kind === 'walk' ? e.n : e.kind === 'group' ? e.n : e.pts.length;
     // sitters on about half the benches (one end each, so there's room for you too)
     const benchSit = [];
@@ -136,7 +163,7 @@ const Life = (() => {
     personMeshes(Math.min(1500, n + 60));
     for (const e of W.npcs) {
       if (e.kind === 'walk') {
-        const paths = e.paths.filter(p => p.length > 1);
+        const paths = clearPaths(e.paths.filter(p => p.length > 1), e.y);
         for (let i = 0; i < e.n && paths.length; i++) {
           const P = paths[Math.floor(r() * paths.length)];
           const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); if (l < 0.01) continue; segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
@@ -176,7 +203,8 @@ const Life = (() => {
     for (const b of busks) for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 4 + r() * 4, x = b.x + Math.cos(a) * d, z = b.z + Math.sin(a) * d; const s = person(pickStyle(x, z), r, { x, z, y: terrainAt(x, z), yaw0: Math.atan2(b.x - x, b.z - z), nearBusk: true }); s.yaw = s.yaw0; standers.push(s); }
     // ---- little scenes ----
     // a tour group following a flag up and down the old town's main lane
-    const lane = (W.oldLanes || [])[0];
+    // (the longest stretch of it that doesn't run through the bell tower or a wall)
+    const lane = W.oldLanes && W.oldLanes[0] ? clearPaths([W.oldLanes[0]]).map(P => [P, P.reduce((L, q, k) => k ? L + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0, 0)]).sort((a, b) => b[1] - a[1]).map(e => e[0])[0] : null;
     if (lane) {
       const segs = []; let len = 0; for (let j = 0; j < lane.length - 1; j++) { const l = Math.hypot(lane[j + 1][0] - lane[j][0], lane[j + 1][1] - lane[j][1]); if (l < 0.01) continue; segs.push({ a: lane[j], b: lane[j + 1], l, s0: len }); len += l; }
       const s0 = len * 0.3;

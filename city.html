@@ -3212,9 +3212,9 @@ const Sound = (() => {
     woodblock(t, m = 84, v = 0.6, d = musicOut) { if (!voice(0.1)) return; const g = gain(d, 0); env(g, t, 0.001, 0.32 * v, 0.06); osc('sine', midiF(m), t, 0.09, g); const g2 = gain(d, 0); env(g2, t, 0.001, 0.12 * v, 0.02); osc('square', midiF(m) * 2.4, t, 0.04, filt('bandpass', midiF(m) * 2.4, 4, g2)); sends(g, 0.35); },
     frame(t, v = 0.6, d = musicOut) { if (!voice(0.5)) return; const g = gain(d, 0); env(g, t, 0.004, 0.55 * v, 0.45); const o = osc('sine', 72, t, 0.5, g); o.frequency.exponentialRampToValueAtTime(55, t + 0.3); const s = gain(d, 0); env(s, t, 0.003, 0.06 * v, 0.2); noise(t, 0.25, filt('lowpass', 500, 0.8, s)); sends(g, 0.3); },
     cowbell(t, v = 0.5, d = musicOut) { if (!voice(0.3)) return; const g = gain(d, 0); env(g, t, 0.001, 0.15 * v, 0.25); const bp = filt('bandpass', 900, 2.5, g); osc('square', 545, t, 0.3, bp); osc('square', 815, t, 0.3, bp); sends(g, 0.15); },
-    agogo(t, hi = true, v = 0.5, d = musicOut) { if (!voice(0.3)) return; const f = hi ? 1120 : 840, g = gain(d, 0); env(g, t, 0.001, 0.16 * v, 0.22); osc('sine', f, t, 0.25, g); osc('sine', f * 2.71, t, 0.12, gain(g, 0.3)); sends(g, 0.2); },
+    agogo(t, hi = true, v = 0.5, d = musicOut, m = null) { if (!voice(0.3)) return; const f = m != null ? midiF(m) : hi ? 1120 : 840, g = gain(d, 0); env(g, t, 0.001, 0.16 * v, 0.22); osc('sine', f, t, 0.25, g); osc('sine', f * 2.71, t, 0.12, gain(g, 0.3)); sends(g, 0.2); },
     metal(t, m = 60, v = 0.5, d = musicOut, dec = 0.5) { if (!voice(dec)) return; const f = midiF(m), g = gain(d, 0); env(g, t, 0.001, 0.2 * v, dec); const c = osc('sine', f, t, dec + 0.1, g); const mod = ctx.createOscillator(); mod.frequency.value = f * 1.41; const mg = ctx.createGain(); mg.gain.setValueAtTime(f * 4, t); mg.gain.exponentialRampToValueAtTime(f * 0.2, t + dec); mod.connect(mg); mg.connect(c.frequency); mod.start(t); mod.stop(t + dec + 0.1); sends(g, 0.3, 0.1); },
-    clank(t, v = 0.5, d = musicOut) { I.metal(t, 70 + Math.floor(Math.random() * 5), v, d, 0.18); },
+    clank(t, v = 0.5, d = musicOut) { I.metal(t, deg(Math.floor(Math.random() * 4) * 2, 1), v, d, 0.18); },      // in key: chord-ish degrees
     // pitched
     upright(t, m, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.006, 0.6 * v, Math.max(0.2, dur * 0.95)); const f = filt('lowpass', 900, 1.5, g); f.frequency.setValueAtTime(1500, t); f.frequency.exponentialRampToValueAtTime(350, t + 0.15); osc('triangle', midiF(m), t, dur + 0.1, f); osc('sine', midiF(m), t, dur + 0.1, gain(g, 0.7)); },
     sub(t, m, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.01, 0.55 * v, dur, 0.0001, dur * 0.4); osc('sine', midiF(m), t, dur + 0.1, g); osc('triangle', midiF(m), t, dur + 0.1, gain(g, 0.15)); },
@@ -3277,7 +3277,7 @@ const Sound = (() => {
     whistle(t, m, m2, dur, v = 0.5, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.03, 0.07 * v, dur, 0.0001, dur * 0.4); const o = osc('sine', midiF(m), t, dur + 0.1, g); o.frequency.setValueAtTime(midiF(m), t + dur * 0.4); o.frequency.exponentialRampToValueAtTime(midiF(m2), t + dur * 0.7); const lf = ctx.createOscillator(); lf.frequency.value = 6; const lg = ctx.createGain(); lg.gain.value = midiF(m) * 0.012; lf.connect(lg); lg.connect(o.frequency); lf.start(t); lf.stop(t + dur + 0.1); sends(g, 0.3, 0.1); },
     horn(t, notes, v = 0.5, d = musicOut) { if (!voice(0.4)) return; const g = gain(d, 0); env(g, t, 0.01, 0.07 * v, 0.3, 0.0001, 0.12); const f = filt('bandpass', 700, 1.4, g); for (const m of notes) osc('square', midiF(m), t, 0.45, f); },
     croak(t, m, v = 0.5, d = musicOut) { if (!voice(0.3)) return; for (let j = 0; j < 3; j++) { const tt = t + j * 0.045, g = gain(d, 0); env(g, tt, 0.002, 0.12 * v, 0.03); osc('square', midiF(m), tt, 0.05, filt('bandpass', midiF(m) * 5, 3, g)); } },
-    hoot(t, v = 0.5, d = musicOut) { if (!voice(1.2)) return; for (const [o, f] of [[0, 400], [0.45, 380], [0.7, 380]]) { const g = gain(d, 0); env(g, t + o, 0.04, 0.09 * v, 0.25); const s2 = osc('sine', f * 1.05, t + o, 0.32, g); s2.frequency.exponentialRampToValueAtTime(f, t + o + 0.12); sends(g, 0.6); } },
+    hoot(t, v = 0.5, d = musicOut, m = 67, m2 = 66) { if (!voice(1.2)) return; for (const [o, f] of [[0, midiF(m)], [0.45, midiF(m2)], [0.7, midiF(m2)]]) { const g = gain(d, 0); env(g, t + o, 0.04, 0.09 * v, 0.25); const s2 = osc('sine', f * 1.05, t + o, 0.32, g); s2.frequency.exponentialRampToValueAtTime(f, t + o + 0.12); sends(g, 0.6); } },
     clack(t, v = 1, d = musicOut) { if (!voice(0.1)) return; const g = gain(d, 0); env(g, t, 0.001, 0.4 * v, 0.06); noise(t, 0.08, filt('bandpass', 1200, 1.4, g)); const o = gain(d, 0); env(o, t, 0.001, 0.25 * v, 0.05); osc('triangle', 180, t, 0.07, o); },
   };
 
@@ -3290,6 +3290,7 @@ const Sound = (() => {
   const deg = (dd, oct = 0) => { const m = H.mode, n = m.length, o = Math.floor(dd / n), k = ((dd % n) + n) % n; return H.root + m[k] + 12 * (o + oct); };
   // chord tones of the current chord (stacked thirds from the chord degree)
   const chord = (size = 4, oct = 0, d0 = H.deg) => { const out = []; for (let i = 0; i < size; i++) out.push(deg(d0 + i * 2, oct)); return out; };
+  const fold = (m, hi = 88) => { while (m > hi) m -= 12; return m; };
   const nearest = (m, set) => { let b = set[0], bd = 99; for (const s of set) for (const o of [-24, -12, 0, 12, 24]) { const d = Math.abs(s + o - m); if (d < bd) { bd = d; b = s + o; } } return b; };
 
   // generators
@@ -3352,7 +3353,7 @@ const Sound = (() => {
         // heartbeat: soft frame drum, woodblock on the triplet
         if (s === 0) I.frame(t, v * 0.6);
         if (s === 7 && e > 0.3) I.frame(t, v * 0.3);
-        if (s % 3 === 2 && e > 0.5 && r() < 0.5) I.woodblock(t, 79 + (s % 6 === 2 ? 5 : 0), v * 0.35);
+        if (s % 3 === 2 && e > 0.5 && r() < 0.5) I.woodblock(t, deg(s % 6 === 2 ? 4 : 2, 1), v * 0.35);
         // marimba / kalimba rolling arpeggio of the chord
         if (e > 0.2) { const ct = chord(4, 0); const m = ct[st.arp[s % st.arp.length] % 4] + (s >= 6 ? 12 : 0); (s % 2 ? I.kalimba : I.marimba)(t, m, v * (s % 3 === 0 ? 0.7 : 0.45)); }
         // low drone on the root
@@ -3371,7 +3372,7 @@ const Sound = (() => {
         const { s, t, sd, v, r, st, e, bar } = c;
         if (!st.bell || c.newPhrase) { st.bell = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1]; st.riff = motif(r, 12, 7, 2, 0.15); st.callBar = Math.floor(r() * 2); }
         // the 12/8 bell (the "standard pattern") on the agogo
-        if (st.bell[s]) I.agogo(t, s % 4 !== 1, v * 0.55);
+        if (st.bell[s]) I.agogo(t, s % 4 !== 1, v * 0.55, musicOut, deg(s % 4 !== 1 ? 4 : 0, 2));
         // doum on 1 and the "and" of 2, teks filling in
         if (s === 0 || s === 5 || (s === 8 && e > 0.5)) I.doum(t, v * 0.8);
         else if ((s % 3 === 1 || s % 3 === 2) && r() < 0.55 + e * 0.3) I.tek(t, v * (0.3 + r() * 0.35));
@@ -3539,7 +3540,7 @@ const Sound = (() => {
       perc: (t, v) => I.shaker(t, v * 1.2),
       land: (t, v) => { I.frame(t, v * 0.8); I.kalimba(t, chord(1, 0)[0], v * 0.6); },
       trick: (t, sd, v, n) => { const ct = chord(4, 1); for (let i = 0; i < 2 + Math.min(n, 3); i++) I.flute(t + i * sd * 0.5, ct[i % 4] + 12, sd * 0.45, v * 0.55); },
-      push: (t, v) => I.woodblock(t, 81, v * 0.5),
+      push: (t, v) => I.woodblock(t, deg(3, 1), v * 0.5),
       bass: (t, m, d, v) => I.sub(t, m, d, v * 0.8),
     },
     market: {
@@ -3631,13 +3632,14 @@ const Sound = (() => {
     const oct = U.clamp(Math.floor(G.h / 4), 0, 2);
     let m = deg(d, oct);
     if (c.ds === 0) m = nearest(m, chord(4, oct));
+    m = fold(m);                                   // high rails climb, but never into a whistle
     const v = U.clamp(0.35 + sp / 30, 0.35, 0.8), dur = c.dsd * rate;
     if (vc === 'cable') { I.pad(c.t, [m - 12, nearest(deg(d + 2, oct - 1), chord(4, oct - 1))], dur * 1.1, 1.4, musicOut, 1 + G.h / 30); I.bell(c.t, m + 12, 0.18, musicOut, 2); return; }
     if (vc === 'balcony') { I.musicbox(c.t, m + 12, v * 0.7); return; }
     if (vc === 'pipe') I.metal(c.t, m, v * 0.4, musicOut, 0.35);
     withKits((k, w) => k.lead(c.t, m, v * w, dur));
     // after four bars a second voice joins a third above; after two, a bass line
-    if (bars >= 4) withKits((k, w) => k.lead(c.t, nearest(deg(d + 2, oct), chord(4, oct)), v * 0.4 * w, dur));
+    if (bars >= 4) withKits((k, w) => k.lead(c.t, fold(nearest(deg(d + 2, oct), chord(4, oct))), v * 0.4 * w, dur));
     if (bars >= 2 && c.ds === 0 && c.di % 8 === 0) withKits((k, w) => k.bass && k.bass(c.t, chord(1, -2)[0], c.dsd * 7, 0.6 * w));
   }
   // a run of tricks and grinds without touching the ground: an extra groove that fades when you stop
@@ -3652,7 +3654,7 @@ const Sound = (() => {
     const dawn = R.dawn || 0, wild = (REC.park.w + REC.lake.w + REC.obs.w + REC.oldtown.w * 0.5);
     if (dawn > 0.05 && Math.random() < 0.09 * dawn * (0.3 + wild)) I.bird(c.t + Math.random() * c.dsd, 0.5 * dawn * (0.4 + wild));
     // an owl in the woods at night
-    if (R.night > 0.6 && c.ds === 0 && REC.park.w + REC.obs.w > 0.3 && Math.random() < 0.012) I.hoot(c.t, 0.7 * (REC.park.w + REC.obs.w));
+    if (R.night > 0.6 && c.ds === 0 && REC.park.w + REC.obs.w > 0.3 && Math.random() < 0.012) { const m = nearest(67, chord(3, 0)), below = ((m - 1 - H.root) % 12 + 12) % 12; I.hoot(c.t, 0.7 * (REC.park.w + REC.obs.w), musicOut, m, m - (H.mode.includes(below) ? 1 : 2)); }
   }
 
   // a busker answers your trick: two beats later, your figure back to you, upside down
@@ -3719,9 +3721,10 @@ const Sound = (() => {
       const bar = Math.floor(T / barTicks);
       // a mood change every 16 bars; switch scale when a new place has taken over, or the mood/zone/night asks
       if (bar % 16 === 0 && bar > 0) dom.moodI = (dom.moodI || 0) + 1;
-      if (H.next) { H.root = H.next.root; H.next = null; }
+      let newKey = false; if (H.next) { H.root = H.next.root; H.next = null; newKey = true; }
       const want = moodOf(dom);
-      if (want !== H.modeName && (bar % 2 === 0 || R.zone)) { H.modeName = want; H.mode = MODES[want]; }
+      // (a new key brings its own mode with it on the same bar, never a bar of the old mode on the new root)
+      if (want !== H.modeName && (bar % 2 === 0 || R.zone || newKey)) { H.modeName = want; H.mode = MODES[want]; }
       const p = dom.prog[bar % dom.prog.length]; H.deg = p[0] + (H.bell > 0 ? 3 : 0);
       H.nextDeg = dom.prog[(bar + 1) % dom.prog.length][0];
       harmonyBar = bar;
@@ -3833,16 +3836,16 @@ const Sound = (() => {
       noise(t, 0.24, f); const o = osc('sawtooth', 160, t, 0.2, gain(g, 0.2)); o.frequency.linearRampToValueAtTime(420, t + 0.08); o.frequency.linearRampToValueAtTime(120, t + 0.18);
     },
     // soft, musical feedback for moves (no "scores")
-    jump(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.01, 0.1, 0.18); const f = filt('bandpass', 700, 1.6, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 2600 : 1600, t + 0.18); noise(t, 0.22, f); },
+    jump(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.01, 0.25, 0.18); const f = filt('bandpass', 700, 1.6, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 2600 : 1600, t + 0.18); noise(t, 0.22, f); },
     land(h = 1) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.002, 0.22 * Math.min(1.3, h), 0.1); const o = osc('sine', 110, t, 0.13, g); o.frequency.exponentialRampToValueAtTime(50, t + 0.09); if (h > 0.5) quant((tt) => withKits((k, w) => k.land(tt, 0.5 * Math.min(1.3, h) * w))); },
     trick(n = 0) { quant((t, sd) => { withKits((k, w) => k.trick(t, sd, 0.8 * w, n)); const a = buskAnswer(sd); if (a) a(t); }); },
     // people: brush past someone and they make a little sound of their own, in key
     person(style, i = 0) {
       quant((t, sd) => {
-        const ct = chord(4, 1), m = ct[i % 4], v = 0.55;
+        const ct = chord(4, 1), m = ct[i % 4], v = 1.6;      // loud enough to hear over the band
         const kind = { business: ['phone', 'hey', 'whistle'], market: ['call', 'call', 'hey'], park: ['whistle', 'hum'], canals: ['hum', 'whistle'], oldtown: ['hum', 'whistle', 'laugh'], docks: ['whistle', 'hey'], lake: ['laugh', 'hum', 'whistle'], obs: ['hum'] }[style] || ['hum'];
         switch (kind[i % kind.length]) {
-          case 'phone': [0, 2, 1].forEach((k, j) => { const g = gain(musicOut, 0), tt = t + j * sd; env(g, tt, 0.002, 0.04, sd * 0.8); osc('square', midiF(ct[k] + 12), tt, sd, filt('lowpass', 3000, 1, g)); }); break;
+          case 'phone': [0, 2, 1].forEach((k, j) => { const g = gain(musicOut, 0), tt = t + j * sd; env(g, tt, 0.002, 0.1, sd * 0.8); osc('square', midiF(ct[k] + 12), tt, sd, filt('lowpass', 3000, 1, g)); }); break;
           case 'hey': I.vox(t, m - 12, v * 0.6, 'e', musicOut, 0.18); break;
           case 'call': I.vox(t, m, v * 0.6, 'a', musicOut, sd * 2); I.vox(t + sd * 2, ct[(i + 2) % 4] - 12 + 12, v * 0.4, 'o', musicOut, sd * 2); break;
           case 'whistle': I.whistle(t, m + 12, ct[(i + 1) % 4] + 12, sd * 3, v); break;
@@ -3854,12 +3857,12 @@ const Sound = (() => {
     // skate through a crowd: a ripple up the scale
     ripple() { quant((t, sd) => withKits((k, w) => { const ct = chord(4, 1); for (let i = 0; i < 6; i++) k.lead(t + i * sd * 0.5, ct[i % 4] + 12 * Math.floor(i / 4), 0.5 * w, sd); })); },
     // a group chatting as you come near: a murmured chord
-    murmur() { quant((t, sd) => { const ct = chord(3, -1); ct.forEach((m, j) => I.vox(t + j * sd * 0.3, m, 0.25, ['o', 'u', 'a'][j], musicOut, sd * 5)); }); },
+    murmur() { quant((t, sd) => { const ct = chord(3, -1); ct.forEach((m, j) => I.vox(t + j * sd * 0.3, m, 0.8, ['o', 'u', 'a'][j], musicOut, sd * 5)); }); },
     // a rail within reach: a soft note to say so
-    hint() { quant((t) => withKits((k, w) => k.lead(t, chord(3, 1)[2] + 12, 0.2 * w, 0.2))); },
+    hint() { quant((t) => withKits((k, w) => k.lead(t, chord(3, 1)[2] + 12, 0.5 * w, 0.2))); },
     // a little crowd claps you in, on the beat
-    applause(n) { quant((t, sd) => { const k = Math.min(1, n / 6); for (let i = 0; i < 6; i++) I.clap(t + i * sd * 2 + Math.random() * 0.02, (0.25 + k * 0.35) * (1 - i * 0.1)); if (n > 3) I.vox(t, chord(1, 0)[0], 0.25 * k, 'e', musicOut, sd * 3); }); },
-    bark() { quant((t, sd) => { I.bark(t, 0.6); if (Math.random() < 0.5) I.bark(t + sd * 2, 0.5); }); },
+    applause(n) { quant((t, sd) => { const k = Math.min(1, n / 6); for (let i = 0; i < 6; i++) I.clap(t + i * sd * 2 + Math.random() * 0.02, (0.5 + k * 0.6) * (1 - i * 0.1)); if (n > 3) I.vox(t, chord(1, 0)[0], 0.25 * k, 'e', musicOut, sd * 3); }); },
+    bark() { quant((t, sd) => { I.bark(t, 1.1); if (Math.random() < 0.5) I.bark(t + sd * 2, 0.9); }); },
     grindStart(info) { if (ctx) grindBegin(info); },
     grindEnd() { grindFinish(); },
     push(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.003, onBeat ? 0.12 : 0.07, 0.16); const f = filt('bandpass', 900, 1.5, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 3000 : 1400, t + 0.15); noise(t, 0.18, f); if (onBeat) quant((tt) => withKits((k, w) => k.push(tt, 0.7 * w))); },
@@ -3872,32 +3875,32 @@ const Sound = (() => {
         switch (kind) {
           case 'lamp': I.glock(t, m - 12, 0.5); break;
           case 'lantern': I.kalimba(t, m, 0.6); break;
-          case 'plank': I.woodblock(t, 72 + (i % 3) * 5, 0.5); break;
+          case 'plank': I.woodblock(t, deg((i % 3) * 2, 1), 0.5); break;
           case 'bollard': I.steelpan(t, m - 12, 0.6); break;
           case 'fountain': I.bell(t, m, 0.3, musicOut, 1.4); break;
           case 'telescope': I.bell(t, m + 12, 0.35); break;
           case 'fence': I.marimba(t, m, 0.5); break;
           case 'bird': I.flute(t, deg(7 + (i % 5), 1), 0.07, 0.4); I.flute(t + 0.08, deg(9 + (i % 5), 1), 0.07, 0.3); break;
-          case 'pigeon': I.woodblock(t, 88, 0.25); break;
+          case 'pigeon': I.woodblock(t, fold(deg(4, 2), 90), 0.25); break;
           case 'crate': I.conga(t, 200 + (i % 3) * 60, 0.5); break;
           case 'container': I.metal(t, deg(i % 5, 0), 0.45, musicOut, 0.9); break;
           case 'rigging': I.steelpan(t, deg((i * 2) % 7, 1), 0.4); break;
           case 'chime': [0, 4, 7].forEach((d, k) => I.bell(t + k * 0.32, deg(d, 1), 0.5, musicOut, 1.8)); break;
-          case 'bounce': { const ct2 = chord(3, 1), mm = ct2[i % 3] + 12 * Math.min(2, Math.floor(i / 3)); withKits((k, w) => k.lead(t, mm, 0.7 * w, 0.2)); I.kalimba(t + 0.05, ct2[(i + 1) % 3] + 12, 0.2); break; }
-          case 'deer': for (let j = 0; j < 6; j++) I.woodblock(t + j * 0.11, 70 + (j % 3) * 3, 0.3 - j * 0.03); I.flute(t + 0.1, m + 12, 0.25, 0.25); break;
+          case 'bounce': { const ct2 = chord(3, 1), mm = fold(ct2[i % 3] + 12 * Math.min(2, Math.floor(i / 3)), 93); withKits((k, w) => k.lead(t, mm, 0.7 * w, 0.2)); I.kalimba(t + 0.05, ct2[(i + 1) % 3] + 12, 0.2); break; }
+          case 'deer': for (let j = 0; j < 6; j++) I.woodblock(t + j * 0.11, deg(j % 3, 0) + 12, 0.3 - j * 0.03); I.flute(t + 0.1, m + 12, 0.25, 0.25); break;
           case 'heron': I.flute(t, m, 0.6, 0.3); I.flute(t + 0.5, m - 5, 0.9, 0.25); for (let j = 0; j < 4; j++) I.brush(t + j * 0.35, 0.4, musicOut, true); break;
           case 'catch': [0, 2, 4, 7].forEach((d, k) => I.steelpan(t + k * 0.12, deg(d, 1), 0.45)); I.vox(t + 0.5, m - 12, 0.3, 'e', musicOut, 0.25); break;
           case 'xylo': I.marimba(t, deg(i, 0), 0.75); I.marimba(t, deg(i, 1), 0.25); break;
           case 'tube': I.bell(t, deg(i, 1), 0.45, musicOut, 2.2); break;
-          case 'drum': if (i === 0) I.frame(t, 0.9); else if (i === 1) I.doum(t, 0.9); else if (i === 2) I.conga(t, 220, 0.8); else I.conga(t, 330, 0.7); I.sub(t, deg(0, -2) + [0, 7, 12, 16][i], 0.4, 0.4); break;
+          case 'drum': if (i === 0) I.frame(t, 0.9); else if (i === 1) I.doum(t, 0.9); else if (i === 2) I.conga(t, 220, 0.8); else I.conga(t, 330, 0.7); I.sub(t, deg([0, 4, 7, 9][i % 4], -2), 0.4, 0.4); break;
           case 'puddle': { const g = gain(musicOut, 0); env(g, t, 0.004, 0.12, 0.2); const f = filt('bandpass', 1300, 1, g); f.frequency.exponentialRampToValueAtTime(500, t + 0.2); noise(t, 0.22, f); I.kalimba(t + 0.05, m + 12, 0.35); break; }
           case 'mushroom': [0, 2, 4].forEach((d, k) => I.marimba(t + k * 0.09, deg(d + (i % 4), 1) + 12, 0.35 - k * 0.08)); break;
-          case 'flutter': for (let j = 0; j < 8; j++) I.shaker(t + j * 0.045, 0.6 - j * 0.05); break;
-          case 'quack': I.quack(t + 0.08, 0.6); if (i % 2) I.quack(t + 0.3, 0.45); break;
-          case 'clink': I.bell(t, m + 24, 0.12, musicOut, 0.6); I.bell(t + 0.07, m + 28, 0.08, musicOut, 0.5); break;
-          case 'bin': I.conga(t, 140 + (i % 3) * 30, 0.7); break;
+          case 'flutter': for (let j = 0; j < 8; j++) I.shaker(t + j * 0.045, 1.2 - j * 0.1); break;
+          case 'quack': I.quack(t + 0.08, 2.6); if (i % 2) I.quack(t + 0.3, 2); break;
+          case 'clink': I.bell(t, m + 24, 0.12, musicOut, 0.6); I.bell(t + 0.07, ct[(i + 1) % 4] + 24, 0.08, musicOut, 0.5); break;
+          case 'bin': I.conga(t, 140 + (i % 3) * 30, 0.45); break;
           case 'horn': I.horn(t, [deg(H.deg + 2, -1), deg(H.deg + 4, -1)], 0.7); break;
-          case 'dish': I.bell(t, m + 24, 0.22, musicOut, 3.2); I.bell(t + 0.5, m + 19, 0.12, musicOut, 3.2); break;
+          case 'dish': I.bell(t, m + 24, 0.35, musicOut, 3.2); I.bell(t + 0.5, ct[(i + 2) % 4] + 12, 0.12, musicOut, 3.2); break;
           case 'ferris': [0, 2, 4, 7].forEach((d, k) => I.kalimba(t + k * 0.16, deg(d + (i % 3), 1), 0.4)); break;
           default: I.marimba(t, m, 0.4);
         }
@@ -4106,7 +4109,10 @@ function buildMetro(K, M, S, F) {
   // the deck you skate on
   for (let i = 0; i < N; i++) { const a = M.pts[i], b = M.pts[(i + 1) % N]; S.add(a.x, a.y, a.z, b.x, b.y, b.z, hw - 0.3); }
   // pillars (and their far copies), arches over the gallery
-  for (let i = 0; i < N; i += 9) {
+  // (never in a traffic lane: where the line crosses a road, the pillar steps to the kerb or the span grows)
+  const onRoad = (x, z) => { for (const k in (W.roads || {})) { const rd = W.roads[k], P = rd.pts; for (let j = 0; j < P.length - 1; j++) { const [ax, az] = P[j], [bx, bz] = P[j + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); if (Math.hypot(ax + dx * u - x, az + dz * u - z) < rd.width / 2 + 1.6) return true; } } return false; };
+  for (let i0 = 0; i0 < N; i0 += 9) {
+    let i = i0; if (onRoad(M.pts[i].x, M.pts[i].z)) { i = -1; for (const o of [3, -3, 5, -5, 7, -7]) { const k = i0 + o; if (k >= 0 && k < N && !onRoad(M.pts[k].x, M.pts[k].z)) { i = k; break; } } if (i < 0) continue; }
     const p = M.pts[i];
     if (p.covered || inHole(p.x, p.z)) continue;
     const gy = Math.min(terrainAt(p.x - p.dz * 2, p.z + p.dx * 2), terrainAt(p.x + p.dz * 2, p.z - p.dx * 2), terrainAt(p.x, p.z));
@@ -4115,7 +4121,7 @@ function buildMetro(K, M, S, F) {
     const h = p.y - 1.4 - gy + 1;
     K.B.add(new THREE.BoxGeometry(2.6, h, 2.2), m, pillarCol, 'plain', { outlineT: 0.08 });
     W.boxes.push({ x0: p.x - 1.3, y0: gy - 1, z0: p.z - 1.3, x1: p.x + 1.3, y1: p.y - 1.4, z1: p.z + 1.3, tag: 'pillar' });
-    if (i % 18 === 0) F.add(new THREE.BoxGeometry(2.2, h, 1.8), m, pillarCol);
+    if (i0 % 18 === 0) F.add(new THREE.BoxGeometry(2.2, h, 1.8), m, pillarCol);
   }
   // far deck (a simple band)
   const fp = []; for (let i = 0; i < N; i += 4) { const a = M.pts[i], b = M.pts[(i + 4) % N]; const fq = (A, Bb, C, D) => fp.push(...A, ...Bb, ...C, ...A, ...C, ...D); fq(L(a, -hw + 0.4, -0.2), L(b, -hw + 0.4, -0.2), L(b, hw - 0.4, -0.2), L(a, hw - 0.4, -0.2)); fq(L(a, hw - 0.4, -0.2), L(b, hw - 0.4, -0.2), L(b, hw - 0.4, -1.3), L(a, hw - 0.4, -1.3)); fq(L(a, -hw + 0.4, -1.3), L(b, -hw + 0.4, -1.3), L(b, -hw + 0.4, -0.2), L(a, -hw + 0.4, -0.2)); }
@@ -4867,6 +4873,9 @@ function buildBusiness(H) {
     return r() < 0.4 ? (r() < 0.5 ? -1 : 1) * (6 + r() * 7) : 0;
   }));
   W.bizStreets = [];
+  // the sky rail (built later, in fill) drops from the garage roof across one block: keep that block's lots low
+  const skyA = (() => { const sp = PLAN.spots.find(s => s.key === 'rooftop').at; return [sp[0] - 22 + 9.6, sp[1] + 30]; })(), skyB = [132, PLAN.spots.find(s => s.key === 'rooftop').at[1] + 60];
+  const underSkyRail = (x0, z0, x1, z1) => { for (let t = 0; t <= 1; t += 0.05) { const x = U.lerp(skyA[0], skyB[0], t), z = U.lerp(skyA[1], skyB[1], t); if (x > x0 - 5 && x < x1 + 5 && z > z0 - 5 && z < z1 + 5) return true; } return false; };
   W.walkLines = W.walkLines || [];
   for (let i = 1; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
     const x = xs[i] + jog[i][j], za = j === 0 ? R[1] + 4 : zs[j] - street / 2, zb = j === zs.length - 2 ? R[3] - 4 : zs[j + 1] + street / 2;
@@ -4909,6 +4918,7 @@ function buildBusiness(H) {
     else { const mx = U.lerp(bx0, bx1, 0.4 + r() * 0.2), mz = U.lerp(bz0, bz1, 0.4 + r() * 0.2); lots.push([bx0, bz0, mx - 4, mz - 4], [mx + 4, bz0, bx1, mz - 4], [bx0, mz + 4, mx - 4, bz1], [mx + 4, mz + 4, bx1, bz1]); }
     for (const [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
+      if (underSkyRail(x0, z0, x1, z1)) { for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); } continue; }
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
         // cut by the avenue: build on whichever corner still fits, plant the rest
         const halves = [[x0, z0, (x0 + x1) / 2 - 2, (z0 + z1) / 2 - 2], [(x0 + x1) / 2 + 2, z0, x1, (z0 + z1) / 2 - 2], [x0, (z0 + z1) / 2 + 2, (x0 + x1) / 2 - 2, z1], [(x0 + x1) / 2 + 2, (z0 + z1) / 2 + 2, x1, z1]];
@@ -5943,8 +5953,8 @@ function fillBusiness(H) {
     else if (what === 1) H.bench(fx, z, false, { color: '#5a4a3a' });
     else if (what === 2) H.bikes(fx, z, false, 4, r);
     else if (what === 3) H.bin(fx, z);
-    else if (what === 4 && r() < 0.3) H.busStop(fx + sd * 0.8, z, false, 'business', r);
-    else if (what === 5 && r() < 0.35) H.kiosk(fx + sd * 2, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2, pick(r, ['#2f5f8a', '#3e8f86', '#7a2f3a']), r, 'business');
+    else if (what === 4 && r() < 0.3) H.busStop(fx - sd * 0.4, z, false, 'business', r);            // at the kerb, off the footway
+    else if (what === 5 && r() < 0.35) H.kiosk(fx + sd * 3.6, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2, pick(r, ['#2f5f8a', '#3e8f86', '#7a2f3a']), r, 'business');
   }
   // the plaza: tree squares in planters, a café terrace, chess tables, food carts, people chatting,
   // a ribbon sculpture to ride (the plaza was reserved whole, so only the viaduct and roads are avoided)
@@ -6274,9 +6284,10 @@ function fillDocks(H) {
   const { K, W, B } = H, r = U.rng(1808);
   const R = PLAN.byKey.docks.rect, QZ = PLAN.docksQuayZ;
   // pipelines on stilts between the sheds and the yard: long grinds, jump to the stacks
+  // (routed through the yard and along the east fence, clear of the sheds and the container rows)
   const py = 3.8 + 2.6;
-  H.wave([[480, py, 470], [560, py, 470], [600, py + 1.4, 520], [600, py + 1.4, 760], [560, py, 800], [490, py, 800]], '#c9a24a', { kind: 'pipe', radius: 0.32, round: 6, stubs: true, collar: '#5b6078' });
-  H.wave([[1010, py - 1, 500], [1010, py + 0.6, 700], [960, py + 0.6, 760], [960, py - 1, 1100]], '#8a8fa8', { kind: 'pipe', radius: 0.3, round: 8, stubs: true });
+  H.wave([[482, py, 477], [556, py, 477], [574, py + 1.4, 505], [574, py + 1.4, 660], [574, py, 694]], '#c9a24a', { kind: 'pipe', radius: 0.32, round: 6, stubs: true, collar: '#5b6078' });
+  H.wave([[1026, py - 1, 500], [1026, py + 0.8, 640], [1026, py - 0.4, 780], [1026, py + 0.8, 930], [1026, py - 1, 1100]], '#8a8fa8', { kind: 'pipe', radius: 0.3, round: 8, stubs: true });
   // workers in groups, crates and pallets to hop over
   for (let i = 0; i < 14; i++) { const x = R[0] + 20 + r() * (R[2] - R[0] - 40), z = R[1] + 20 + r() * (QZ - R[1] - 40); if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'docks'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   for (let i = 0; i < 40; i++) {
@@ -6820,7 +6831,6 @@ const Sky = (() => {
     M.lamp.color.copy(_a.copy(lampDay).lerp(lampNight, S.night)).multiplyScalar(0.75 + S.night * 0.5);
     if (W.lakeMat) W.lakeMat.color.copy(_a.set('#6fb0c8').lerp(k.fog, 0.35).multiplyScalar(1 - S.night * 0.45));
     if (W.canalWaterMat) W.canalWaterMat.color.copy(_a.set('#5f9fa0').multiplyScalar(1 - S.night * 0.5));
-    if (W.rayMat) W.rayMat.opacity = 0.09 * U.clamp(sh * 3, 0, 1);
     return S;
   }
   return { init, update, S, get night() { return S.night; }, get phase() { return S.phase; }, set phase(v) { S.phase = v; } };
@@ -6957,6 +6967,33 @@ const Life = (() => {
   function init(world) {
     W = world;
     const r = U.rng(4242);
+    // walkers' routes: cut out any stretch that runs through a building (or a pillar, a kiosk…), so people
+    // turn back there instead of walking through it; little things (trees, lamps, rocks) they step past
+    const SOFT = new Set(['tree', 'canopy', 'bounce', 'lamp', 'bollard', 'benchleg', 'rock', 'stump', 'log', 'table', 'edge']), _nq = [];
+    const blocked = (x, z, y) => { if (!W.near) return false; _nq.length = 0; for (const b of W.near(x - 0.6, z - 0.6, x + 0.6, z + 0.6, _nq)) { if (b.dyn || SOFT.has(b.tag)) continue; if (x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5 && b.y0 < y + 1.7 && b.y1 > y + 0.3) return true; } return false; };
+    function clearPaths(paths, yFix) {
+      const out = [];
+      for (const P of paths) {
+        const pts = [];                                    // resampled every 0.5 m: [x, z, blocked, isVertex]
+        for (let j = 0; j < P.length - 1; j++) {
+          const [ax, az] = P[j], [bx, bz] = P[j + 1], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.5));
+          for (let k = 0; k < n; k++) { const u = k / n, x = ax + (bx - ax) * u, z = az + (bz - az) * u; pts.push([x, z, blocked(x, z, yFix ?? terrainAt(x, z)), k === 0]); }
+        }
+        const last = P[P.length - 1]; pts.push([last[0], last[1], blocked(last[0], last[1], yFix ?? terrainAt(last[0], last[1])), true]);
+        // a single blocked sample is a graze, not a wall
+        for (let i = 0; i < pts.length;) { if (!pts[i][2]) { i++; continue; } let j = i; while (j < pts.length && pts[j][2]) j++; if (j - i < 2) for (let k = i; k < j; k++) pts[k][2] = false; i = j; }
+        let cur = null;
+        const flush = () => { if (cur && cur.length > 1) { let L = 0; for (let k = 0; k < cur.length - 1; k++) L += Math.hypot(cur[k + 1][0] - cur[k][0], cur[k + 1][1] - cur[k][1]); if (L > 6) out.push(cur); } cur = null; };
+        for (let i = 0; i < pts.length; i++) {
+          const q = pts[i];
+          if (q[2]) { flush(); continue; }
+          if (!cur) cur = [[q[0], q[1]]];
+          else if (q[3] || i === pts.length - 1 || pts[i + 1][2]) cur.push([q[0], q[1]]);
+        }
+        flush();
+      }
+      return out;
+    }
     let n = 0; for (const e of W.npcs) n += e.kind === 'walk' ? e.n : e.kind === 'group' ? e.n : e.pts.length;
     // sitters on about half the benches (one end each, so there's room for you too)
     const benchSit = [];
@@ -6964,7 +7001,7 @@ const Life = (() => {
     personMeshes(Math.min(1500, n + 60));
     for (const e of W.npcs) {
       if (e.kind === 'walk') {
-        const paths = e.paths.filter(p => p.length > 1);
+        const paths = clearPaths(e.paths.filter(p => p.length > 1), e.y);
         for (let i = 0; i < e.n && paths.length; i++) {
           const P = paths[Math.floor(r() * paths.length)];
           const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); if (l < 0.01) continue; segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
@@ -7004,7 +7041,8 @@ const Life = (() => {
     for (const b of busks) for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 4 + r() * 4, x = b.x + Math.cos(a) * d, z = b.z + Math.sin(a) * d; const s = person(pickStyle(x, z), r, { x, z, y: terrainAt(x, z), yaw0: Math.atan2(b.x - x, b.z - z), nearBusk: true }); s.yaw = s.yaw0; standers.push(s); }
     // ---- little scenes ----
     // a tour group following a flag up and down the old town's main lane
-    const lane = (W.oldLanes || [])[0];
+    // (the longest stretch of it that doesn't run through the bell tower or a wall)
+    const lane = W.oldLanes && W.oldLanes[0] ? clearPaths([W.oldLanes[0]]).map(P => [P, P.reduce((L, q, k) => k ? L + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0, 0)]).sort((a, b) => b[1] - a[1]).map(e => e[0])[0] : null;
     if (lane) {
       const segs = []; let len = 0; for (let j = 0; j < lane.length - 1; j++) { const l = Math.hypot(lane[j + 1][0] - lane[j][0], lane[j + 1][1] - lane[j][1]); if (l < 0.01) continue; segs.push({ a: lane[j], b: lane[j + 1], l, s0: len }); len += l; }
       const s0 = len * 0.3;
@@ -7960,8 +7998,9 @@ function updateWorld(dt, bi) {
   for (const s of W.soundGrid.query(pos.x - 2, pos.z - 2, pos.x + 2, pos.z + 2, _sq)) {
     s.cd -= dt;
     const d = Math.hypot(s.x - pos.x, s.z - pos.z);
-    if (d < s.r && Math.abs(s.y - pos.y) < 4 && s.cd <= 0 && (p.speed > 2.5 || s.kind === 'fountain' || s.kind === 'pond')) {
-      s.cd = s.kind === 'fountain' || s.kind === 'pond' ? 2.4 : 1.4;
+    // (the fountain rings while you stand by it; the pond — a big place — only chimes as you skate along it)
+    if (d < s.r && Math.abs(s.y - pos.y) < 4 && s.cd <= 0 && (p.speed > 2.5 || s.kind === 'fountain')) {
+      s.cd = s.kind === 'fountain' ? 2.4 : s.kind === 'pond' ? 4.8 : 1.4;
       Sound.sfx.touch(s.kind === 'pond' ? 'chime' : s.kind, s.deg ?? (Game.touchN = (Game.touchN || 0) + 1));
     }
   }

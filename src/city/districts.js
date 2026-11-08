@@ -231,6 +231,9 @@ function buildBusiness(H) {
     return r() < 0.4 ? (r() < 0.5 ? -1 : 1) * (6 + r() * 7) : 0;
   }));
   W.bizStreets = [];
+  // the sky rail (built later, in fill) drops from the garage roof across one block: keep that block's lots low
+  const skyA = (() => { const sp = PLAN.spots.find(s => s.key === 'rooftop').at; return [sp[0] - 22 + 9.6, sp[1] + 30]; })(), skyB = [132, PLAN.spots.find(s => s.key === 'rooftop').at[1] + 60];
+  const underSkyRail = (x0, z0, x1, z1) => { for (let t = 0; t <= 1; t += 0.05) { const x = U.lerp(skyA[0], skyB[0], t), z = U.lerp(skyA[1], skyB[1], t); if (x > x0 - 5 && x < x1 + 5 && z > z0 - 5 && z < z1 + 5) return true; } return false; };
   W.walkLines = W.walkLines || [];
   for (let i = 1; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
     const x = xs[i] + jog[i][j], za = j === 0 ? R[1] + 4 : zs[j] - street / 2, zb = j === zs.length - 2 ? R[3] - 4 : zs[j + 1] + street / 2;
@@ -273,6 +276,7 @@ function buildBusiness(H) {
     else { const mx = U.lerp(bx0, bx1, 0.4 + r() * 0.2), mz = U.lerp(bz0, bz1, 0.4 + r() * 0.2); lots.push([bx0, bz0, mx - 4, mz - 4], [mx + 4, bz0, bx1, mz - 4], [bx0, mz + 4, mx - 4, bz1], [mx + 4, mz + 4, bx1, bz1]); }
     for (const [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
+      if (underSkyRail(x0, z0, x1, z1)) { for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); } continue; }
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
         // cut by the avenue: build on whichever corner still fits, plant the rest
         const halves = [[x0, z0, (x0 + x1) / 2 - 2, (z0 + z1) / 2 - 2], [(x0 + x1) / 2 + 2, z0, x1, (z0 + z1) / 2 - 2], [x0, (z0 + z1) / 2 + 2, (x0 + x1) / 2 - 2, z1], [(x0 + x1) / 2 + 2, (z0 + z1) / 2 + 2, x1, z1]];

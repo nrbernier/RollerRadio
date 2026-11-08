@@ -145,7 +145,6 @@ const Sky = (() => {
     M.lamp.color.copy(_a.copy(lampDay).lerp(lampNight, S.night)).multiplyScalar(0.75 + S.night * 0.5);
     if (W.lakeMat) W.lakeMat.color.copy(_a.set('#6fb0c8').lerp(k.fog, 0.35).multiplyScalar(1 - S.night * 0.45));
     if (W.canalWaterMat) W.canalWaterMat.color.copy(_a.set('#5f9fa0').multiplyScalar(1 - S.night * 0.5));
-    if (W.rayMat) W.rayMat.opacity = 0.09 * U.clamp(sh * 3, 0, 1);
     return S;
   }
   return { init, update, S, get night() { return S.night; }, get phase() { return S.phase; }, set phase(v) { S.phase = v; } };

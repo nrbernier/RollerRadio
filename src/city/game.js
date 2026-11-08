@@ -229,8 +229,9 @@ function updateWorld(dt, bi) {
   for (const s of W.soundGrid.query(pos.x - 2, pos.z - 2, pos.x + 2, pos.z + 2, _sq)) {
     s.cd -= dt;
     const d = Math.hypot(s.x - pos.x, s.z - pos.z);
-    if (d < s.r && Math.abs(s.y - pos.y) < 4 && s.cd <= 0 && (p.speed > 2.5 || s.kind === 'fountain' || s.kind === 'pond')) {
-      s.cd = s.kind === 'fountain' || s.kind === 'pond' ? 2.4 : 1.4;
+    // (the fountain rings while you stand by it; the pond — a big place — only chimes as you skate along it)
+    if (d < s.r && Math.abs(s.y - pos.y) < 4 && s.cd <= 0 && (p.speed > 2.5 || s.kind === 'fountain')) {
+      s.cd = s.kind === 'fountain' ? 2.4 : s.kind === 'pond' ? 4.8 : 1.4;
       Sound.sfx.touch(s.kind === 'pond' ? 'chime' : s.kind, s.deg ?? (Game.touchN = (Game.touchN || 0) + 1));
     }
   }

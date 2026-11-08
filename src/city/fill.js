@@ -246,8 +246,8 @@ function fillBusiness(H) {
     else if (what === 1) H.bench(fx, z, false, { color: '#5a4a3a' });
     else if (what === 2) H.bikes(fx, z, false, 4, r);
     else if (what === 3) H.bin(fx, z);
-    else if (what === 4 && r() < 0.3) H.busStop(fx + sd * 0.8, z, false, 'business', r);
-    else if (what === 5 && r() < 0.35) H.kiosk(fx + sd * 2, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2, pick(r, ['#2f5f8a', '#3e8f86', '#7a2f3a']), r, 'business');
+    else if (what === 4 && r() < 0.3) H.busStop(fx - sd * 0.4, z, false, 'business', r);            // at the kerb, off the footway
+    else if (what === 5 && r() < 0.35) H.kiosk(fx + sd * 3.6, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2, pick(r, ['#2f5f8a', '#3e8f86', '#7a2f3a']), r, 'business');
   }
   // the plaza: tree squares in planters, a café terrace, chess tables, food carts, people chatting,
   // a ribbon sculpture to ride (the plaza was reserved whole, so only the viaduct and roads are avoided)
@@ -577,9 +577,10 @@ function fillDocks(H) {
   const { K, W, B } = H, r = U.rng(1808);
   const R = PLAN.byKey.docks.rect, QZ = PLAN.docksQuayZ;
   // pipelines on stilts between the sheds and the yard: long grinds, jump to the stacks
+  // (routed through the yard and along the east fence, clear of the sheds and the container rows)
   const py = 3.8 + 2.6;
-  H.wave([[480, py, 470], [560, py, 470], [600, py + 1.4, 520], [600, py + 1.4, 760], [560, py, 800], [490, py, 800]], '#c9a24a', { kind: 'pipe', radius: 0.32, round: 6, stubs: true, collar: '#5b6078' });
-  H.wave([[1010, py - 1, 500], [1010, py + 0.6, 700], [960, py + 0.6, 760], [960, py - 1, 1100]], '#8a8fa8', { kind: 'pipe', radius: 0.3, round: 8, stubs: true });
+  H.wave([[482, py, 477], [556, py, 477], [574, py + 1.4, 505], [574, py + 1.4, 660], [574, py, 694]], '#c9a24a', { kind: 'pipe', radius: 0.32, round: 6, stubs: true, collar: '#5b6078' });
+  H.wave([[1026, py - 1, 500], [1026, py + 0.8, 640], [1026, py - 0.4, 780], [1026, py + 0.8, 930], [1026, py - 1, 1100]], '#8a8fa8', { kind: 'pipe', radius: 0.3, round: 8, stubs: true });
   // workers in groups, crates and pallets to hop over
   for (let i = 0; i < 14; i++) { const x = R[0] + 20 + r() * (R[2] - R[0] - 40), z = R[1] + 20 + r() * (QZ - R[1] - 40); if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'docks'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   for (let i = 0; i < 40; i++) {
