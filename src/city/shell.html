@@ -69,6 +69,7 @@ body.touch
 .card .howto li { display: grid; grid-template-columns: 7.5em 1fr; gap: 10px; }
 .card .howto b { font-weight: 500; opacity: .7; }
 #pause { overflow-y: auto; }
+#map { display: block; width: 100%; aspect-ratio: 1; margin: 4px 0 6px; border-radius: 12px; background: #e8dfcc; }
 </style>
 <div id="loading">building the city…</div>
 <canvas id="gl"></canvas>
@@ -92,6 +93,7 @@ body.touch
   <div class="card">
     <h2>Resting</h2>
     <p class="where" id="where"></p>
+    <canvas id="map" width="560" height="560"></canvas>
     <label>Music <input id="volMusic" type="range" min="0" max="100" value="85"></label>
     <label>Sounds <input id="volFx" type="range" min="0" max="100" value="80"></label>
     <label>Time of day <input id="tod" type="range" min="0" max="100" value="60"></label>

@@ -86,6 +86,8 @@ function profileH(z) {
 const gauss = (d, r) => Math.exp(-(d * d) / (r * r));
 // a hill that starts gently at the city edge and levels off at `top` metres
 const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 300) * 0.04;
+// the canal stops short of the beach, in a basin behind the promenade
+function canalEndZ() { return shoreZ(PLAN.canal.bendX) - 48; }
 function shoreZ(x) { return PLAN.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5; }
 // the raw land before carving
 function landH(x, z) {
@@ -134,6 +136,6 @@ function cityHeight(x, z) {
 function inCanal(x, z) {
   const C = PLAN.canal;
   if (x > C.x0 && x < C.bendX + C.half && Math.abs(z - C.z) < C.half) return true;
-  if (Math.abs(x - C.bendX) < C.half && z > C.z && z < shoreZ(x) + 4) return true;
+  if (Math.abs(x - C.bendX) < C.half && z > C.z && z < canalEndZ()) return true;
   return false;
 }

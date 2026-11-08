@@ -47,4 +47,8 @@ cpwa = ('<link rel="manifest" href="city.webmanifest">\n'
         '<meta name="theme-color" content="#b0cce0">\n')
 (ROOT / 'city.html').write_text(head + cpwa + cbody(CDN).replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
 (ROOT / 'dist/city_test.html').write_text(head + cbody('../vendor/three.min.js').replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + '</body></html>\n')
+# the debug page: the same city plus a panel to jump to every place worth checking
+dbg = (ROOT / 'src/city/debug.js').read_text()
+(ROOT / 'city_debug.html').write_text(head + cbody(CDN).replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + f'<script>\n{dbg}\n</script>\n</body></html>\n')
+(ROOT / 'dist/city_debug_test.html').write_text(head + cbody('../vendor/three.min.js').replace('<canvas id="gl">', '</head><body><canvas id="gl">', 1) + f'<script>\n{dbg}\n</script>\n</body></html>\n')
 print('built city', len(cbody(CDN)) // 1024, 'KB')

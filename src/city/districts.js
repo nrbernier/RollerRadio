@@ -11,7 +11,7 @@ function districtKit(K, S, F) {
   const block = (x, z, r) => { const e = { x, z, r }; PG.add(e, x - r, z - r, x + r, z + r); if (r > maxR) maxR = r; };
   const M = W.metro;
   // (deep under downtown the line doesn't get in the way of anything on the surface)
-  if (M) for (let i = 0; i < M.N; i++) { const p = M.pts[i]; if (p.down && p.covered && p.g > p.y + 8) continue; block(p.x, p.z, METRO.deckW / 2 + 1.5); }
+  if (M) for (let i = 0; i < M.N; i++) { const p = M.pts[i]; if (p.bored) continue; block(p.x, p.z, p.g > p.y - 1.5 ? METRO.deckW / 2 + 9 : METRO.deckW / 2 + 1.5); }
   for (const st of (W.stations || [])) if (st.court) { const c = st.court; for (let x = c.x0 - 3; x <= c.x1 + 3; x += 6) for (let z = c.z0 - 3; z <= c.z1 + 3; z += 6) block(x, z, 5); }
   for (const st of (W.stations || [])) for (const rp of st.ramps) { const dx = rp.to[0] - rp.from[0], dz = rp.to[1] - rp.from[1], L = Math.hypot(dx, dz); for (let t = 0; t <= L; t += 2) block(rp.from[0] + dx * t / L, rp.from[1] + dz * t / L, 3); }
   for (const r of Object.values(W.roads || {})) for (let i = 0; i < r.pts.length - 1; i++) {
@@ -38,7 +38,9 @@ function districtKit(K, S, F) {
   // a building standing on the slope (its floor line is the highest corner)
   H.bldg = (x0, z0, x1, z1, h, col, o = {}) => {
     const [lo, hi] = groundSpan(x0, z0, x1, z1);
-    const base = lo - 1.5, top = (o.top ?? hi + h);
+    let base = lo - 1.5; const top = (o.top ?? hi + h);
+    // (never down into a metro tunnel: over one, the footing stops just above its roof)
+    if (M) for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (p.bored && p.x > x0 - 7 && p.x < x1 + 7 && p.z > z0 - 7 && p.z < z1 + 7) base = Math.max(base, p.y + STN.ceil + 0.3); }
     K.box(x0, base, z0, x1, top, z1, col, o.kind || 'building', { roofColor: o.roof || col, outlineT: o.outline ?? 0.16 });
     if (o.trim !== false) B.box(x0 - 0.2, top - 0.7, z0 - 0.2, x1 + 0.2, top - 0.05, z1 + 0.2, o.trim || '#3a3550', 'plain', { outlineT: 0, edges: false });
     F.box(x0, base, z0, x1, top, z1, o.far || col);

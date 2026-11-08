@@ -142,11 +142,43 @@ function bindUI() {
   $('tod').oninput = (e) => { Sky.phase = (+e.target.value / 100 + 0.0) % 1; Sky.update(0, G.camera.position); };
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(true); });
 }
+// the pause-menu map: districts, water, roads, the metro and its stations, and you
+function drawMap(cv) {
+  if (!cv) return;
+  const W = Game.W, c = cv.getContext('2d'), S = cv.width;
+  const x0 = -1100, x1 = 1100, z0 = -1450, z1 = 1450, k = S / Math.max(x1 - x0, z1 - z0), ox = (S - (x1 - x0) * k) / 2;
+  const X = (x) => ox + (x - x0) * k, Z = (z) => (z - z0) * k;
+  c.fillStyle = '#e8dfcc'; c.fillRect(0, 0, S, S);
+  const tint = { park: '#a9c98f', obs: '#c9cfa0', oldtown: '#e3c9a4', business: '#cfd3d8', market: '#e8c7a0', canals: '#bcd2b8', docks: '#c9c0b2', lake: '#d9e3b8' };
+  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillStyle = tint[d.key] || '#ddd'; c.fillRect(X(a), Z(b), (e - a) * k, (f - b) * k); }
+  // the lake
+  c.fillStyle = '#8fbcd0'; c.beginPath(); c.moveTo(X(x0), Z(z1)); for (let x = x0; x <= x1; x += 20) c.lineTo(X(x), Z(shoreZ(x))); c.lineTo(X(x1), Z(z1)); c.fill();
+  const C = PLAN.canal; c.fillStyle = '#8fbcd0'; c.fillRect(X(C.x0), Z(C.z - C.half), (C.bendX + C.half - C.x0) * k, C.half * 2 * k); c.fillRect(X(C.bendX - C.half), Z(C.z), C.half * 2 * k, (canalEndZ() - C.z) * k);
+  if (PLAN.pond) { c.beginPath(); c.arc(X(PLAN.pond.x), Z(PLAN.pond.z), PLAN.pond.r * k, 0, 7); c.fill(); }
+  // roads
+  c.strokeStyle = '#8a8698'; c.lineCap = 'round';
+  const line = (P, w) => { c.lineWidth = Math.max(1.5, w * k); c.beginPath(); P.forEach(([x, z], i) => i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z))); c.stroke(); };
+  for (const r of Object.values(W.roads || {})) line(r.pts, r.width);
+  for (const s of (W.bizStreets || [])) line([[s.x, s.z0], [s.x, s.z1]], 10);
+  // metro
+  const M = W.metro; if (M) { c.strokeStyle = '#e4572e'; c.lineWidth = 3; c.setLineDash([]); c.beginPath(); M.pts.forEach((p, i) => { if (i % 3) return; const sx = X(p.x), sz = Z(p.z); i ? c.lineTo(sx, sz) : c.moveTo(sx, sz); }); c.closePath(); c.stroke();
+    c.font = `600 ${Math.round(S / 34)}px ${FONT.body}`; c.textBaseline = 'middle';
+    for (const st of (W.stations || [])) { const sx = X(st.p.x), sz = Z(st.p.z); c.fillStyle = '#fff'; c.strokeStyle = '#1b1a24'; c.lineWidth = 2; c.beginPath(); c.arc(sx, sz, S / 75, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#1b1a24'; c.fillText(st.name, sx + S / 55, sz); } }
+  // district names
+  c.font = `500 ${Math.round(S / 30)}px ${FONT.title}`; c.textAlign = 'center'; c.fillStyle = 'rgba(27,26,36,.55)';
+  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillText(d.name, X((a + e) / 2), Z((b + f) / 2)); }
+  c.textAlign = 'left';
+  // you
+  const p = Game.player, px = X(p.pos.x), pz = Z(p.pos.z), a = p.yaw;
+  c.save(); c.translate(px, pz); c.rotate(-a + Math.PI); c.fillStyle = '#e4572e'; c.strokeStyle = '#fff'; c.lineWidth = 2.5;
+  c.beginPath(); c.moveTo(0, -S / 40); c.lineTo(S / 60, S / 60); c.lineTo(0, S / 120); c.lineTo(-S / 60, S / 60); c.closePath(); c.stroke(); c.fill(); c.restore();
+}
 function pause(on) {
   if (on && Game.state === 'play') {
     Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100);
     const d = PLAN.byKey[Sound.place], R = Sound.REC[Sound.place];
     $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm · ${Sound.modeName}` : '';
+    drawMap($('map'));
     $('howto').innerHTML = HOWTO.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join('');
   }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }

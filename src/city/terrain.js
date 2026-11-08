@@ -15,7 +15,7 @@ function buildHeights() {
   const C = PLAN.canal;
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
-    const inside = (x > C.x0 && x < C.bendX + C.half - 0.1 && Math.abs(z - C.z) < C.half - 0.1) || (Math.abs(x - C.bendX) < C.half - 0.1 && z > C.z && z < shoreZ(x) + 4);
+    const inside = (x > C.x0 && x < C.bendX + C.half - 0.1 && Math.abs(z - C.z) < C.half - 0.1) || (Math.abs(x - C.bendX) < C.half - 0.1 && z > C.z && z < canalEndZ());
     if (inside) H[j * (nx + 1) + i] = C.bedY;
   }
 }
@@ -93,7 +93,7 @@ function terrainMeshes(paint, mat) {
   const hole = (i, j) => {   // a cell that lies inside the canal (or a dug-out hole) is not drawn
     const cx = x0 + (i + 0.5) * cell, cz = z0 + (j + 0.5) * cell;
     if (inHole(cx, cz)) return true;
-    return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < shoreZ(cx) + 4);
+    return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < canalEndZ());
   };
   for (let tj = 0; tj < nz; tj += TILE) for (let ti = 0; ti < nx; ti += TILE) {
     const ni = Math.min(TILE, nx - ti), nj = Math.min(TILE, nz - tj), NG = (ni + 1) * (nj + 1);
@@ -112,7 +112,7 @@ function terrainMeshes(paint, mat) {
       cols[k * 3] = col.r; cols[k * 3 + 1] = col.g; cols[k * 3 + 2] = col.b;
     }
     const V = (i, j) => j * (ni + 1) + i, skirtOf = new Map();
-    ring.forEach(([i, j], r) => { const a = V(i, j), k = NG + r; skirtOf.set(a, k); pos[k * 3] = pos[a * 3]; pos[k * 3 + 1] = pos[a * 3 + 1] - 4; pos[k * 3 + 2] = pos[a * 3 + 2]; uv[k * 2] = uv[a * 2]; uv[k * 2 + 1] = uv[a * 2 + 1]; cols[k * 3] = cols[a * 3] * 0.9; cols[k * 3 + 1] = cols[a * 3 + 1] * 0.9; cols[k * 3 + 2] = cols[a * 3 + 2] * 0.9; });
+    ring.forEach(([i, j], r) => { const a = V(i, j), k = NG + r; skirtOf.set(a, k); pos[k * 3] = pos[a * 3]; pos[k * 3 + 1] = pos[a * 3 + 1] - (TER.skirtD ? TER.skirtD(pos[a * 3], pos[a * 3 + 2]) : 4); pos[k * 3 + 2] = pos[a * 3 + 2]; uv[k * 2] = uv[a * 2]; uv[k * 2 + 1] = uv[a * 2 + 1]; cols[k * 3] = cols[a * 3] * 0.9; cols[k * 3 + 1] = cols[a * 3 + 1] * 0.9; cols[k * 3 + 2] = cols[a * 3 + 2] * 0.9; });
     // index sets: full detail, every 2nd vertex, every 5th (blocks touching a hole stay full detail)
     const levels = [];
     for (const st of [1, 2, 5]) {

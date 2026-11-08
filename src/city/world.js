@@ -77,9 +77,14 @@ function buildCity() {
   const M = planMetro();
   // the gallery: dig the line into the ridge
   // (downtown is bored, not dug: only the approaches where the deck runs at or just below the ground are cut)
-  const cut = (p) => p.down ? (!p.covered && p.g > p.y - 1.5 && !inHole(p.x, p.z)) : p.covered;
-  const corridor = []; for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (cut(p) || (!p.down && (M.pts[(i + 6) % M.N].covered || M.pts[(i - 6 + M.N) % M.N].covered))) corridor.push([p.x, p.y, p.z]); else if (corridor.length && corridor[corridor.length - 1] !== null) corridor.push(null); }
-  let run = []; for (const c of corridor) { if (c === null) { if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8); run = []; } else run.push(c); } if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8);
+  // dig wherever the deck is below the ground but too shallow to bore (a wide cutting, so its slopes stay off the deck)
+  const cut = (p) => !p.bored && p.g > p.y - 1.5 && !inHole(p.x, p.z);
+  const corridor = []; for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (cut(p) || (!p.bored && (M.pts[(i + 4) % M.N].bored || M.pts[(i - 4 + M.N) % M.N].bored))) corridor.push([p.x, p.y, p.z]); else if (corridor.length && corridor[corridor.length - 1] !== null) corridor.push(null); }
+  let run = []; for (const c of corridor) { if (c === null) { if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 8.5, -1.8); run = []; } else run.push(c); } if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 8.5, -1.8);
+  // over a bored tunnel the terrain skirts stay shallow (they would hang into it)
+  { const tg = new Map(), k = (x, z) => Math.floor(x / 16) + ',' + Math.floor(z / 16);
+    for (const p of M.pts) if (p.bored) { const kk = k(p.x, p.z); (tg.get(kk) || tg.set(kk, []).get(kk)).push(p); }
+    TER.skirtD = (x, z) => { let d = 4; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const p of (tg.get((Math.floor(x / 16) + a) + ',' + (Math.floor(z / 16) + b)) || [])) if (Math.hypot(p.x - x, p.z - z) < 16) d = Math.min(d, Math.max(0.3, terrainAt(x, z) - p.y - 8)); return d; }; }
   if (typeof prepDistricts === 'function') prepDistricts();
   // station surroundings: a little forecourt where each ramp lands
   lap('heights');
@@ -152,13 +157,14 @@ function buildCity() {
 function buildCanal(K, S, F) {
   const W = K.W, C = PLAN.canal, B = K.B;
   const wall = '#8f8577', top = '#b9b0a0';
-  const sz = shoreZ(C.bendX) + 4;
+  const sz = canalEndZ();
   // walls (thin boxes from the bed up to the quay), a stone coping on top
   const walls = [
     [C.x0, C.z - C.half - 1, C.bendX + C.half, C.z - C.half],             // north
     [C.x0, C.z + C.half, C.bendX - C.half, C.z + C.half + 1],             // south (west of the bend)
     [C.bendX - C.half - 1, C.z + C.half, C.bendX - C.half, sz],           // west side of the bend
     [C.bendX + C.half, C.z - C.half, C.bendX + C.half + 1, sz],           // east side of the bend
+    [C.bendX - C.half - 1, sz, C.bendX + C.half + 1, sz + 1],             // the end of the basin
   ];
   for (const [x0, z0, x1, z1] of walls) {
     // in pieces, so the cells can cull them
@@ -185,7 +191,8 @@ function buildCanal(K, S, F) {
   addWater(C.bendX - C.half, C.z + C.half, C.bendX + C.half, sz);
   W.canalWaterMat = wm;
   // the weir where the canal steps down into the lake
-  K.waterfall(C.bendX - C.half, C.bendX + C.half, sz, C.waterY, 0.05, '#cfeff0');
+  // (the basin ends in a wall behind the promenade: a lock gate in it, the lake beyond)
+  for (const sd of [-1, 1]) B.box(C.bendX + sd * 0.3 - (sd < 0 ? C.half - 0.3 : 0), C.bedY, sz - 3, C.bendX + sd * 0.3 + (sd > 0 ? C.half - 0.3 : 0), C.quayY - 0.6, sz - 2.4, '#7a5a3a', 'wood', { outlineT: 0.05 });
   F.box(C.x0, C.bedY, C.z - C.half - 1, C.bendX + C.half + 1, C.quayY, C.z - C.half, wall, 0);
   W.canal = C;
 }

@@ -202,6 +202,24 @@ function fillKit(H) {
 // observatory, then a median ledge down the boulevard to the market
 function fillRoutes(H) {
   const { K, W } = H;
+  // no roads to nowhere: where a road just stops (not at another road, not at the map's edge),
+  // it ends in a turning circle round a little tree island
+  { const roads = Object.entries(W.roads || {});
+    const distTo = (x, z, P) => { let d = 1e9; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); d = Math.min(d, Math.hypot(ax + dx * u - x, az + dz * u - z)); } return d; };
+    for (const [k, rd] of roads) for (const end of (k === 'oblique' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
+      let [x, z] = end;
+      { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 1000) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
+      if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;
+      if (inCanal(x, z)) continue;
+      const R = rd.width * 0.95 + 4;
+      H.blob(x, z, R + 3.5, R + 3.5, '#c8c1b4', 'walk', 0.075, 3);
+      H.blob(x, z, R, R, '#5a5868', 'road', 0.105, 5);
+      H.blob(x, z, 4.2, 4.2, '#7da35a', 'grass', 0.14, 7);
+      K.box(x - 3.2, terrainAt(x, z) - 0.2, z - 3.2, x + 3.2, terrainAt(x, z) + 0.35, z + 3.2, '#b9b0a0', 'paving', { outlineT: 0.04 });
+      H.tree(x, z, { s: 1.2, color: '#4f9a52' });
+      H.block(x, z, R + 2);
+    }
+  }
   const hill = ROADS.hill.slice().reverse();     // from the observatory end, downhill
   const side = (pts, off, h) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 3) { const x = ax + ux * t - uz * off, z = az + uz * t + ux * off; out.push([x, terrainAt(x, z) + h, z]); } } return out; };
   const gr = side(hill, 6.4, 0.85);
@@ -274,7 +292,7 @@ function fillBusiness(H) {
   const pts = [top, [top[0], g0 + 0.6, sp[1] + 30], [sx, terrainAt(sx, sp[1] + 60) + 10, sp[1] + 60]];
   for (let z = sp[1] + 100; z < -60; z += 40) { const t = U.clamp((z - (sp[1] + 60)) / (-60 - (sp[1] + 60)), 0, 1); pts.push([sx, terrainAt(sx, z) + U.lerp(10, 1.2, t * t), z]); }
   pts.push([sx, terrainAt(sx, -50) + 1.0, -50]);
-  H.wave(pts, '#ff7a5a', { radius: 0.18, round: 8, stubs: false });
+  H.wave(pts, '#8e95a2', { radius: 0.16, round: 8, stubs: true });      // plain steel, on posts, like the street furniture
   // more people in the streets
   H.walkers(W.walkLines, 120, 'business');
 }
@@ -681,6 +699,13 @@ function buildCable(H) {
     const rx = T.x + ux * dir * 2, rz = T.z + uz * dir * 2;
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.cyl(rx + nx * hw * sx + ux * 4 * sz, T.g - 0.2, rz + nz * hw * sx + uz * 4 * sz, 0.3, T.y + 2.6 - T.g, '#e9e4f5', { outline: 0.03, seg: 6 });
     B.add(new THREE.BoxGeometry(hw * 2 + 1, 0.6, 10), new THREE.Matrix4().makeRotationY(yaw).setPosition(rx, T.y + 2.8, rz), '#3e8f86', 'plain', { outlineT: 0.06, edges: false });
+    // the bull wheel the cable turns round, hung from a column under the roof, and the frame that holds it
+    K.cyl(T.x, T.y - 0.25, T.z, C.off + 0.25, 0.5, '#2a2838', { outline: 0.03, seg: 20 });
+    K.cyl(T.x, T.y - 0.1, T.z, C.off - 0.6, 0.35, '#c4523a', { outline: 0.02, seg: 20 });
+    K.cyl(T.x, T.y + 0.25, T.z, 0.45, 2.3, '#9aa0b4', { outline: 0.03, seg: 8 });
+    B.add(new THREE.BoxGeometry(1.2, T.y - T.g + 0.6, 1.2), new THREE.Matrix4().makeRotationY(yaw).setPosition(T.x + ux * dir * 2.4, (T.y + T.g) / 2 - 0.2, T.z + uz * dir * 2.4), '#9aa0b4', 'plain', { outlineT: 0.06, edges: false });
+    B.add(new THREE.BoxGeometry(0.8, 0.8, 3.2), new THREE.Matrix4().makeRotationY(yaw).setPosition(T.x + ux * dir * 1.2, T.y + 0.3, T.z + uz * dir * 1.2), '#9aa0b4', 'plain', { outlineT: 0.06, edges: false });
+    W.boxes.push({ x0: T.x + ux * dir * 2.4 - 0.7, y0: T.g - 1, z0: T.z + uz * dir * 2.4 - 0.7, x1: T.x + ux * dir * 2.4 + 0.7, y1: T.y - 0.6, z1: T.z + uz * dir * 2.4 + 0.7, tag: 'tower' });
     H.reserve([cx - 18, cz - 18, cx + 18, cz + 18]);
     H.standers([[cx + nx * 9, cz + nz * 9, yaw, T.g], [cx - nx * 9 + ux * 3, cz - nz * 9 + uz * 3, yaw + 2, T.g]], k === 0 ? 'lake' : 'park');
     H.bench(cx - ux * dir * 10, cz - uz * dir * 10, Math.abs(nx) > Math.abs(nz), { view: true });

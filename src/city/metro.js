@@ -16,7 +16,8 @@ const METRO_SVG = [
 ];
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
 const DOWNTOWN = [-250, -700, 370, 250];
-const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96 };
+const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
+const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
   // sample the Béziers evenly
@@ -58,12 +59,6 @@ function planMetro() {
     let g = st.under ? 1e9 : -1e9; for (let d = -half; d <= half; d++) g = st.under ? Math.min(g, ground[(st.i + d + N) % N]) : Math.max(g, ground[(st.i + d + N) % N]);
     st.y = st.under ? g - 10 : g + METRO.clear - 1;
     for (let d = -half; d <= half; d++) fixed[(st.i + d + N) % N] = st.y;
-    if (st.under) {
-      // the sunken court over the platforms (on the terrain grid's lines)
-      const sn = (v, o, c) => o + Math.round((v - o) / c) * c, p = pts[st.i];
-      st.hole = [sn(p.x - 16, TER.x0, TER.cell), sn(p.z - 56, TER.z0, TER.cell), sn(p.x + 16, TER.x0, TER.cell), sn(p.z + 56, TER.z0, TER.cell)];
-      TER.holes.push(st.hole);
-    }
   }
   // the approaches: free to dip below the ground for a few hundred metres either side of downtown
   const free = new Array(N).fill(false), reach = Math.round(330 / METRO.step);
@@ -94,9 +89,45 @@ function planMetro() {
   for (let i = 0; i < N; i++) { pts[i].y = y[i]; pts[i].g = ground[i]; }
   // directions
   for (let i = 0; i < N; i++) { const a = pts[(i - 1 + N) % N], b = pts[(i + 1) % N]; const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); pts[i].dx = dx / l; pts[i].dz = dz / l; }
+  for (const st of stations) {
+    if (st.under) {
+      // a real underground station: a hall round the platforms, and four stairways up to the street,
+      // two off each platform, each in an open well (a terrain hole on the grid's lines)
+      const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c - 1e-6) : Math.floor((v - o) / c + 1e-6)) * c;
+      st.exits = [];
+      for (const k of [-9, 9]) for (const sd of [-1, 1]) {
+        const e = pts[(st.i + k + N) % N], nx = -e.dz * sd, nz = e.dx * sd;          // straight out sideways
+        const ax = Math.abs(nx) > Math.abs(nz) ? 'x' : 'z';
+        const x0 = e.x + nx * STN.hw, z0 = e.z + nz * STN.hw, y0 = st.y + 1.2;
+        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 30); }
+        const L = 3 + run + 3, x1 = x0 + nx * L, z1 = z0 + nz * L, w = 2.4, gTop = terrainAt(x1, z1);
+        // the well opens a few metres out from the hall (the first steps run under a slab)
+        const o0x = x0 + nx * 7, o0z = z0 + nz * 7;
+        const rx0 = Math.min(o0x, x1) - (ax === 'z' ? w : 0), rx1 = Math.max(o0x, x1) + (ax === 'z' ? w : 0), rz0 = Math.min(o0z, z1) - (ax === 'x' ? w : 0), rz1 = Math.max(o0z, z1) + (ax === 'x' ? w : 0);
+        const hole = [sn(rx0, TER.x0, TER.cell, nx < 0 && ax === 'x' ? 0 : ax === 'x' ? 1 : 0), sn(rz0, TER.z0, TER.cell, nz < 0 && ax === 'z' ? 0 : ax === 'z' ? 1 : 0), sn(rx1, TER.x0, TER.cell, ax === 'x' && nx < 0 ? 0 : 1), sn(rz1, TER.z0, TER.cell, ax === 'z' && nz < 0 ? 0 : 1)];
+        // keep the hole's hall-side edge outside the hall
+        if (ax === 'x') { if (nx > 0) hole[0] = Math.max(hole[0], sn(x0 + 1, TER.x0, TER.cell, 1)); else hole[2] = Math.min(hole[2], sn(x0 - 1, TER.x0, TER.cell, 0)); }
+        else { if (nz > 0) hole[1] = Math.max(hole[1], sn(z0 + 1, TER.z0, TER.cell, 1)); else hole[3] = Math.min(hole[3], sn(z0 - 1, TER.z0, TER.cell, 0)); }
+        let top = -1e9; for (let x = hole[0]; x <= hole[2]; x += TER.cell) for (let z = hole[1]; z <= hole[3]; z += TER.cell) top = Math.max(top, terrainAt(x, z));
+        TER.holes.push(hole);
+        st.exits.push({ k, sd, nx, nz, ax, x0, z0, y0, run, L, w, x1, z1, gTop, hole, top });
+      }
+    }
+  }
   // covered parts: the ground is well above the deck
-  for (let i = 0; i < N; i++) { pts[i].covered = ground[i] > y[i] + 5 && !inHole(pts[i].x, pts[i].z); pts[i].down = under[i] || free[i]; }
-  return { pts, L, N, stations, step: L / N };
+  for (let i = 0; i < N; i++) { pts[i].covered = ground[i] > y[i] + 5 && !inHole(pts[i].x, pts[i].z); pts[i].down = under[i] || free[i]; pts[i].bored = ground[i] - y[i] >= METRO.bore && !inHole(pts[i].x, pts[i].z); }
+  // portals: where the bored tunnel meets the cutting the heightfield can't overhang, so the ground
+  // there is cut away (a terrain hole) and rebuilt as a concrete portal block in buildMetro
+  const portals = [];
+  for (let i = 0; i < N; i++) {
+    const a = pts[i], b = pts[(i + 1) % N]; if (a.bored === b.bored) continue;
+    const m = a.bored ? b : a, inner = a.bored ? a : b;
+    const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c) : Math.floor((v - o) / c)) * c;
+    const hole = [sn(m.x - 11, TER.x0, TER.cell, 0), sn(m.z - 11, TER.z0, TER.cell, 0), sn(m.x + 11, TER.x0, TER.cell, 1), sn(m.z + 11, TER.z0, TER.cell, 1)];
+    let top = -1e9; for (let x = hole[0]; x <= hole[2]; x += TER.cell) for (let z = hole[1]; z <= hole[3]; z += TER.cell) top = Math.max(top, terrainAt(x, z));
+    TER.holes.push(hole); portals.push({ i, hole, top, y: inner.y });
+  }
+  return { pts, L, N, stations, step: L / N, portals };
 }
 
 // position on the loop at arc length s, offset sideways by `off` (+ = right of travel)
@@ -203,9 +234,12 @@ function buildMetro(K, M, S, F) {
   const fp = []; for (let i = 0; i < N; i += 4) { const a = M.pts[i], b = M.pts[(i + 4) % N]; const fq = (A, Bb, C, D) => fp.push(...A, ...Bb, ...C, ...A, ...C, ...D); fq(L(a, -hw + 0.4, -0.2), L(b, -hw + 0.4, -0.2), L(b, hw - 0.4, -0.2), L(a, hw - 0.4, -0.2)); fq(L(a, hw - 0.4, -0.2), L(b, hw - 0.4, -0.2), L(b, hw - 0.4, -1.3), L(a, hw - 0.4, -1.3)); fq(L(a, -hw + 0.4, -1.3), L(b, -hw + 0.4, -1.3), L(b, -hw + 0.4, -0.2), L(a, -hw + 0.4, -0.2)); }
   const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); F.add(fg, null, sideCol);
   // the gallery: walls + roof where the line runs under the hill (and a bit either side)
-  const cov = M.pts.map((p, i) => { for (let d = -8; d <= 8; d++) if (M.pts[(i + d + N) % N].covered) return true; return false; });
+  // (only where the line is properly bored: the hill stays whole above it; elsewhere it runs in an open cutting)
+  const inPortal = (p) => (M.portals || []).some(q => p.x > q.hole[0] - 2 && p.x < q.hole[2] + 2 && p.z > q.hole[1] - 2 && p.z < q.hole[3] + 2);
+  const cov = M.pts.map((p, i) => { if (inPortal(p)) return true; for (let d = -1; d <= 1; d++) if (M.pts[(i + d + N) % N].bored) return true; return false; });
+  const inHall = (i) => M.stations.some(st => st.under && Math.abs(((i - st.i) % N + N + N / 2) % N - N / 2) <= Math.round(METRO.platLen / 2 / M.step) + 1);
   for (let i = 0; i < N; i++) {
-    if (!cov[i]) continue;
+    if (!cov[i] || inHall(i)) continue;
     const a = M.pts[i], b = M.pts[(i + 1) % N];
     const wp = [];
     for (const side of [-1, 1]) { const o = side * (hw + 0.4); wp.push(...L(a, o, -1.5), ...L(b, o, -1.5), ...L(b, o, 7.5), ...L(a, o, -1.5), ...L(b, o, 7.5), ...L(a, o, 7.5)); }
@@ -220,12 +254,12 @@ function buildMetro(K, M, S, F) {
     // gallery lights
     if (i % 10 === 0) B.box(a.x - 0.4, a.y + 7.0, a.z - 0.4, a.x + 0.4, a.y + 7.3, a.z + 0.4, '#ffe9b0', 'lamp', { outlineT: 0, edges: false });
   }
-  // portals
-  for (let i = 0; i < N; i++) {
-    const c0 = cov[i], c1 = cov[(i + 1) % N]; if (c0 === c1) continue;
-    const p = M.pts[c1 ? (i + 1) % N : i], m = new THREE.Matrix4().makeRotationY(Math.atan2(p.dx, p.dz));
-    for (const side of [-1, 1]) K.B.add(new THREE.BoxGeometry(2, 11, 1.6), m.clone().setPosition(p.x - p.dz * side * (hw + 1.2), p.y + 3, p.z + p.dx * side * (hw + 1.2)), '#8a8378', 'plain', { outlineT: 0.1 });
-    K.B.add(new THREE.BoxGeometry(METRO.deckW + 6, 2.4, 1.8), m.clone().setPosition(p.x, p.y + 8.6, p.z), '#8a8378', 'plain', { outlineT: 0.1 });
+  // portal blocks: fill each portal hole with concrete up to the hillside, leaving the line's corridor open
+  for (const q of (M.portals || [])) {
+    const [hx0, hz0, hx1, hz1] = q.hole, roof = q.y + 7.5, wc = '#9d968a';
+    K.box(hx0, roof, hz0, hx1, q.top + 0.3, hz1, wc, 'paving', { outlineT: 0.06 });
+    const near = (x, z) => { let bi = 0, bd = 1e9; for (let i = 0; i < N; i++) { const p = M.pts[i], d = (p.x - x) ** 2 + (p.z - z) ** 2; if (d < bd) { bd = d; bi = i; } } const p = M.pts[bi]; return Math.abs((x - p.x) * -p.dz + (z - p.z) * p.dx); };
+    for (let x = hx0; x < hx1; x += 3) for (let z = hz0; z < hz1; z += 3) if (near(x + 1.5, z + 1.5) > 7.4) K.box(x, q.y - 2, z, x + 3, roof + 0.05, z + 3, wc, 'paving', { outlineT: 0.04 });
   }
   W.metro = M;
 }
@@ -263,7 +297,7 @@ function buildStations(K, M, S, F) {
         else { q(quads.side, L(a, oi, PH), L(b, oi, PH), L(b, oi, 0), L(a, oi, 0)); q(quads.side, L(a, oo, -2.2), L(b, oo, -2.2), L(b, oo, PH), L(a, oo, PH)); }
         S.add(...L(a, om, PH), ...L(b, om, PH), WIDTH / 2);
         // canopy over the middle two thirds
-        if (Math.abs(k) < hn * 0.7) {
+        if (!st.under && Math.abs(k) < hn * 0.7) {
           const c0 = sd * (IN + 0.3), c1 = sd * (IN + WIDTH + 0.6), C = sd > 0 ? [c0, c1] : [c1, c0];
           q(quads.can, L(a, C[0], CAN), L(b, C[0], CAN), L(b, C[1], CAN), L(a, C[1], CAN));
           q(quads.can, L(a, C[1], CAN - 0.3), L(b, C[1], CAN - 0.3), L(b, C[0], CAN - 0.3), L(a, C[0], CAN - 0.3));
@@ -274,14 +308,16 @@ function buildStations(K, M, S, F) {
       // name boards and benches along the platform
       const smat = W.signMats || (W.signMats = {}); const sm = smat[st.name] || (smat[st.name] = new THREE.MeshBasicMaterial({ map: stationSign(st.name) }));
       for (const [k, face] of [[-4, -1], [4, 1]]) {
-        const a = M.pts[idx(k)], [sx, , sz] = L(a, sd * (face < 0 ? IN + 0.35 : IN + WIDTH + 0.65), CAN + 0.9);
-        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm); sign.position.set(sx, p.y + CAN + 0.9, sz);
+        const a = M.pts[idx(k)], under = st.under, [sx, , sz] = L(a, under ? sd * (STN.hw - 0.08) : sd * (face < 0 ? IN + 0.35 : IN + WIDTH + 0.65), CAN + 0.9);
+        if (under && face > 0) continue;
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm); sign.position.set(sx, p.y + (under ? PH + 2.8 : CAN + 0.9), sz);
+        if (under) { sign.rotation.y = Math.atan2(a.dz * sd, -a.dx * sd); K.scene.add(sign); continue; }
         const nx = a.dz * sd * face, nz = -a.dx * sd * face; sign.rotation.y = Math.atan2(nx, nz); K.scene.add(sign);
       }
       for (const k of [-8, 8]) { const a = M.pts[idx(k)], [bx, , bz] = L(a, sd * (IN + WIDTH - 1.3)); K.bench(bx, bz, Math.abs(a.dx) > Math.abs(a.dz), p.y + PH, '#c97a3c', false); W.benches.push({ x: bx, y: p.y + PH, z: bz, alongX: Math.abs(a.dx) > Math.abs(a.dz) }); }
     }
     const ramps = [];
-    if (st.under) { sunkenCourt(K, S, st, p, ramps, IN + WIDTH, PH); W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 })); continue; }
+    if (st.under) { undergroundHall(K, S, M, st, p, ramps, hn, PH); W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 })); continue; }
     // ramps down to the street, leaving each platform end at an angle, away from the line
     for (const sd of [-1, 1]) {
       const kEnd = sd > 0 ? hn : -hn, e = M.pts[idx(kEnd)], dirA = sd > 0 ? 1 : -1;
@@ -311,6 +347,73 @@ function buildStations(K, M, S, F) {
   }
   const mk = (arr, col, kind) => { if (!arr.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
   mk(quads.plat, '#d8d0c0', 'paving'); mk(quads.edge, '#e8c84a', 'paint'); mk(quads.side, '#b9b1a2', 'plain'); mk(quads.can, '#7aa6b8', 'plain');
+}
+
+// an underground station: the hall (walls, ceiling, lights) and its four stairways up to the street
+function undergroundHall(K, S, M, st, p, ramps, hn, PH) {
+  const W = K.W, B = K.B, N = M.N, HW = STN.hw, CY = STN.ceil, py = p.y + PH;
+  const L = (q, o, dy = 0) => [q.x - q.dz * o, q.y + dy, q.z + q.dx * o];
+  const idx = (k) => (st.i + k + N) % N, wall = [], ceil = [];
+  const q4 = (arr, a, b, c, d) => arr.push(...a, ...b, ...c, ...a, ...c, ...d, ...a, ...c, ...b, ...a, ...d, ...c);
+  const doorAt = (k, sd) => st.exits.some(e => e.sd === sd && (k === e.k || k === e.k - 1));
+  for (let k = -hn - 1; k <= hn; k++) {
+    const a = M.pts[idx(k)], b = M.pts[idx(k + 1)];
+    for (const sd of [-1, 1]) {
+      const o = sd * HW;
+      if (doorAt(k, sd)) q4(wall, L(a, o, PH + 3.6), L(b, o, PH + 3.6), L(b, o, CY), L(a, o, CY));   // over a doorway
+      else q4(wall, L(a, o, -2), L(b, o, -2), L(b, o, CY), L(a, o, CY));
+    }
+    q4(ceil, L(a, -HW - 0.2, CY), L(b, -HW - 0.2, CY), L(b, HW + 0.2, CY), L(a, HW + 0.2, CY));
+    W.camBoxes.push({ x0: Math.min(a.x, b.x) - HW - 1, y0: a.y + CY - 0.2, z0: Math.min(a.z, b.z) - HW - 1, x1: Math.max(a.x, b.x) + HW + 1, y1: a.y + CY + 3, z1: Math.max(a.z, b.z) + HW + 1 });
+    if ((k + hn) % 3 === 1) for (const sd of [-1, 1]) { const [lx, ly, lz] = L(a, sd * 6.3, CY - 0.25); B.box(lx - 0.5, ly, lz - 0.5, lx + 0.5, ly + 0.2, lz + 0.5, '#fff2c8', 'lamp', { outlineT: 0, edges: false }); }
+  }
+  // end walls between the tunnel mouth and the hall's sides
+  for (const k of [-hn - 1, hn + 1]) { const a = M.pts[idx(k)]; for (const sd of [-1, 1]) q4(wall, L(a, sd * 5.9, -2), L(a, sd * HW, -2), L(a, sd * HW, CY), L(a, sd * 5.9, CY)); }
+  const mk = (arr, col, kind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
+  mk(wall, '#e6dcc4', 'plain'); mk(ceil, '#5d5a54', 'plain');
+  // the stairways
+  for (const e of st.exits) {
+    const { nx, nz, x0, z0, y0, run, w, gTop, hole, top } = e, at = (d) => [x0 + nx * d, z0 + nz * d];
+    const sx = -nz, sz = nx;            // across the stair
+    const yTop = gTop + 0.05;
+    // doorway landing (level), the flight, the top landing — physics: two boxes and a ramp
+    const box = (d0, d1, y) => { const [ax, az] = at(d0), [bx, bz] = at(d1); K.box(Math.min(ax, bx) - Math.abs(sx) * w, p.y - 2, Math.min(az, bz) - Math.abs(sz) * w, Math.max(ax, bx) + Math.abs(sx) * w, y, Math.max(az, bz) + Math.abs(sz) * w, '#d8d0c0', 'paving', { outlineT: 0.04 }); };
+    box(-0.4, 3, y0);
+    { const [ax, az] = at(3), [bx, bz] = at(3 + run), axis = e.ax;
+      const xa = Math.min(ax, bx) - Math.abs(sx) * w, xb = Math.max(ax, bx) + Math.abs(sx) * w, za = Math.min(az, bz) - Math.abs(sz) * w, zb = Math.max(az, bz) + Math.abs(sz) * w;
+      const up = (axis === 'x' ? nx : nz) > 0;
+      K.ramp(xa, za, xb, zb, axis, up ? y0 + 0.12 : yTop, up ? yTop : y0 + 0.12, '#cfc7b8', false, p.y - 2);
+      // steps (look)
+      const n = Math.max(8, Math.round((yTop - y0) / 0.32));
+      for (let j = 0; j < n; j++) { const d0 = 3 + run * j / n, d1 = 3 + run * (j + 1) / n, y = U.lerp(y0, yTop, (j + 1) / n); const [cx0, cz0] = at(d0), [cx1, cz1] = at(d1);
+        B.box(Math.min(cx0, cx1) - Math.abs(sx) * w, y - 0.32, Math.min(cz0, cz1) - Math.abs(sz) * w, Math.max(cx0, cx1) + Math.abs(sx) * w, y + 0.04, Math.max(cz0, cz1) + Math.abs(sz) * w, j % 2 ? '#dcd4c4' : '#cfc7b8', 'paving', { outlineT: 0.02, edges: false }); }
+      // handrails both sides (grindable, of course)
+      for (const sd2 of [-1, 1]) { const rp = []; for (let j = 0; j <= 8; j++) { const d = 3 + run * j / 8, [cx, cz] = at(d); rp.push([cx + sx * sd2 * (w - 0.25), U.lerp(y0, yTop, j / 8) + 1.0, cz + sz * sd2 * (w - 0.25)]); } K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.2, round: 0, radius: 0.06 }); }
+      ramps.push({ from: at(0), to: at(e.L) });
+    }
+    box(3 + run, e.L + 0.5, yTop);
+    // the passage under the street before the well opens: walls and a slab
+    // the well: everything in the hole that isn't stairway is solid up to the street
+    for (let x = hole[0]; x < hole[2]; x += 2) for (let z = hole[1]; z < hole[3]; z += 2) {
+      const cx = x + 1, cz = z + 1, along = (cx - x0) * nx + (cz - z0) * nz, across = Math.abs((cx - x0) * sx + (cz - z0) * sz);
+      if (across < w + 0.2 && along > -1 && along < e.L + 0.6) continue;
+      K.box(x, p.y - 2, z, x + 2, top + 0.15, z + 2, '#cbbfa6', 'paving', { outlineT: 0.04 });
+    }
+    // side walls of the stairway (inside the well and in the covered stretch), a slab over the covered part
+    for (const sd2 of [-1, 1]) { const [ax, az] = at(0), [bx, bz] = at(e.L + 0.5), ox = sx * sd2 * (w + 0.3), oz = sz * sd2 * (w + 0.3);
+      K.box(Math.min(ax, bx) + ox - 0.3, p.y - 2, Math.min(az, bz) + oz - 0.3, Math.max(ax, bx) + ox + 0.3, yTop + 1.0, Math.max(az, bz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
+      const rp = [[bx + ox * 0.95 - nx * (e.L - 6), yTop + 1.1, bz + oz * 0.95 - nz * (e.L - 6)], [bx + ox * 0.95, yTop + 1.1, bz + oz * 0.95]]; K.rail(rp, { color: '#e9e4f5', postColor: '#3a3550', round: 0 }); }
+    { const [ax, az] = at(-0.4), [bx, bz] = at(Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0)))); const gy = terrainAt((ax + bx) / 2, (az + bz) / 2);
+      B.box(Math.min(ax, bx) - Math.abs(sx) * (w + 0.6), p.y + CY, Math.min(az, bz) - Math.abs(sz) * (w + 0.6), Math.max(ax, bx) + Math.abs(sx) * (w + 0.6), Math.max(p.y + CY + 0.4, gy - 0.05), Math.max(az, bz) + Math.abs(sz) * (w + 0.6), '#d8d0c0', 'paving', { outlineT: 0, edges: false }); }
+    // street entrance: a little glass canopy on two posts and an M sign
+    { const [tx, tz] = at(e.L - 2), ty = yTop;
+      for (const sd2 of [-1, 1]) K.cyl(tx + sx * sd2 * (w + 0.3), ty, tz + sz * sd2 * (w + 0.3), 0.1, 3.1, '#3a3550', { outline: 0.03, seg: 6 });
+      B.box(tx - Math.abs(sx) * (w + 0.8) - Math.abs(nx) * 2, ty + 3.1, tz - Math.abs(sz) * (w + 0.8) - Math.abs(nz) * 2, tx + Math.abs(sx) * (w + 0.8) + Math.abs(nx) * 2, ty + 3.3, tz + Math.abs(sz) * (w + 0.8) + Math.abs(nz) * 2, '#7aa6b8', 'plain', { outlineT: 0.04 });
+      const [mx, mz] = at(e.L + 0.8), px = mx + sx * (w + 1.2), pz = mz + sz * (w + 1.2);
+      K.cyl(px, ty, pz, 0.08, 3.6, '#3a3550', { outline: 0.03, seg: 6 });
+      K.sphere(px, ty + 3.9, pz, 0.45, '#e4572e', { outline: 0.05 });
+    }
+  }
 }
 
 // an underground station's court: retaining walls (ledges on top), ramps from the street down to

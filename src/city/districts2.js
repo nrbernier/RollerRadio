@@ -220,8 +220,8 @@ function buildCanals(H) {
   // quays
   groundRibbon(B, [[C.x0 + 4, qN - 8], [C.bendX + C.half + 6, qN - 8]], 15, '#b9ad98', 'walk', 0.07);
   groundRibbon(B, [[C.x0 + 4, qS + 8], [C.bendX - C.half - 2, qS + 8]], 15, '#b9ad98', 'walk', 0.07);
-  groundRibbon(B, [[C.bendX - C.half - 8, qS + 4], [C.bendX - C.half - 8, shoreZ(C.bendX) - 10]], 15, '#b9ad98', 'walk', 0.07);
-  groundRibbon(B, [[C.bendX + C.half + 8, qN], [C.bendX + C.half + 8, shoreZ(C.bendX) - 10]], 15, '#b9ad98', 'walk', 0.07);
+  groundRibbon(B, [[C.bendX - C.half - 8, qS + 4], [C.bendX - C.half - 8, canalEndZ() + 10]], 15, '#b9ad98', 'walk', 0.07);
+  groundRibbon(B, [[C.bendX + C.half + 8, qN], [C.bendX + C.half + 8, canalEndZ() + 10]], 15, '#b9ad98', 'walk', 0.07);
   H.line([[C.x0, qN - 8], [C.bendX + C.half + 8, qN - 8]], 8); H.line([[C.x0, qS + 8], [C.bendX, qS + 8]], 8);
   H.line([[C.bendX - C.half - 8, qS], [C.bendX - C.half - 8, 1300]], 8); H.line([[C.bendX + C.half + 8, qN], [C.bendX + C.half + 8, 1300]], 8);
   // bridges

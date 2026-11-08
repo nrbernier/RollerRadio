@@ -79,6 +79,7 @@ body.touch
 .card .howto li { display: grid; grid-template-columns: 7.5em 1fr; gap: 10px; }
 .card .howto b { font-weight: 500; opacity: .7; }
 #pause { overflow-y: auto; }
+#map { display: block; width: 100%; aspect-ratio: 1; margin: 4px 0 6px; border-radius: 12px; background: #e8dfcc; }
 </style>
 <div id="loading">building the city…</div>
 </head><body><canvas id="gl"></canvas>
@@ -102,6 +103,7 @@ body.touch
   <div class="card">
     <h2>Resting</h2>
     <p class="where" id="where"></p>
+    <canvas id="map" width="560" height="560"></canvas>
     <label>Music <input id="volMusic" type="range" min="0" max="100" value="85"></label>
     <label>Sounds <input id="volFx" type="range" min="0" max="100" value="80"></label>
     <label>Time of day <input id="tod" type="range" min="0" max="100" value="60"></label>
@@ -2561,6 +2563,8 @@ function profileH(z) {
 const gauss = (d, r) => Math.exp(-(d * d) / (r * r));
 // a hill that starts gently at the city edge and levels off at `top` metres
 const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 300) * 0.04;
+// the canal stops short of the beach, in a basin behind the promenade
+function canalEndZ() { return shoreZ(PLAN.canal.bendX) - 48; }
 function shoreZ(x) { return PLAN.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5; }
 // the raw land before carving
 function landH(x, z) {
@@ -2609,7 +2613,7 @@ function cityHeight(x, z) {
 function inCanal(x, z) {
   const C = PLAN.canal;
   if (x > C.x0 && x < C.bendX + C.half && Math.abs(z - C.z) < C.half) return true;
-  if (Math.abs(x - C.bendX) < C.half && z > C.z && z < shoreZ(x) + 4) return true;
+  if (Math.abs(x - C.bendX) < C.half && z > C.z && z < canalEndZ()) return true;
   return false;
 }
 
@@ -2630,7 +2634,7 @@ function buildHeights() {
   const C = PLAN.canal;
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
-    const inside = (x > C.x0 && x < C.bendX + C.half - 0.1 && Math.abs(z - C.z) < C.half - 0.1) || (Math.abs(x - C.bendX) < C.half - 0.1 && z > C.z && z < shoreZ(x) + 4);
+    const inside = (x > C.x0 && x < C.bendX + C.half - 0.1 && Math.abs(z - C.z) < C.half - 0.1) || (Math.abs(x - C.bendX) < C.half - 0.1 && z > C.z && z < canalEndZ());
     if (inside) H[j * (nx + 1) + i] = C.bedY;
   }
 }
@@ -2708,7 +2712,7 @@ function terrainMeshes(paint, mat) {
   const hole = (i, j) => {   // a cell that lies inside the canal (or a dug-out hole) is not drawn
     const cx = x0 + (i + 0.5) * cell, cz = z0 + (j + 0.5) * cell;
     if (inHole(cx, cz)) return true;
-    return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < shoreZ(cx) + 4);
+    return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < canalEndZ());
   };
   for (let tj = 0; tj < nz; tj += TILE) for (let ti = 0; ti < nx; ti += TILE) {
     const ni = Math.min(TILE, nx - ti), nj = Math.min(TILE, nz - tj), NG = (ni + 1) * (nj + 1);
@@ -2727,7 +2731,7 @@ function terrainMeshes(paint, mat) {
       cols[k * 3] = col.r; cols[k * 3 + 1] = col.g; cols[k * 3 + 2] = col.b;
     }
     const V = (i, j) => j * (ni + 1) + i, skirtOf = new Map();
-    ring.forEach(([i, j], r) => { const a = V(i, j), k = NG + r; skirtOf.set(a, k); pos[k * 3] = pos[a * 3]; pos[k * 3 + 1] = pos[a * 3 + 1] - 4; pos[k * 3 + 2] = pos[a * 3 + 2]; uv[k * 2] = uv[a * 2]; uv[k * 2 + 1] = uv[a * 2 + 1]; cols[k * 3] = cols[a * 3] * 0.9; cols[k * 3 + 1] = cols[a * 3 + 1] * 0.9; cols[k * 3 + 2] = cols[a * 3 + 2] * 0.9; });
+    ring.forEach(([i, j], r) => { const a = V(i, j), k = NG + r; skirtOf.set(a, k); pos[k * 3] = pos[a * 3]; pos[k * 3 + 1] = pos[a * 3 + 1] - (TER.skirtD ? TER.skirtD(pos[a * 3], pos[a * 3 + 2]) : 4); pos[k * 3 + 2] = pos[a * 3 + 2]; uv[k * 2] = uv[a * 2]; uv[k * 2 + 1] = uv[a * 2 + 1]; cols[k * 3] = cols[a * 3] * 0.9; cols[k * 3 + 1] = cols[a * 3 + 1] * 0.9; cols[k * 3 + 2] = cols[a * 3 + 2] * 0.9; });
     // index sets: full detail, every 2nd vertex, every 5th (blocks touching a hole stay full detail)
     const levels = [];
     for (const st of [1, 2, 5]) {
@@ -3940,7 +3944,8 @@ const METRO_SVG = [
 ];
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
 const DOWNTOWN = [-250, -700, 370, 250];
-const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96 };
+const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
+const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
   // sample the Béziers evenly
@@ -3982,12 +3987,6 @@ function planMetro() {
     let g = st.under ? 1e9 : -1e9; for (let d = -half; d <= half; d++) g = st.under ? Math.min(g, ground[(st.i + d + N) % N]) : Math.max(g, ground[(st.i + d + N) % N]);
     st.y = st.under ? g - 10 : g + METRO.clear - 1;
     for (let d = -half; d <= half; d++) fixed[(st.i + d + N) % N] = st.y;
-    if (st.under) {
-      // the sunken court over the platforms (on the terrain grid's lines)
-      const sn = (v, o, c) => o + Math.round((v - o) / c) * c, p = pts[st.i];
-      st.hole = [sn(p.x - 16, TER.x0, TER.cell), sn(p.z - 56, TER.z0, TER.cell), sn(p.x + 16, TER.x0, TER.cell), sn(p.z + 56, TER.z0, TER.cell)];
-      TER.holes.push(st.hole);
-    }
   }
   // the approaches: free to dip below the ground for a few hundred metres either side of downtown
   const free = new Array(N).fill(false), reach = Math.round(330 / METRO.step);
@@ -4018,9 +4017,45 @@ function planMetro() {
   for (let i = 0; i < N; i++) { pts[i].y = y[i]; pts[i].g = ground[i]; }
   // directions
   for (let i = 0; i < N; i++) { const a = pts[(i - 1 + N) % N], b = pts[(i + 1) % N]; const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); pts[i].dx = dx / l; pts[i].dz = dz / l; }
+  for (const st of stations) {
+    if (st.under) {
+      // a real underground station: a hall round the platforms, and four stairways up to the street,
+      // two off each platform, each in an open well (a terrain hole on the grid's lines)
+      const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c - 1e-6) : Math.floor((v - o) / c + 1e-6)) * c;
+      st.exits = [];
+      for (const k of [-9, 9]) for (const sd of [-1, 1]) {
+        const e = pts[(st.i + k + N) % N], nx = -e.dz * sd, nz = e.dx * sd;          // straight out sideways
+        const ax = Math.abs(nx) > Math.abs(nz) ? 'x' : 'z';
+        const x0 = e.x + nx * STN.hw, z0 = e.z + nz * STN.hw, y0 = st.y + 1.2;
+        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 30); }
+        const L = 3 + run + 3, x1 = x0 + nx * L, z1 = z0 + nz * L, w = 2.4, gTop = terrainAt(x1, z1);
+        // the well opens a few metres out from the hall (the first steps run under a slab)
+        const o0x = x0 + nx * 7, o0z = z0 + nz * 7;
+        const rx0 = Math.min(o0x, x1) - (ax === 'z' ? w : 0), rx1 = Math.max(o0x, x1) + (ax === 'z' ? w : 0), rz0 = Math.min(o0z, z1) - (ax === 'x' ? w : 0), rz1 = Math.max(o0z, z1) + (ax === 'x' ? w : 0);
+        const hole = [sn(rx0, TER.x0, TER.cell, nx < 0 && ax === 'x' ? 0 : ax === 'x' ? 1 : 0), sn(rz0, TER.z0, TER.cell, nz < 0 && ax === 'z' ? 0 : ax === 'z' ? 1 : 0), sn(rx1, TER.x0, TER.cell, ax === 'x' && nx < 0 ? 0 : 1), sn(rz1, TER.z0, TER.cell, ax === 'z' && nz < 0 ? 0 : 1)];
+        // keep the hole's hall-side edge outside the hall
+        if (ax === 'x') { if (nx > 0) hole[0] = Math.max(hole[0], sn(x0 + 1, TER.x0, TER.cell, 1)); else hole[2] = Math.min(hole[2], sn(x0 - 1, TER.x0, TER.cell, 0)); }
+        else { if (nz > 0) hole[1] = Math.max(hole[1], sn(z0 + 1, TER.z0, TER.cell, 1)); else hole[3] = Math.min(hole[3], sn(z0 - 1, TER.z0, TER.cell, 0)); }
+        let top = -1e9; for (let x = hole[0]; x <= hole[2]; x += TER.cell) for (let z = hole[1]; z <= hole[3]; z += TER.cell) top = Math.max(top, terrainAt(x, z));
+        TER.holes.push(hole);
+        st.exits.push({ k, sd, nx, nz, ax, x0, z0, y0, run, L, w, x1, z1, gTop, hole, top });
+      }
+    }
+  }
   // covered parts: the ground is well above the deck
-  for (let i = 0; i < N; i++) { pts[i].covered = ground[i] > y[i] + 5 && !inHole(pts[i].x, pts[i].z); pts[i].down = under[i] || free[i]; }
-  return { pts, L, N, stations, step: L / N };
+  for (let i = 0; i < N; i++) { pts[i].covered = ground[i] > y[i] + 5 && !inHole(pts[i].x, pts[i].z); pts[i].down = under[i] || free[i]; pts[i].bored = ground[i] - y[i] >= METRO.bore && !inHole(pts[i].x, pts[i].z); }
+  // portals: where the bored tunnel meets the cutting the heightfield can't overhang, so the ground
+  // there is cut away (a terrain hole) and rebuilt as a concrete portal block in buildMetro
+  const portals = [];
+  for (let i = 0; i < N; i++) {
+    const a = pts[i], b = pts[(i + 1) % N]; if (a.bored === b.bored) continue;
+    const m = a.bored ? b : a, inner = a.bored ? a : b;
+    const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c) : Math.floor((v - o) / c)) * c;
+    const hole = [sn(m.x - 11, TER.x0, TER.cell, 0), sn(m.z - 11, TER.z0, TER.cell, 0), sn(m.x + 11, TER.x0, TER.cell, 1), sn(m.z + 11, TER.z0, TER.cell, 1)];
+    let top = -1e9; for (let x = hole[0]; x <= hole[2]; x += TER.cell) for (let z = hole[1]; z <= hole[3]; z += TER.cell) top = Math.max(top, terrainAt(x, z));
+    TER.holes.push(hole); portals.push({ i, hole, top, y: inner.y });
+  }
+  return { pts, L, N, stations, step: L / N, portals };
 }
 
 // position on the loop at arc length s, offset sideways by `off` (+ = right of travel)
@@ -4127,9 +4162,12 @@ function buildMetro(K, M, S, F) {
   const fp = []; for (let i = 0; i < N; i += 4) { const a = M.pts[i], b = M.pts[(i + 4) % N]; const fq = (A, Bb, C, D) => fp.push(...A, ...Bb, ...C, ...A, ...C, ...D); fq(L(a, -hw + 0.4, -0.2), L(b, -hw + 0.4, -0.2), L(b, hw - 0.4, -0.2), L(a, hw - 0.4, -0.2)); fq(L(a, hw - 0.4, -0.2), L(b, hw - 0.4, -0.2), L(b, hw - 0.4, -1.3), L(a, hw - 0.4, -1.3)); fq(L(a, -hw + 0.4, -1.3), L(b, -hw + 0.4, -1.3), L(b, -hw + 0.4, -0.2), L(a, -hw + 0.4, -0.2)); }
   const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); F.add(fg, null, sideCol);
   // the gallery: walls + roof where the line runs under the hill (and a bit either side)
-  const cov = M.pts.map((p, i) => { for (let d = -8; d <= 8; d++) if (M.pts[(i + d + N) % N].covered) return true; return false; });
+  // (only where the line is properly bored: the hill stays whole above it; elsewhere it runs in an open cutting)
+  const inPortal = (p) => (M.portals || []).some(q => p.x > q.hole[0] - 2 && p.x < q.hole[2] + 2 && p.z > q.hole[1] - 2 && p.z < q.hole[3] + 2);
+  const cov = M.pts.map((p, i) => { if (inPortal(p)) return true; for (let d = -1; d <= 1; d++) if (M.pts[(i + d + N) % N].bored) return true; return false; });
+  const inHall = (i) => M.stations.some(st => st.under && Math.abs(((i - st.i) % N + N + N / 2) % N - N / 2) <= Math.round(METRO.platLen / 2 / M.step) + 1);
   for (let i = 0; i < N; i++) {
-    if (!cov[i]) continue;
+    if (!cov[i] || inHall(i)) continue;
     const a = M.pts[i], b = M.pts[(i + 1) % N];
     const wp = [];
     for (const side of [-1, 1]) { const o = side * (hw + 0.4); wp.push(...L(a, o, -1.5), ...L(b, o, -1.5), ...L(b, o, 7.5), ...L(a, o, -1.5), ...L(b, o, 7.5), ...L(a, o, 7.5)); }
@@ -4144,12 +4182,12 @@ function buildMetro(K, M, S, F) {
     // gallery lights
     if (i % 10 === 0) B.box(a.x - 0.4, a.y + 7.0, a.z - 0.4, a.x + 0.4, a.y + 7.3, a.z + 0.4, '#ffe9b0', 'lamp', { outlineT: 0, edges: false });
   }
-  // portals
-  for (let i = 0; i < N; i++) {
-    const c0 = cov[i], c1 = cov[(i + 1) % N]; if (c0 === c1) continue;
-    const p = M.pts[c1 ? (i + 1) % N : i], m = new THREE.Matrix4().makeRotationY(Math.atan2(p.dx, p.dz));
-    for (const side of [-1, 1]) K.B.add(new THREE.BoxGeometry(2, 11, 1.6), m.clone().setPosition(p.x - p.dz * side * (hw + 1.2), p.y + 3, p.z + p.dx * side * (hw + 1.2)), '#8a8378', 'plain', { outlineT: 0.1 });
-    K.B.add(new THREE.BoxGeometry(METRO.deckW + 6, 2.4, 1.8), m.clone().setPosition(p.x, p.y + 8.6, p.z), '#8a8378', 'plain', { outlineT: 0.1 });
+  // portal blocks: fill each portal hole with concrete up to the hillside, leaving the line's corridor open
+  for (const q of (M.portals || [])) {
+    const [hx0, hz0, hx1, hz1] = q.hole, roof = q.y + 7.5, wc = '#9d968a';
+    K.box(hx0, roof, hz0, hx1, q.top + 0.3, hz1, wc, 'paving', { outlineT: 0.06 });
+    const near = (x, z) => { let bi = 0, bd = 1e9; for (let i = 0; i < N; i++) { const p = M.pts[i], d = (p.x - x) ** 2 + (p.z - z) ** 2; if (d < bd) { bd = d; bi = i; } } const p = M.pts[bi]; return Math.abs((x - p.x) * -p.dz + (z - p.z) * p.dx); };
+    for (let x = hx0; x < hx1; x += 3) for (let z = hz0; z < hz1; z += 3) if (near(x + 1.5, z + 1.5) > 7.4) K.box(x, q.y - 2, z, x + 3, roof + 0.05, z + 3, wc, 'paving', { outlineT: 0.04 });
   }
   W.metro = M;
 }
@@ -4187,7 +4225,7 @@ function buildStations(K, M, S, F) {
         else { q(quads.side, L(a, oi, PH), L(b, oi, PH), L(b, oi, 0), L(a, oi, 0)); q(quads.side, L(a, oo, -2.2), L(b, oo, -2.2), L(b, oo, PH), L(a, oo, PH)); }
         S.add(...L(a, om, PH), ...L(b, om, PH), WIDTH / 2);
         // canopy over the middle two thirds
-        if (Math.abs(k) < hn * 0.7) {
+        if (!st.under && Math.abs(k) < hn * 0.7) {
           const c0 = sd * (IN + 0.3), c1 = sd * (IN + WIDTH + 0.6), C = sd > 0 ? [c0, c1] : [c1, c0];
           q(quads.can, L(a, C[0], CAN), L(b, C[0], CAN), L(b, C[1], CAN), L(a, C[1], CAN));
           q(quads.can, L(a, C[1], CAN - 0.3), L(b, C[1], CAN - 0.3), L(b, C[0], CAN - 0.3), L(a, C[0], CAN - 0.3));
@@ -4198,14 +4236,16 @@ function buildStations(K, M, S, F) {
       // name boards and benches along the platform
       const smat = W.signMats || (W.signMats = {}); const sm = smat[st.name] || (smat[st.name] = new THREE.MeshBasicMaterial({ map: stationSign(st.name) }));
       for (const [k, face] of [[-4, -1], [4, 1]]) {
-        const a = M.pts[idx(k)], [sx, , sz] = L(a, sd * (face < 0 ? IN + 0.35 : IN + WIDTH + 0.65), CAN + 0.9);
-        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm); sign.position.set(sx, p.y + CAN + 0.9, sz);
+        const a = M.pts[idx(k)], under = st.under, [sx, , sz] = L(a, under ? sd * (STN.hw - 0.08) : sd * (face < 0 ? IN + 0.35 : IN + WIDTH + 0.65), CAN + 0.9);
+        if (under && face > 0) continue;
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sm); sign.position.set(sx, p.y + (under ? PH + 2.8 : CAN + 0.9), sz);
+        if (under) { sign.rotation.y = Math.atan2(a.dz * sd, -a.dx * sd); K.scene.add(sign); continue; }
         const nx = a.dz * sd * face, nz = -a.dx * sd * face; sign.rotation.y = Math.atan2(nx, nz); K.scene.add(sign);
       }
       for (const k of [-8, 8]) { const a = M.pts[idx(k)], [bx, , bz] = L(a, sd * (IN + WIDTH - 1.3)); K.bench(bx, bz, Math.abs(a.dx) > Math.abs(a.dz), p.y + PH, '#c97a3c', false); W.benches.push({ x: bx, y: p.y + PH, z: bz, alongX: Math.abs(a.dx) > Math.abs(a.dz) }); }
     }
     const ramps = [];
-    if (st.under) { sunkenCourt(K, S, st, p, ramps, IN + WIDTH, PH); W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 })); continue; }
+    if (st.under) { undergroundHall(K, S, M, st, p, ramps, hn, PH); W.stations.push(Object.assign(st, { p, yaw, ramps, platY: p.y + PH, platOff: IN + WIDTH / 2 })); continue; }
     // ramps down to the street, leaving each platform end at an angle, away from the line
     for (const sd of [-1, 1]) {
       const kEnd = sd > 0 ? hn : -hn, e = M.pts[idx(kEnd)], dirA = sd > 0 ? 1 : -1;
@@ -4235,6 +4275,73 @@ function buildStations(K, M, S, F) {
   }
   const mk = (arr, col, kind) => { if (!arr.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
   mk(quads.plat, '#d8d0c0', 'paving'); mk(quads.edge, '#e8c84a', 'paint'); mk(quads.side, '#b9b1a2', 'plain'); mk(quads.can, '#7aa6b8', 'plain');
+}
+
+// an underground station: the hall (walls, ceiling, lights) and its four stairways up to the street
+function undergroundHall(K, S, M, st, p, ramps, hn, PH) {
+  const W = K.W, B = K.B, N = M.N, HW = STN.hw, CY = STN.ceil, py = p.y + PH;
+  const L = (q, o, dy = 0) => [q.x - q.dz * o, q.y + dy, q.z + q.dx * o];
+  const idx = (k) => (st.i + k + N) % N, wall = [], ceil = [];
+  const q4 = (arr, a, b, c, d) => arr.push(...a, ...b, ...c, ...a, ...c, ...d, ...a, ...c, ...b, ...a, ...d, ...c);
+  const doorAt = (k, sd) => st.exits.some(e => e.sd === sd && (k === e.k || k === e.k - 1));
+  for (let k = -hn - 1; k <= hn; k++) {
+    const a = M.pts[idx(k)], b = M.pts[idx(k + 1)];
+    for (const sd of [-1, 1]) {
+      const o = sd * HW;
+      if (doorAt(k, sd)) q4(wall, L(a, o, PH + 3.6), L(b, o, PH + 3.6), L(b, o, CY), L(a, o, CY));   // over a doorway
+      else q4(wall, L(a, o, -2), L(b, o, -2), L(b, o, CY), L(a, o, CY));
+    }
+    q4(ceil, L(a, -HW - 0.2, CY), L(b, -HW - 0.2, CY), L(b, HW + 0.2, CY), L(a, HW + 0.2, CY));
+    W.camBoxes.push({ x0: Math.min(a.x, b.x) - HW - 1, y0: a.y + CY - 0.2, z0: Math.min(a.z, b.z) - HW - 1, x1: Math.max(a.x, b.x) + HW + 1, y1: a.y + CY + 3, z1: Math.max(a.z, b.z) + HW + 1 });
+    if ((k + hn) % 3 === 1) for (const sd of [-1, 1]) { const [lx, ly, lz] = L(a, sd * 6.3, CY - 0.25); B.box(lx - 0.5, ly, lz - 0.5, lx + 0.5, ly + 0.2, lz + 0.5, '#fff2c8', 'lamp', { outlineT: 0, edges: false }); }
+  }
+  // end walls between the tunnel mouth and the hall's sides
+  for (const k of [-hn - 1, hn + 1]) { const a = M.pts[idx(k)]; for (const sd of [-1, 1]) q4(wall, L(a, sd * 5.9, -2), L(a, sd * HW, -2), L(a, sd * HW, CY), L(a, sd * 5.9, CY)); }
+  const mk = (arr, col, kind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
+  mk(wall, '#e6dcc4', 'plain'); mk(ceil, '#5d5a54', 'plain');
+  // the stairways
+  for (const e of st.exits) {
+    const { nx, nz, x0, z0, y0, run, w, gTop, hole, top } = e, at = (d) => [x0 + nx * d, z0 + nz * d];
+    const sx = -nz, sz = nx;            // across the stair
+    const yTop = gTop + 0.05;
+    // doorway landing (level), the flight, the top landing — physics: two boxes and a ramp
+    const box = (d0, d1, y) => { const [ax, az] = at(d0), [bx, bz] = at(d1); K.box(Math.min(ax, bx) - Math.abs(sx) * w, p.y - 2, Math.min(az, bz) - Math.abs(sz) * w, Math.max(ax, bx) + Math.abs(sx) * w, y, Math.max(az, bz) + Math.abs(sz) * w, '#d8d0c0', 'paving', { outlineT: 0.04 }); };
+    box(-0.4, 3, y0);
+    { const [ax, az] = at(3), [bx, bz] = at(3 + run), axis = e.ax;
+      const xa = Math.min(ax, bx) - Math.abs(sx) * w, xb = Math.max(ax, bx) + Math.abs(sx) * w, za = Math.min(az, bz) - Math.abs(sz) * w, zb = Math.max(az, bz) + Math.abs(sz) * w;
+      const up = (axis === 'x' ? nx : nz) > 0;
+      K.ramp(xa, za, xb, zb, axis, up ? y0 + 0.12 : yTop, up ? yTop : y0 + 0.12, '#cfc7b8', false, p.y - 2);
+      // steps (look)
+      const n = Math.max(8, Math.round((yTop - y0) / 0.32));
+      for (let j = 0; j < n; j++) { const d0 = 3 + run * j / n, d1 = 3 + run * (j + 1) / n, y = U.lerp(y0, yTop, (j + 1) / n); const [cx0, cz0] = at(d0), [cx1, cz1] = at(d1);
+        B.box(Math.min(cx0, cx1) - Math.abs(sx) * w, y - 0.32, Math.min(cz0, cz1) - Math.abs(sz) * w, Math.max(cx0, cx1) + Math.abs(sx) * w, y + 0.04, Math.max(cz0, cz1) + Math.abs(sz) * w, j % 2 ? '#dcd4c4' : '#cfc7b8', 'paving', { outlineT: 0.02, edges: false }); }
+      // handrails both sides (grindable, of course)
+      for (const sd2 of [-1, 1]) { const rp = []; for (let j = 0; j <= 8; j++) { const d = 3 + run * j / 8, [cx, cz] = at(d); rp.push([cx + sx * sd2 * (w - 0.25), U.lerp(y0, yTop, j / 8) + 1.0, cz + sz * sd2 * (w - 0.25)]); } K.rail(rp, { color: '#e9e4f5', postColor: '#7a7468', postMax: 1.2, round: 0, radius: 0.06 }); }
+      ramps.push({ from: at(0), to: at(e.L) });
+    }
+    box(3 + run, e.L + 0.5, yTop);
+    // the passage under the street before the well opens: walls and a slab
+    // the well: everything in the hole that isn't stairway is solid up to the street
+    for (let x = hole[0]; x < hole[2]; x += 2) for (let z = hole[1]; z < hole[3]; z += 2) {
+      const cx = x + 1, cz = z + 1, along = (cx - x0) * nx + (cz - z0) * nz, across = Math.abs((cx - x0) * sx + (cz - z0) * sz);
+      if (across < w + 0.2 && along > -1 && along < e.L + 0.6) continue;
+      K.box(x, p.y - 2, z, x + 2, top + 0.15, z + 2, '#cbbfa6', 'paving', { outlineT: 0.04 });
+    }
+    // side walls of the stairway (inside the well and in the covered stretch), a slab over the covered part
+    for (const sd2 of [-1, 1]) { const [ax, az] = at(0), [bx, bz] = at(e.L + 0.5), ox = sx * sd2 * (w + 0.3), oz = sz * sd2 * (w + 0.3);
+      K.box(Math.min(ax, bx) + ox - 0.3, p.y - 2, Math.min(az, bz) + oz - 0.3, Math.max(ax, bx) + ox + 0.3, yTop + 1.0, Math.max(az, bz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
+      const rp = [[bx + ox * 0.95 - nx * (e.L - 6), yTop + 1.1, bz + oz * 0.95 - nz * (e.L - 6)], [bx + ox * 0.95, yTop + 1.1, bz + oz * 0.95]]; K.rail(rp, { color: '#e9e4f5', postColor: '#3a3550', round: 0 }); }
+    { const [ax, az] = at(-0.4), [bx, bz] = at(Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0)))); const gy = terrainAt((ax + bx) / 2, (az + bz) / 2);
+      B.box(Math.min(ax, bx) - Math.abs(sx) * (w + 0.6), p.y + CY, Math.min(az, bz) - Math.abs(sz) * (w + 0.6), Math.max(ax, bx) + Math.abs(sx) * (w + 0.6), Math.max(p.y + CY + 0.4, gy - 0.05), Math.max(az, bz) + Math.abs(sz) * (w + 0.6), '#d8d0c0', 'paving', { outlineT: 0, edges: false }); }
+    // street entrance: a little glass canopy on two posts and an M sign
+    { const [tx, tz] = at(e.L - 2), ty = yTop;
+      for (const sd2 of [-1, 1]) K.cyl(tx + sx * sd2 * (w + 0.3), ty, tz + sz * sd2 * (w + 0.3), 0.1, 3.1, '#3a3550', { outline: 0.03, seg: 6 });
+      B.box(tx - Math.abs(sx) * (w + 0.8) - Math.abs(nx) * 2, ty + 3.1, tz - Math.abs(sz) * (w + 0.8) - Math.abs(nz) * 2, tx + Math.abs(sx) * (w + 0.8) + Math.abs(nx) * 2, ty + 3.3, tz + Math.abs(sz) * (w + 0.8) + Math.abs(nz) * 2, '#7aa6b8', 'plain', { outlineT: 0.04 });
+      const [mx, mz] = at(e.L + 0.8), px = mx + sx * (w + 1.2), pz = mz + sz * (w + 1.2);
+      K.cyl(px, ty, pz, 0.08, 3.6, '#3a3550', { outline: 0.03, seg: 6 });
+      K.sphere(px, ty + 3.9, pz, 0.45, '#e4572e', { outline: 0.05 });
+    }
+  }
 }
 
 // an underground station's court: retaining walls (ledges on top), ramps from the street down to
@@ -4480,9 +4587,14 @@ function buildCity() {
   const M = planMetro();
   // the gallery: dig the line into the ridge
   // (downtown is bored, not dug: only the approaches where the deck runs at or just below the ground are cut)
-  const cut = (p) => p.down ? (!p.covered && p.g > p.y - 1.5 && !inHole(p.x, p.z)) : p.covered;
-  const corridor = []; for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (cut(p) || (!p.down && (M.pts[(i + 6) % M.N].covered || M.pts[(i - 6 + M.N) % M.N].covered))) corridor.push([p.x, p.y, p.z]); else if (corridor.length && corridor[corridor.length - 1] !== null) corridor.push(null); }
-  let run = []; for (const c of corridor) { if (c === null) { if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8); run = []; } else run.push(c); } if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 2, -1.8);
+  // dig wherever the deck is below the ground but too shallow to bore (a wide cutting, so its slopes stay off the deck)
+  const cut = (p) => !p.bored && p.g > p.y - 1.5 && !inHole(p.x, p.z);
+  const corridor = []; for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (cut(p) || (!p.bored && (M.pts[(i + 4) % M.N].bored || M.pts[(i - 4 + M.N) % M.N].bored))) corridor.push([p.x, p.y, p.z]); else if (corridor.length && corridor[corridor.length - 1] !== null) corridor.push(null); }
+  let run = []; for (const c of corridor) { if (c === null) { if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 8.5, -1.8); run = []; } else run.push(c); } if (run.length > 1) carveCorridor(run, METRO.deckW / 2 + 8.5, -1.8);
+  // over a bored tunnel the terrain skirts stay shallow (they would hang into it)
+  { const tg = new Map(), k = (x, z) => Math.floor(x / 16) + ',' + Math.floor(z / 16);
+    for (const p of M.pts) if (p.bored) { const kk = k(p.x, p.z); (tg.get(kk) || tg.set(kk, []).get(kk)).push(p); }
+    TER.skirtD = (x, z) => { let d = 4; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const p of (tg.get((Math.floor(x / 16) + a) + ',' + (Math.floor(z / 16) + b)) || [])) if (Math.hypot(p.x - x, p.z - z) < 16) d = Math.min(d, Math.max(0.3, terrainAt(x, z) - p.y - 8)); return d; }; }
   if (typeof prepDistricts === 'function') prepDistricts();
   // station surroundings: a little forecourt where each ramp lands
   lap('heights');
@@ -4555,13 +4667,14 @@ function buildCity() {
 function buildCanal(K, S, F) {
   const W = K.W, C = PLAN.canal, B = K.B;
   const wall = '#8f8577', top = '#b9b0a0';
-  const sz = shoreZ(C.bendX) + 4;
+  const sz = canalEndZ();
   // walls (thin boxes from the bed up to the quay), a stone coping on top
   const walls = [
     [C.x0, C.z - C.half - 1, C.bendX + C.half, C.z - C.half],             // north
     [C.x0, C.z + C.half, C.bendX - C.half, C.z + C.half + 1],             // south (west of the bend)
     [C.bendX - C.half - 1, C.z + C.half, C.bendX - C.half, sz],           // west side of the bend
     [C.bendX + C.half, C.z - C.half, C.bendX + C.half + 1, sz],           // east side of the bend
+    [C.bendX - C.half - 1, sz, C.bendX + C.half + 1, sz + 1],             // the end of the basin
   ];
   for (const [x0, z0, x1, z1] of walls) {
     // in pieces, so the cells can cull them
@@ -4588,7 +4701,8 @@ function buildCanal(K, S, F) {
   addWater(C.bendX - C.half, C.z + C.half, C.bendX + C.half, sz);
   W.canalWaterMat = wm;
   // the weir where the canal steps down into the lake
-  K.waterfall(C.bendX - C.half, C.bendX + C.half, sz, C.waterY, 0.05, '#cfeff0');
+  // (the basin ends in a wall behind the promenade: a lock gate in it, the lake beyond)
+  for (const sd of [-1, 1]) B.box(C.bendX + sd * 0.3 - (sd < 0 ? C.half - 0.3 : 0), C.bedY, sz - 3, C.bendX + sd * 0.3 + (sd > 0 ? C.half - 0.3 : 0), C.quayY - 0.6, sz - 2.4, '#7a5a3a', 'wood', { outlineT: 0.05 });
   F.box(C.x0, C.bedY, C.z - C.half - 1, C.bendX + C.half + 1, C.quayY, C.z - C.half, wall, 0);
   W.canal = C;
 }
@@ -4653,7 +4767,7 @@ function districtKit(K, S, F) {
   const block = (x, z, r) => { const e = { x, z, r }; PG.add(e, x - r, z - r, x + r, z + r); if (r > maxR) maxR = r; };
   const M = W.metro;
   // (deep under downtown the line doesn't get in the way of anything on the surface)
-  if (M) for (let i = 0; i < M.N; i++) { const p = M.pts[i]; if (p.down && p.covered && p.g > p.y + 8) continue; block(p.x, p.z, METRO.deckW / 2 + 1.5); }
+  if (M) for (let i = 0; i < M.N; i++) { const p = M.pts[i]; if (p.bored) continue; block(p.x, p.z, p.g > p.y - 1.5 ? METRO.deckW / 2 + 9 : METRO.deckW / 2 + 1.5); }
   for (const st of (W.stations || [])) if (st.court) { const c = st.court; for (let x = c.x0 - 3; x <= c.x1 + 3; x += 6) for (let z = c.z0 - 3; z <= c.z1 + 3; z += 6) block(x, z, 5); }
   for (const st of (W.stations || [])) for (const rp of st.ramps) { const dx = rp.to[0] - rp.from[0], dz = rp.to[1] - rp.from[1], L = Math.hypot(dx, dz); for (let t = 0; t <= L; t += 2) block(rp.from[0] + dx * t / L, rp.from[1] + dz * t / L, 3); }
   for (const r of Object.values(W.roads || {})) for (let i = 0; i < r.pts.length - 1; i++) {
@@ -4680,7 +4794,9 @@ function districtKit(K, S, F) {
   // a building standing on the slope (its floor line is the highest corner)
   H.bldg = (x0, z0, x1, z1, h, col, o = {}) => {
     const [lo, hi] = groundSpan(x0, z0, x1, z1);
-    const base = lo - 1.5, top = (o.top ?? hi + h);
+    let base = lo - 1.5; const top = (o.top ?? hi + h);
+    // (never down into a metro tunnel: over one, the footing stops just above its roof)
+    if (M) for (let i = 0; i < M.N; i += 2) { const p = M.pts[i]; if (p.bored && p.x > x0 - 7 && p.x < x1 + 7 && p.z > z0 - 7 && p.z < z1 + 7) base = Math.max(base, p.y + STN.ceil + 0.3); }
     K.box(x0, base, z0, x1, top, z1, col, o.kind || 'building', { roofColor: o.roof || col, outlineT: o.outline ?? 0.16 });
     if (o.trim !== false) B.box(x0 - 0.2, top - 0.7, z0 - 0.2, x1 + 0.2, top - 0.05, z1 + 0.2, o.trim || '#3a3550', 'plain', { outlineT: 0, edges: false });
     F.box(x0, base, z0, x1, top, z1, o.far || col);
@@ -5463,8 +5579,8 @@ function buildCanals(H) {
   // quays
   groundRibbon(B, [[C.x0 + 4, qN - 8], [C.bendX + C.half + 6, qN - 8]], 15, '#b9ad98', 'walk', 0.07);
   groundRibbon(B, [[C.x0 + 4, qS + 8], [C.bendX - C.half - 2, qS + 8]], 15, '#b9ad98', 'walk', 0.07);
-  groundRibbon(B, [[C.bendX - C.half - 8, qS + 4], [C.bendX - C.half - 8, shoreZ(C.bendX) - 10]], 15, '#b9ad98', 'walk', 0.07);
-  groundRibbon(B, [[C.bendX + C.half + 8, qN], [C.bendX + C.half + 8, shoreZ(C.bendX) - 10]], 15, '#b9ad98', 'walk', 0.07);
+  groundRibbon(B, [[C.bendX - C.half - 8, qS + 4], [C.bendX - C.half - 8, canalEndZ() + 10]], 15, '#b9ad98', 'walk', 0.07);
+  groundRibbon(B, [[C.bendX + C.half + 8, qN], [C.bendX + C.half + 8, canalEndZ() + 10]], 15, '#b9ad98', 'walk', 0.07);
   H.line([[C.x0, qN - 8], [C.bendX + C.half + 8, qN - 8]], 8); H.line([[C.x0, qS + 8], [C.bendX, qS + 8]], 8);
   H.line([[C.bendX - C.half - 8, qS], [C.bendX - C.half - 8, 1300]], 8); H.line([[C.bendX + C.half + 8, qN], [C.bendX + C.half + 8, 1300]], 8);
   // bridges
@@ -5909,6 +6025,24 @@ function fillKit(H) {
 // observatory, then a median ledge down the boulevard to the market
 function fillRoutes(H) {
   const { K, W } = H;
+  // no roads to nowhere: where a road just stops (not at another road, not at the map's edge),
+  // it ends in a turning circle round a little tree island
+  { const roads = Object.entries(W.roads || {});
+    const distTo = (x, z, P) => { let d = 1e9; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); d = Math.min(d, Math.hypot(ax + dx * u - x, az + dz * u - z)); } return d; };
+    for (const [k, rd] of roads) for (const end of (k === 'oblique' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
+      let [x, z] = end;
+      { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 1000) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
+      if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;
+      if (inCanal(x, z)) continue;
+      const R = rd.width * 0.95 + 4;
+      H.blob(x, z, R + 3.5, R + 3.5, '#c8c1b4', 'walk', 0.075, 3);
+      H.blob(x, z, R, R, '#5a5868', 'road', 0.105, 5);
+      H.blob(x, z, 4.2, 4.2, '#7da35a', 'grass', 0.14, 7);
+      K.box(x - 3.2, terrainAt(x, z) - 0.2, z - 3.2, x + 3.2, terrainAt(x, z) + 0.35, z + 3.2, '#b9b0a0', 'paving', { outlineT: 0.04 });
+      H.tree(x, z, { s: 1.2, color: '#4f9a52' });
+      H.block(x, z, R + 2);
+    }
+  }
   const hill = ROADS.hill.slice().reverse();     // from the observatory end, downhill
   const side = (pts, off, h) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 3) { const x = ax + ux * t - uz * off, z = az + uz * t + ux * off; out.push([x, terrainAt(x, z) + h, z]); } } return out; };
   const gr = side(hill, 6.4, 0.85);
@@ -5981,7 +6115,7 @@ function fillBusiness(H) {
   const pts = [top, [top[0], g0 + 0.6, sp[1] + 30], [sx, terrainAt(sx, sp[1] + 60) + 10, sp[1] + 60]];
   for (let z = sp[1] + 100; z < -60; z += 40) { const t = U.clamp((z - (sp[1] + 60)) / (-60 - (sp[1] + 60)), 0, 1); pts.push([sx, terrainAt(sx, z) + U.lerp(10, 1.2, t * t), z]); }
   pts.push([sx, terrainAt(sx, -50) + 1.0, -50]);
-  H.wave(pts, '#ff7a5a', { radius: 0.18, round: 8, stubs: false });
+  H.wave(pts, '#8e95a2', { radius: 0.16, round: 8, stubs: true });      // plain steel, on posts, like the street furniture
   // more people in the streets
   H.walkers(W.walkLines, 120, 'business');
 }
@@ -6388,6 +6522,13 @@ function buildCable(H) {
     const rx = T.x + ux * dir * 2, rz = T.z + uz * dir * 2;
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.cyl(rx + nx * hw * sx + ux * 4 * sz, T.g - 0.2, rz + nz * hw * sx + uz * 4 * sz, 0.3, T.y + 2.6 - T.g, '#e9e4f5', { outline: 0.03, seg: 6 });
     B.add(new THREE.BoxGeometry(hw * 2 + 1, 0.6, 10), new THREE.Matrix4().makeRotationY(yaw).setPosition(rx, T.y + 2.8, rz), '#3e8f86', 'plain', { outlineT: 0.06, edges: false });
+    // the bull wheel the cable turns round, hung from a column under the roof, and the frame that holds it
+    K.cyl(T.x, T.y - 0.25, T.z, C.off + 0.25, 0.5, '#2a2838', { outline: 0.03, seg: 20 });
+    K.cyl(T.x, T.y - 0.1, T.z, C.off - 0.6, 0.35, '#c4523a', { outline: 0.02, seg: 20 });
+    K.cyl(T.x, T.y + 0.25, T.z, 0.45, 2.3, '#9aa0b4', { outline: 0.03, seg: 8 });
+    B.add(new THREE.BoxGeometry(1.2, T.y - T.g + 0.6, 1.2), new THREE.Matrix4().makeRotationY(yaw).setPosition(T.x + ux * dir * 2.4, (T.y + T.g) / 2 - 0.2, T.z + uz * dir * 2.4), '#9aa0b4', 'plain', { outlineT: 0.06, edges: false });
+    B.add(new THREE.BoxGeometry(0.8, 0.8, 3.2), new THREE.Matrix4().makeRotationY(yaw).setPosition(T.x + ux * dir * 1.2, T.y + 0.3, T.z + uz * dir * 1.2), '#9aa0b4', 'plain', { outlineT: 0.06, edges: false });
+    W.boxes.push({ x0: T.x + ux * dir * 2.4 - 0.7, y0: T.g - 1, z0: T.z + uz * dir * 2.4 - 0.7, x1: T.x + ux * dir * 2.4 + 0.7, y1: T.y - 0.6, z1: T.z + uz * dir * 2.4 + 0.7, tag: 'tower' });
     H.reserve([cx - 18, cz - 18, cx + 18, cz + 18]);
     H.standers([[cx + nx * 9, cz + nz * 9, yaw, T.g], [cx - nx * 9 + ux * 3, cz - nz * 9 + uz * 3, yaw + 2, T.g]], k === 0 ? 'lake' : 'park');
     H.bench(cx - ux * dir * 10, cz - uz * dir * 10, Math.abs(nx) > Math.abs(nz), { view: true });
@@ -7911,11 +8052,43 @@ function bindUI() {
   $('tod').oninput = (e) => { Sky.phase = (+e.target.value / 100 + 0.0) % 1; Sky.update(0, G.camera.position); };
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(true); });
 }
+// the pause-menu map: districts, water, roads, the metro and its stations, and you
+function drawMap(cv) {
+  if (!cv) return;
+  const W = Game.W, c = cv.getContext('2d'), S = cv.width;
+  const x0 = -1100, x1 = 1100, z0 = -1450, z1 = 1450, k = S / Math.max(x1 - x0, z1 - z0), ox = (S - (x1 - x0) * k) / 2;
+  const X = (x) => ox + (x - x0) * k, Z = (z) => (z - z0) * k;
+  c.fillStyle = '#e8dfcc'; c.fillRect(0, 0, S, S);
+  const tint = { park: '#a9c98f', obs: '#c9cfa0', oldtown: '#e3c9a4', business: '#cfd3d8', market: '#e8c7a0', canals: '#bcd2b8', docks: '#c9c0b2', lake: '#d9e3b8' };
+  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillStyle = tint[d.key] || '#ddd'; c.fillRect(X(a), Z(b), (e - a) * k, (f - b) * k); }
+  // the lake
+  c.fillStyle = '#8fbcd0'; c.beginPath(); c.moveTo(X(x0), Z(z1)); for (let x = x0; x <= x1; x += 20) c.lineTo(X(x), Z(shoreZ(x))); c.lineTo(X(x1), Z(z1)); c.fill();
+  const C = PLAN.canal; c.fillStyle = '#8fbcd0'; c.fillRect(X(C.x0), Z(C.z - C.half), (C.bendX + C.half - C.x0) * k, C.half * 2 * k); c.fillRect(X(C.bendX - C.half), Z(C.z), C.half * 2 * k, (canalEndZ() - C.z) * k);
+  if (PLAN.pond) { c.beginPath(); c.arc(X(PLAN.pond.x), Z(PLAN.pond.z), PLAN.pond.r * k, 0, 7); c.fill(); }
+  // roads
+  c.strokeStyle = '#8a8698'; c.lineCap = 'round';
+  const line = (P, w) => { c.lineWidth = Math.max(1.5, w * k); c.beginPath(); P.forEach(([x, z], i) => i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z))); c.stroke(); };
+  for (const r of Object.values(W.roads || {})) line(r.pts, r.width);
+  for (const s of (W.bizStreets || [])) line([[s.x, s.z0], [s.x, s.z1]], 10);
+  // metro
+  const M = W.metro; if (M) { c.strokeStyle = '#e4572e'; c.lineWidth = 3; c.setLineDash([]); c.beginPath(); M.pts.forEach((p, i) => { if (i % 3) return; const sx = X(p.x), sz = Z(p.z); i ? c.lineTo(sx, sz) : c.moveTo(sx, sz); }); c.closePath(); c.stroke();
+    c.font = `600 ${Math.round(S / 34)}px ${FONT.body}`; c.textBaseline = 'middle';
+    for (const st of (W.stations || [])) { const sx = X(st.p.x), sz = Z(st.p.z); c.fillStyle = '#fff'; c.strokeStyle = '#1b1a24'; c.lineWidth = 2; c.beginPath(); c.arc(sx, sz, S / 75, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#1b1a24'; c.fillText(st.name, sx + S / 55, sz); } }
+  // district names
+  c.font = `500 ${Math.round(S / 30)}px ${FONT.title}`; c.textAlign = 'center'; c.fillStyle = 'rgba(27,26,36,.55)';
+  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillText(d.name, X((a + e) / 2), Z((b + f) / 2)); }
+  c.textAlign = 'left';
+  // you
+  const p = Game.player, px = X(p.pos.x), pz = Z(p.pos.z), a = p.yaw;
+  c.save(); c.translate(px, pz); c.rotate(-a + Math.PI); c.fillStyle = '#e4572e'; c.strokeStyle = '#fff'; c.lineWidth = 2.5;
+  c.beginPath(); c.moveTo(0, -S / 40); c.lineTo(S / 60, S / 60); c.lineTo(0, S / 120); c.lineTo(-S / 60, S / 60); c.closePath(); c.stroke(); c.fill(); c.restore();
+}
 function pause(on) {
   if (on && Game.state === 'play') {
     Game.state = 'paused'; $('pause').hidden = false; Input.enabled = false; Sound.suspend(true); $('tod').value = Math.round(Sky.phase * 100);
     const d = PLAN.byKey[Sound.place], R = Sound.REC[Sound.place];
     $('where').textContent = d ? `${d.name} · ${Math.round(Sound.bpm / (R ? R.f : 1))} bpm · ${Sound.modeName}` : '';
+    drawMap($('map'));
     $('howto').innerHTML = HOWTO.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join('');
   }
   else if (!on && Game.state === 'paused') { Game.state = 'play'; $('pause').hidden = true; Input.enabled = true; Input.flush(); Sound.suspend(false); Game.last = performance.now(); }
