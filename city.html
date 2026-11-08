@@ -79,7 +79,14 @@ body.touch
 .card .howto li { display: grid; grid-template-columns: 7.5em 1fr; gap: 10px; }
 .card .howto b { font-weight: 500; opacity: .7; }
 #pause { overflow-y: auto; }
-#map { display: block; width: 100%; aspect-ratio: 1; margin: 4px 0 6px; border-radius: 12px; background: #e8dfcc; }
+#map { display: block; width: min(100%, 34vh); aspect-ratio: 1; margin: 4px auto 6px; border-radius: 12px; background: #e8dfcc; }
+/* landscape phones: map on the left, the rest of the menu beside it */
+@media (orientation: landscape) and (max-height: 560px) {
+  #pause .card { width: min(720px, 94vw); display: grid; grid-template-columns: auto 1fr; column-gap: 20px; grid-auto-flow: row dense; align-content: start; padding: 16px 20px; max-height: 94vh; overflow-y: auto; }
+  #pause .card > *:not(#map) { grid-column: 2; }
+  #pause .card h2 { margin-bottom: 6px; font-size: 24px; }
+  #pause #map { grid-column: 1; grid-row: 1 / span 9; width: min(80vh, 42vw); margin: 0; align-self: start; }
+}
 </style>
 <div id="loading">building the city…</div>
 </head><body><canvas id="gl"></canvas>
