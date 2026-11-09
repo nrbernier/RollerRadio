@@ -24,3 +24,19 @@
 - Ways up to the roofs, and pathways at roof level to grind along and rest on
 - Fabric shades above shops are great: arrange the bouncy shades as stepping stones, so you can bounce from one to the next up to roof level (alongside the other ways up). No trampolines.
 - More grindable things at height, e.g. balconies
+
+## New places (each with its own musical ambience)
+- Forest crag: a big rock / small mountain in the forest rising above the tree line; a path up with a rail;
+  you can grind down the cliff side
+- Construction site in the city: lots to ride (cranes, fences, scaffolding, etc.)
+- Downtown tower, well above the other buildings: lift with a door at street level, the character reappears
+  at the lift door on the top deck; something to ride down from it
+
+## World
+- Vineyards: improve them, make the grapes visible
+- More relief overall; downtown, some streets much higher than others, with at least one bridge crossing
+  a street far below
+- Market: too self-similar. One real big market instead of several similar ones; vary the rest of the
+  district, and make it less like the old town (needs ideas)
+- Canal's far end runs off towards the mountains: let it come out of a tunnel instead
+- Old town: washing lines (with clothes pegs) and other links between houses at roof level, to grind on
