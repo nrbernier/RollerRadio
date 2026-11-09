@@ -40,3 +40,8 @@
   district, and make it less like the old town (needs ideas)
 - Canal's far end runs off towards the mountains: let it come out of a tunnel instead
 - Old town: washing lines (with clothes pegs) and other links between houses at roof level, to grind on
+
+## Distance / far view
+- Tune how very distant things are shown: e.g. on the title screen roads just stop at some distance,
+  which looks very odd. Distant roads and other ground features should fade out or have a far version
+  (FarBatch) instead of cutting off
