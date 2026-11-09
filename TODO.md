@@ -45,3 +45,10 @@
 - Tune how very distant things are shown: e.g. on the title screen roads just stop at some distance,
   which looks very odd. Distant roads and other ground features should fade out or have a far version
   (FarBatch) instead of cutting off
+
+## Street-level variety (and easier to find your way)
+- Downtown: buildings vary only higher up; at street level they're too regular and self-similar (boring,
+  and hard to navigate). Vary the ground-floor shapes (arcades, set-backs, glass lobbies, steps, corners
+  cut off…) and add signs and landmark fronts: cinema, theatre, hotel, bank, diner…
+- Old town & market: much more variety in the buildings, and more open spaces between them:
+  inner courtyards, small playgrounds, squares
