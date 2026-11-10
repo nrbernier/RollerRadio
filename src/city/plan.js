@@ -7,7 +7,7 @@ const M6 = (u, v) => [(u - 190) * 6, (v - 260) * 6];
 
 const PLAN = {
   shoreZ: 1236,                 // where the beach meets the lake (wiggles a little with x)
-  canal: { z: 474, half: 12, x0: -1110, bendX: 306, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
+  canal: { z: 474, half: 12, x0: -1072, bendX: 306, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
   docksQuayZ: 1198,
   // districts: rect in metres, palette, ground colour and the music recipe key
   districts: [
@@ -104,6 +104,8 @@ function landH(x, z) {
   h += Math.min(22, gauss(sd, 330) * 30);
   // a ridge spur between park and hilltop (the metro tunnels through it)
   h += gauss(Math.hypot(x + 300, z + 860), 240) * 22;
+  // the canal comes out of a tunnel under a wooded knoll at the city's west edge
+  h += gauss(Math.hypot(x + 1150, z - 474), 95) * 30;
   // the edge of the world: hills all round (outside the city)
   // (they rise, then roll: no green walls in the distance)
   const ex = Math.max(0, Math.abs(x) - 1060), en = Math.max(0, -1490 - z);
