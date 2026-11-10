@@ -357,7 +357,7 @@ function loop(now) {
     Input.poll();
     const moving = Math.hypot(Input.move.x, Input.move.y) > 0.15 || Input.kbActive || Input.jumpQ.length > 0;
     // safety net: nobody falls out of the world
-    Game.cam.indoor = p.pos.y < terrainAt(p.pos.x, p.pos.z) - 3.5 && !!(W.metro && W.metro.pts.some((q, i) => i % 4 === 0 && Math.abs(q.x - p.pos.x) < 60 && Math.abs(q.z - p.pos.z) < 60 && q.y < p.pos.y + 3 && (q.bored)));
+    Game.cam.indoor = (W.indoor || []).some(r => p.pos.x > r[0] && p.pos.x < r[2] && p.pos.z > r[1] && p.pos.z < r[3] && p.pos.y < r[4]) || p.pos.y < terrainAt(p.pos.x, p.pos.z) - 3.5 && !!(W.metro && W.metro.pts.some((q, i) => i % 4 === 0 && Math.abs(q.x - p.pos.x) < 60 && Math.abs(q.z - p.pos.z) < 60 && q.y < p.pos.y + 3 && (q.bored)));
     if (p.pos.y < -40 || p.pos.y < terrainAt(p.pos.x, p.pos.z) - 70 || !isFinite(p.pos.y)) { getUp(); Game.cam.snap(p); }
     if (Game.swim > 0) {
       Game.swim -= dt; Input.flush(); p.vel.multiplyScalar(0.9);

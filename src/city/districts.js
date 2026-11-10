@@ -173,12 +173,37 @@ function districtKit(K, S, F) {
   H.spot = (key, x, z, r, extra = {}) => { const y = terrainAt(x, z); W.spots.push(Object.assign({ key, x, y, z, r, w: 0 }, extra)); };
   // a busker: a person, an instrument case, a little tune that grows as you come close
   H.busker = (inst, x, z, yaw = 0) => {
-    const y = terrainAt(x, z);
+    const y0 = terrainAt(x, z), y = y0 + 0.3, fx = Math.sin(yaw), fz = Math.cos(yaw), rx = fz, rz = -fx;
+    const col = { sax: '#e0a030', flute: '#3aa8c8', trumpet: '#e4572e', oud: '#a8508a', accordion: '#d83a3a', pan: '#35b08a' }[inst] || '#e4572e';
+    // a little round stage on a bright rug, so you can spot them across a square
+    K.cyl(x, y0 + 0.02, z, 2.3, 0.05, col, { outline: 0.02, seg: 18 });
+    K.cyl(x, y0 + 0.05, z, 1.25, 0.25, '#f3ead8', { outline: 0.04, seg: 14 });
     H.standers([[x, z, yaw, y]], 'market');
-    const cx = x + Math.sin(yaw) * 1.2, cz = z + Math.cos(yaw) * 1.2;
-    B.box(cx - 0.45, y, cz - 0.2, cx + 0.45, y + 0.25, cz + 0.2, '#3a2a22', 'plain', { outlineT: 0.02, edges: false });
-    B.box(cx - 0.4, y + 0.25, cz - 0.15, cx + 0.4, y + 0.28, cz + 0.15, '#a0302a', 'plain', { outlineT: 0, edges: false });
-    W.spots.push({ key: 'busk_' + inst, x, y, z, r: 22, w: 0, busker: true });
+    const put = (g, px, py, pz, c, rot) => { const m = new THREE.Matrix4(); if (rot) m.makeRotationFromEuler(new THREE.Euler(rot[0], rot[1] + yaw, rot[2], 'YXZ')); else m.makeRotationY(yaw); m.setPosition(x + fx * pz + rx * px, y + py, z + fz * pz + rz * px); B.add(g, m, c, 'plain', { outlineT: 0.03, edges: false }); };
+    const CYL = (r, h, r2 = r) => new THREE.CylinderGeometry(r2, r, h, 8), BOX = (a, b, c) => new THREE.BoxGeometry(a, b, c);
+    if (inst === 'sax') { put(CYL(0.07, 0.75), 0.08, 1.02, 0.36, '#e8b53a', [0.45, 0, 0.12]); put(CYL(0.17, 0.3, 0.07), 0.1, 0.7, 0.56, '#e8b53a', [-0.9, 0, 0]); put(CYL(0.035, 0.3), 0.06, 1.42, 0.22, '#2a2838', [0.9, 0, 0]); }
+    else if (inst === 'flute') put(CYL(0.035, 0.85), 0.2, 1.47, 0.3, '#dfe6ee', [0, 0, Math.PI / 2]);
+    else if (inst === 'trumpet') { put(CYL(0.045, 0.6), 0, 1.48, 0.55, '#f0c040', [Math.PI / 2, 0, 0]); put(CYL(0.16, 0.24, 0.05), 0, 1.48, 0.93, '#f0c040', [-Math.PI / 2, 0, 0]); put(BOX(0.12, 0.16, 0.2), 0, 1.42, 0.5, '#f0c040'); }
+    else if (inst === 'oud') { put(new THREE.SphereGeometry(0.3, 8, 6), -0.12, 1.02, 0.36, '#b97a3e', [0, 0, 0]); put(BOX(0.08, 0.06, 0.7), 0.34, 1.2, 0.36, '#6a4324', [0, Math.PI / 2, -0.35]); put(CYL(0.1, 0.02), -0.12, 1.02, 0.6, '#3a2a22', [Math.PI / 2, 0, 0]); }
+    else if (inst === 'accordion') { put(BOX(0.22, 0.5, 0.3), -0.3, 1.08, 0.4, '#d83a3a'); put(BOX(0.34, 0.46, 0.26), 0, 1.08, 0.4, '#f3ead8'); put(BOX(0.22, 0.5, 0.3), 0.3, 1.08, 0.4, '#d83a3a'); for (const k of [-0.1, 0, 0.1]) put(BOX(0.02, 0.48, 0.28), k, 1.08, 0.4, '#2a2838'); }
+    else if (inst === 'pan') { put(CYL(0.42, 0.22, 0.46), 0, 1.0, 0.7, '#c9d2da', [0.25, 0, 0]); put(CYL(0.36, 0.02), 0, 1.1, 0.72, '#8e98a4', [0.25, 0, 0]); for (const sx of [-0.3, 0.3]) put(CYL(0.025, 0.95), sx, 0.47, 0.7, '#2a2838'); }
+    // the open case with coins, and a tall pennant
+    const cx = x + fx * 2.0, cz = z + fz * 2.0;
+    B.box(cx - 0.45, y0, cz - 0.25, cx + 0.45, y0 + 0.22, cz + 0.25, '#3a2a22', 'plain', { outlineT: 0.02, edges: false });
+    B.box(cx - 0.4, y0 + 0.22, cz - 0.2, cx + 0.4, y0 + 0.25, cz + 0.2, '#f2c14e', 'plain', { outlineT: 0, edges: false });
+    const px = x - fx * 1.5 + rx * 1.5, pz = z - fz * 1.5 + rz * 1.5;
+    K.cyl(px, y0, pz, 0.06, 4.6, '#2a2838', { outline: 0.02, seg: 6 });
+    for (let k = 0; k < 3; k++) put(BOX(0.9 - k * 0.22, 0.42, 0.04), 1.5 + 0.48 - k * 0.11, 4.0 - k * 0.45 - 0.3, -1.5, k % 2 ? '#f3ead8' : col);
+    put(BOX(0.34, 0.5, 0.3), -1.2, 0.0, -0.5, '#2a2838'); put(BOX(0.26, 0.26, 0.02), -1.2, 0.02, -0.34, col);     // a little amp
+    W.spots.push({ key: 'busk_' + inst, x, y: y0, z, r: 22, w: 0, busker: true });
+    H.block(x, z, 3);
+  };
+  // a lettered sign board (two-sided): H.sign('CINEMA', x, y, z, yaw, width, height, background, ink)
+  H.sign = (text, x, y, z, yaw = 0, w = 5, h = 1.2, bg = '#1b1a24', fg = '#ffe9b0', o = {}) => {
+    const key = text + bg + fg, M = W.signMats2 || (W.signMats2 = {});
+    const mat = M[key] || (M[key] = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: canvasTex(512, Math.max(64, Math.round(512 * h / w)), (c, cw, ch) => { c.fillStyle = bg; c.fillRect(0, 0, cw, ch); c.strokeStyle = fg; c.lineWidth = ch * 0.06; c.strokeRect(ch * 0.08, ch * 0.08, cw - ch * 0.16, ch - ch * 0.16); c.fillStyle = fg; c.textAlign = 'center'; c.textBaseline = 'middle'; let fs = ch * 0.62; c.font = `700 ${fs}px ${FONT.body}`; const tw = c.measureText(text).width; if (tw > cw * 0.86) { fs *= cw * 0.86 / tw; c.font = `700 ${fs}px ${FONT.body}`; } c.fillText(text, cw / 2, ch / 2 + fs * 0.04); }).tex }));
+    for (const side of (o.oneSide ? [0] : [0, 1])) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x + Math.sin(yaw) * (side ? -0.03 : 0.03), y, z + Math.cos(yaw) * (side ? -0.03 : 0.03)); m.rotation.y = yaw + (side ? Math.PI : 0); m.matrixAutoUpdate = false; m.updateMatrix(); (W.signGroup || (W.signGroup = (() => { const g = new THREE.Group(); W.group.add(g); return g; })())).add(m); }
+    if (!o.bare) B.add(new THREE.BoxGeometry(w + 0.3, h + 0.3, 0.12), new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z), '#2a2838', 'plain', { outlineT: 0.04, edges: false });
   };
   // walking people (and standing ones); stored for the life system
   H.walkers = (paths, n, style) => W.npcs.push({ kind: 'walk', paths, n, style });
@@ -262,7 +287,7 @@ function buildBusiness(H) {
   W.fountains = [{ x: fx, y: fy + 2.6, z: fz }];
   H.sound(fx, fy + 1, fz, 7, 'fountain');
   for (let a = 0; a < 6; a++) H.bench(fx + Math.cos(a) * 11, fz + Math.sin(a) * 11, Math.abs(Math.cos(a)) < 0.5);
-  H.busker('sax', fx - 14, fz + 4, Math.PI / 2);
+  H.busker('sax', fx - 14, fz + 20, Math.PI / 2);
   // the rooftop garden: a car park with ramps up to a roof full of plants
   const sp = PLAN.spots.find(s => s.key === 'rooftop').at;
   buildGarage(H, sp[0] - 22, sp[1] - 16, sp[0] + 22, sp[1] + 16);

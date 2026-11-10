@@ -202,8 +202,26 @@ function buildMarket(H) {
   K.rail([[cx0 + 6.3, gy + 1.5, cz0 + 0.3], [cx1 - 0.3, gy + 1.5, cz0 + 0.3]], { color: '#e9e4f5', postMax: 1.5 });
   for (let i = 0; i < 6; i++) { const x = cx0 + 10 + (i % 3) * 4.5, z = cz0 + 6 + Math.floor(i / 3) * 6; K.box(x - 1.2, fy, z - 0.6, x + 1.2, fy + 0.8, z + 0.6, '#5a4a3a', 'wood', { outlineT: 0.03 }); for (let k = 0; k < 6; k++) B.box(x - 1.1 + k * 0.38, fy + 0.8, z - 0.5, x - 0.82 + k * 0.38, fy + 1.15, z + 0.5, pick(r, ['#14101f', '#c4523a', '#e8b84a', '#3e8f86', '#f2efe6']), 'plain', { outlineT: 0, edges: false }); }
   K.box(cx1 - 6, fy, cz1 - 5, cx1 - 2, fy + 0.9, cz1 - 2, '#3a2a22', 'wood', { outlineT: 0.03 }); K.cyl(cx1 - 4, fy + 0.9, cz1 - 3.5, 0.9, 0.08, '#14101f', { outline: 0.02, seg: 18 });
-  K.rail([[cx0 + 1, gy + 3.5, cz0 + 1], [cx1 - 1, gy + 3.5, cz1 - 1]], { kind: 'cable', lanterns: ['#ffd27a', '#ff9a6a'], posts: false, sag: 0.8, deco: true });
-  K.rail([[cx1 - 1, gy + 3.5, cz0 + 1], [cx0 + 1, gy + 3.5, cz1 - 1]], { kind: 'cable', lanterns: ['#ffd27a', '#ff9a6a'], posts: false, sag: 0.8, deco: true });
+  // a real cellar: a roof over the room (the ramp stays open to the sky), lights strung under it
+  const ry = gy + 0.25;
+  K.box(cx0 + 6.6, ry, cz0 - 0.2, cx1 + 0.2, ry + 0.5, cz1 + 0.2, '#b9a88e', 'paving', { outlineT: 0.06 });
+  K.box(cx0 + 6, fy + 3.1, cz0, cx0 + 6.6, ry + 0.5, cz1 - 8.5, '#8a5a42', 'brick', { outlineT: 0.05 });       // wall between ramp and room, a doorway at the bottom end
+  K.box(cx0 + 6, fy - 0.6, cz0, cx0 + 6.6, fy + 3.1, cz1 - 14, '#8a5a42', 'brick', { outlineT: 0.05 });
+  (W.camBoxes = W.camBoxes || []).push({ x0: cx0 + 6.6, y0: ry - 0.1, z0: cz0, x1: cx1, y1: ry + 0.6, z1: cz1 });
+  (W.indoor = W.indoor || []).push([cx0 + 6, cz0, cx1, cz1, ry]);
+  K.rail([[cx0 + 8, fy + 3.3, cz0 + 2], [cx1 - 1, fy + 3.3, cz1 - 2]], { kind: 'cable', lanterns: ['#ffd27a', '#ff9a6a'], posts: false, sag: 0.4, deco: true });
+  K.rail([[cx1 - 1, fy + 3.3, cz0 + 2], [cx0 + 8, fy + 3.3, cz1 - 2]], { kind: 'cable', lanterns: ['#ffd27a', '#ff9a6a'], posts: false, sag: 0.4, deco: true });
+  for (let i = 0; i < 4; i++) B.box(cx0 + 9 + i * 4, ry - 0.25, (cz0 + cz1) / 2 - 0.5, cx0 + 10 + i * 4, ry - 0.05, (cz0 + cz1) / 2 + 0.5, '#fff2c8', 'lamp', { outlineT: 0, edges: false });
+  // you can't miss it now: a giant record standing on the roof, a RECORDS board over the way down, a sign over the door
+  { const dx = cx0 + 12, dz = cz0 + 4, dy = ry + 0.5;
+    B.add(new THREE.CylinderGeometry(2.6, 2.6, 0.22, 24), new THREE.Matrix4().makeRotationX(Math.PI / 2).setPosition(dx, dy + 2.9, dz), '#14101f', 'plain', { outlineT: 0.07, edges: false });
+    for (const k of [-1, 1]) B.add(new THREE.CylinderGeometry(0.95, 0.95, 0.04, 20), new THREE.Matrix4().makeRotationX(Math.PI / 2).setPosition(dx, dy + 2.9, dz + k * 0.13), '#e4572e', 'plain', { outlineT: 0, edges: false });
+    K.box(dx - 1.2, dy, dz - 0.5, dx + 1.2, dy + 0.35, dz + 0.5, '#2a2838', 'plain', { outlineT: 0.04 });
+    W.boxes.push({ x0: dx - 2.6, y0: dy, z0: dz - 0.2, x1: dx + 2.6, y1: dy + 5.5, z1: dz + 0.2, tag: 'sign' });
+    H.sign('RECORDS', cx0 + 3, gy + 4.2, cz0 - 0.6, 0, 6, 1.5, '#e4572e', '#fff6e0');
+    for (const sx of [cx0 + 0.3, cx0 + 5.7]) K.cyl(sx, terrainAt(sx, cz0 - 0.6), cz0 - 0.6, 0.1, gy + 3.5 - terrainAt(sx, cz0 - 0.6), '#2a2838', { outline: 0.03, seg: 6 });
+    H.sign('RECORD SHOP  ♪', cx0 + 6.62 - 0.72, fy + 3.5, cz1 - 5, -Math.PI / 2, 5, 0.9, '#1b1a24', '#ffd27a', { oneSide: true, bare: true });
+  }
   H.reserve([cx0 - 4, cz0 - 4, cx1 + 4, cz1 + 4]);
   H.spot('cellar', (cx0 + cx1) / 2, (cz0 + cz1) / 2, 17); W.spots[W.spots.length - 1].y = fy;
   H.bench(cx0 + 12, cz1 - 3, true, { y: fy, view: false });
@@ -410,7 +428,7 @@ function buildLakeshore(H) {
     if (i % 3 === 0 && H.clearOf(x - 0.3, z - 6.3, x + 0.3, z - 5.7, 0)) H.lamp(x + 6, z - 6, { style: 'globe', h: 4, color: '#1f2a3a' });
   }
   H.walkers([prom], 50, 'lake');
-  H.busker('pan', prom[20][0], prom[20][1] - 7, 0);
+  H.busker('pan', prom[20][0] + 7, prom[20][1] - 5, 0);
   // the pier and the lighthouse
   const px = -480, pz0 = shoreZ(px) - 12, pz1 = 1585, py = 2.7;
   S.add(px, terrainAt(px, pz0) + 0.05, pz0, px, py, pz0 + 14, 2.6);
