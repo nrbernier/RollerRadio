@@ -41,6 +41,11 @@ function groundRibbon(B, pts, width, color, kind = 'road', lift = 0.09, step = 4
   // make sure faces point up
   const n = g.attributes.normal.array; if (n[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
   B.add(g, null, color, kind, { outlineT: 0, edges: false });
+  // a copy for the far view (just under the near one), so streets don't stop dead in the distance
+  if (groundRibbon.far && width >= 8 && (kind === 'road' || kind === 'walk')) {
+    const p2 = g.attributes.position.array, per = 36 * 16;
+    for (let o = 0; o < p2.length; o += per) { const a = Array.from(p2.subarray(o, Math.min(p2.length, o + per))); for (let i = 1; i < a.length; i += 3) a[i] -= 0.05; const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); groundRibbon.far.add(fg, null, color); }
+  }
   return P;
 }
 // dashed centre line
@@ -104,7 +109,7 @@ function buildCity() {
     }
   });
   const W = K.W;
-  W.far = F; W.slabs = S; W.mats = mats; W.sounds = []; W.spots = []; W.benches = []; W.lamps = []; W.npcs = []; W.vehicles = [];
+  groundRibbon.far = F; W.far = F; W.slabs = S; W.mats = mats; W.sounds = []; W.spots = []; W.benches = []; W.lamps = []; W.npcs = []; W.vehicles = [];
   W.spawn = V3(96, 0, -1168); W.spawnYaw = 0;
   W.spawn.y = terrainAt(W.spawn.x, W.spawn.z);
   // ground
