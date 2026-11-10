@@ -4889,8 +4889,11 @@ class CamRig {
     this.ty = instant ? pl.pos.y : U.damp(this.ty, pl.pos.y, pl.mode === 'air' ? 5 : 12, dt);
     const tgt = _c1.set(pl.pos.x, this.ty + 1.45, pl.pos.z);
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
-    const dist = this.dist + U.clamp(sp - 10, 0, 12) * 0.12;
-    const want = _c2.set(tgt.x - fx * dist * Math.cos(this.pitch), tgt.y + dist * Math.sin(this.pitch), tgt.z - fz * dist * Math.cos(this.pitch));
+    // indoors (tunnels, the underground station) the camera keeps close and low, to stay inside the room
+    this.inK = U.damp(this.inK || 0, this.indoor ? 1 : 0, 4, dt);
+    const dist = (this.dist + U.clamp(sp - 10, 0, 12) * 0.12) * (1 - 0.42 * this.inK);
+    const pit = this.pitch * (1 - 0.45 * this.inK);
+    const want = _c2.set(tgt.x - fx * dist * Math.cos(pit), tgt.y + dist * Math.sin(pit), tgt.z - fz * dist * Math.cos(pit));
     // occlusion: pull the camera in front of walls
     const dir = _c3.subVectors(want, tgt); const len = dir.length(); dir.divideScalar(len);
     let tmin = len;

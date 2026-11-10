@@ -280,9 +280,6 @@ function fillBusiness(H) {
   let ng = 0; for (let i = 0; i < 60 && ng < 14; i++) { const gx = px - 66 + r() * 132, gz = pz - 56 + r() * 112; if (free(gx - 1.5, gz - 1.5, gx + 1.5, gz + 1.5)) { H.group(gx, gz, 2 + Math.floor(r() * 3), 'business'); take(gx - 1.5, gz - 1.5, gx + 1.5, gz + 1.5); ng++; } }
   for (let i = 0; i < 40; i++) { const bx = px - 66 + r() * 132, bz = pz - 56 + r() * 112; if (free(bx - 2.2, bz - 0.6, bx + 2.2, bz + 0.6)) { H.bench(bx, bz, true, { color: '#5a4a3a' }); take(bx - 2.2, bz - 0.6, bx + 2.2, bz + 0.6); } }
   if (free(px - 20, pz - 24, px - 14, pz - 18)) H.statue(px - 17, pz - 21, '#7a9a8a');
-  // a wave rail across the plaza's west side: low, then a hump, then low
-  const wy = (x, z, h) => [x, terrainAt(x, z) + h, z];
-  H.wave([wy(px - 64, pz - 40, 0.7), wy(px - 56, pz - 20, 1.5), wy(px - 60, pz, 2.4), wy(px - 54, pz + 18, 1.3), wy(px - 62, pz + 34, 0.7)], '#ff7a5a');
   for (let i = 0; i < 5; i++) if (free(px + 50, pz - 47 + i * 9, px + 54, pz - 41 + i * 9)) H.planter(px + 52, pz - 44 + i * 9, 1.4, 5, { flowers: i % 2 === 0, h: 0.5 + i * 0.12 });
   (W.pigeonSpots = W.pigeonSpots || []).push([px + 10, pz - 30, 14], [px + 40, pz + 50, 10]);
   // the sky rail: from the garage roof's edge, a long steel line down over the street to the plaza

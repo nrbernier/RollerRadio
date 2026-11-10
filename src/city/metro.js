@@ -95,10 +95,12 @@ function planMetro() {
       // two off each platform, each in an open well (a terrain hole on the grid's lines)
       const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c - 1e-6) : Math.floor((v - o) / c + 1e-6)) * c;
       st.exits = [];
-      for (const k of [-9, 9]) for (const sd of [-1, 1]) {
+      for (const k of [-9, 13]) for (const sd of [-1, 1]) {      // (the north pair sits clear of the cross street)
         const e = pts[(st.i + k + N) % N], nx = -e.dz * sd, nz = e.dx * sd;          // straight out sideways
         const ax = Math.abs(nx) > Math.abs(nz) ? 'x' : 'z';
-        const x0 = e.x + nx * STN.hw, z0 = e.z + nz * STN.hw, y0 = st.y + 1.2;
+        // (west of the line a street runs close by: those exits pass under it in a corridor first)
+        const pre = nx < -0.5 ? 15 : 0;
+        const x0 = e.x + nx * (STN.hw + pre), z0 = e.z + nz * (STN.hw + pre), y0 = st.y + 1.2;
         let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 30); }
         const L = 3 + run + 3, x1 = x0 + nx * L, z1 = z0 + nz * L, w = 2.4, gTop = terrainAt(x1, z1);
         // the well opens a few metres out from the hall (the first steps run under a slab)
@@ -110,7 +112,7 @@ function planMetro() {
         else { if (nz > 0) hole[1] = Math.max(hole[1], sn(z0 + 1, TER.z0, TER.cell, 1)); else hole[3] = Math.min(hole[3], sn(z0 - 1, TER.z0, TER.cell, 0)); }
         let top = -1e9; for (let x = hole[0]; x <= hole[2]; x += TER.cell) for (let z = hole[1]; z <= hole[3]; z += TER.cell) top = Math.max(top, terrainAt(x, z));
         TER.holes.push(hole);
-        st.exits.push({ k, sd, nx, nz, ax, x0, z0, y0, run, L, w, x1, z1, gTop, hole, top });
+        st.exits.push({ k, sd, nx, nz, ax, x0, z0, y0, run, L, w, x1, z1, gTop, hole, top, pre });
       }
     }
   }
@@ -233,6 +235,9 @@ function buildMetro(K, M, S, F) {
   // far deck (a simple band)
   const fp = []; for (let i = 0; i < N; i += 4) { const a = M.pts[i], b = M.pts[(i + 4) % N]; const fq = (A, Bb, C, D) => fp.push(...A, ...Bb, ...C, ...A, ...C, ...D); fq(L(a, -hw + 0.4, -0.2), L(b, -hw + 0.4, -0.2), L(b, hw - 0.4, -0.2), L(a, hw - 0.4, -0.2)); fq(L(a, hw - 0.4, -0.2), L(b, hw - 0.4, -0.2), L(b, hw - 0.4, -1.3), L(a, hw - 0.4, -1.3)); fq(L(a, -hw + 0.4, -1.3), L(b, -hw + 0.4, -1.3), L(b, -hw + 0.4, -0.2), L(a, -hw + 0.4, -0.2)); }
   const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); F.add(fg, null, sideCol);
+  // solid (and camera-proof) walls for everything underground: little boxes strung along the wall line
+  W.camBoxes = W.camBoxes || [];
+  W.tunnelWall = (a, b, o, y0, y1) => { const s = Math.sign(o), oo = o + s * 1.0; for (const t of [0, 0.5]) { const x = a.x + (b.x - a.x) * t - (a.dz + (b.dz - a.dz) * t) * oo, z = a.z + (b.z - a.z) * t + (a.dx + (b.dx - a.dx) * t) * oo; const bx = { x0: x - 1, y0: a.y + y0, z0: z - 1, x1: x + 1, y1: a.y + y1, z1: z + 1, tag: 'wall' }; W.boxes.push(bx); W.camBoxes.push(bx); } };
   // the gallery: walls + roof where the line runs under the hill (and a bit either side)
   // (only where the line is properly bored: the hill stays whole above it; elsewhere it runs in an open cutting)
   const inPortal = (p) => (M.portals || []).some(q => p.x > q.hole[0] - 2 && p.x < q.hole[2] + 2 && p.z > q.hole[1] - 2 && p.z < q.hole[3] + 2);
@@ -241,6 +246,7 @@ function buildMetro(K, M, S, F) {
   for (let i = 0; i < N; i++) {
     if (!cov[i] || inHall(i)) continue;
     const a = M.pts[i], b = M.pts[(i + 1) % N];
+    for (const side of [-1, 1]) W.tunnelWall(a, b, side * (hw + 0.4), -1.5, 7.5);
     const wp = [];
     for (const side of [-1, 1]) { const o = side * (hw + 0.4); wp.push(...L(a, o, -1.5), ...L(b, o, -1.5), ...L(b, o, 7.5), ...L(a, o, -1.5), ...L(b, o, 7.5), ...L(a, o, 7.5)); }
     wp.push(...L(a, -hw - 0.6, 7.5), ...L(b, -hw - 0.6, 7.5), ...L(b, hw + 0.6, 7.5), ...L(a, -hw - 0.6, 7.5), ...L(b, hw + 0.6, 7.5), ...L(a, hw + 0.6, 7.5));
@@ -361,14 +367,15 @@ function undergroundHall(K, S, M, st, p, ramps, hn, PH) {
     for (const sd of [-1, 1]) {
       const o = sd * HW;
       if (doorAt(k, sd)) q4(wall, L(a, o, PH + 3.6), L(b, o, PH + 3.6), L(b, o, CY), L(a, o, CY));   // over a doorway
-      else q4(wall, L(a, o, -2), L(b, o, -2), L(b, o, CY), L(a, o, CY));
+      else { q4(wall, L(a, o, -2), L(b, o, -2), L(b, o, CY), L(a, o, CY)); W.tunnelWall(a, b, o, -2, CY); }
     }
     q4(ceil, L(a, -HW - 0.2, CY), L(b, -HW - 0.2, CY), L(b, HW + 0.2, CY), L(a, HW + 0.2, CY));
     W.camBoxes.push({ x0: Math.min(a.x, b.x) - HW - 1, y0: a.y + CY - 0.2, z0: Math.min(a.z, b.z) - HW - 1, x1: Math.max(a.x, b.x) + HW + 1, y1: a.y + CY + 3, z1: Math.max(a.z, b.z) + HW + 1 });
     if ((k + hn) % 3 === 1) for (const sd of [-1, 1]) { const [lx, ly, lz] = L(a, sd * 6.3, CY - 0.25); B.box(lx - 0.5, ly, lz - 0.5, lx + 0.5, ly + 0.2, lz + 0.5, '#fff2c8', 'lamp', { outlineT: 0, edges: false }); }
   }
   // end walls between the tunnel mouth and the hall's sides
-  for (const k of [-hn - 1, hn + 1]) { const a = M.pts[idx(k)]; for (const sd of [-1, 1]) q4(wall, L(a, sd * 5.9, -2), L(a, sd * HW, -2), L(a, sd * HW, CY), L(a, sd * 5.9, CY)); }
+  for (const k of [-hn - 1, hn + 1]) { const a = M.pts[idx(k)]; for (const sd of [-1, 1]) for (const oo of [6.9, 8.3]) { const bx = { x0: a.x - a.dz * sd * oo - 0.75 + a.dx * Math.sign(k) * 0.8, y0: a.y - 2, z0: a.z + a.dx * sd * oo - 0.75 + a.dz * Math.sign(k) * 0.8, tag: 'wall' }; bx.x1 = bx.x0 + 1.5; bx.y1 = a.y + CY; bx.z1 = bx.z0 + 1.5; W.boxes.push(bx); W.camBoxes.push(bx); }
+    for (const sd of [-1, 1]) q4(wall, L(a, sd * 5.9, -2), L(a, sd * HW, -2), L(a, sd * HW, CY), L(a, sd * 5.9, CY)); }
   const mk = (arr, col, kind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); B.add(g, null, col, kind, { outlineT: 0, edges: false }); };
   mk(wall, '#e6dcc4', 'plain'); mk(ceil, '#5d5a54', 'plain');
   // the stairways
@@ -378,7 +385,7 @@ function undergroundHall(K, S, M, st, p, ramps, hn, PH) {
     const yTop = gTop + 0.05;
     // doorway landing (level), the flight, the top landing — physics: two boxes and a ramp
     const box = (d0, d1, y) => { const [ax, az] = at(d0), [bx, bz] = at(d1); K.box(Math.min(ax, bx) - Math.abs(sx) * w, p.y - 2, Math.min(az, bz) - Math.abs(sz) * w, Math.max(ax, bx) + Math.abs(sx) * w, y, Math.max(az, bz) + Math.abs(sz) * w, '#d8d0c0', 'paving', { outlineT: 0.04 }); };
-    box(-0.4, 3, y0);
+    box(-e.pre - 0.4, 3, y0);
     { const [ax, az] = at(3), [bx, bz] = at(3 + run), axis = e.ax;
       const xa = Math.min(ax, bx) - Math.abs(sx) * w, xb = Math.max(ax, bx) + Math.abs(sx) * w, za = Math.min(az, bz) - Math.abs(sz) * w, zb = Math.max(az, bz) + Math.abs(sz) * w;
       const up = (axis === 'x' ? nx : nz) > 0;
@@ -400,18 +407,26 @@ function undergroundHall(K, S, M, st, p, ramps, hn, PH) {
       K.box(x, p.y - 2, z, x + 2, top + 0.15, z + 2, '#cbbfa6', 'paving', { outlineT: 0.04 });
     }
     // side walls of the stairway (inside the well and in the covered stretch), a slab over the covered part
-    for (const sd2 of [-1, 1]) { const [ax, az] = at(0), [bx, bz] = at(e.L + 0.5), ox = sx * sd2 * (w + 0.3), oz = sz * sd2 * (w + 0.3);
-      K.box(Math.min(ax, bx) + ox - 0.3, p.y - 2, Math.min(az, bz) + oz - 0.3, Math.max(ax, bx) + ox + 0.3, yTop + 1.0, Math.max(az, bz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
+    for (const sd2 of [-1, 1]) { const [ax, az] = at(-e.pre), [bx, bz] = at(e.L + 0.5), ox = sx * sd2 * (w + 0.3), oz = sz * sd2 * (w + 0.3);
+      // (under the street the walls stop at the ceiling; in the open well they rise to a parapet)
+      const dO = Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0))), [mx, mz] = at(dO);
+      K.box(Math.min(ax, mx) + ox - 0.3, p.y - 2, Math.min(az, mz) + oz - 0.3, Math.max(ax, mx) + ox + 0.3, p.y + CY + 0.2, Math.max(az, mz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
+      K.box(Math.min(mx, bx) + ox - 0.3, p.y - 2, Math.min(mz, bz) + oz - 0.3, Math.max(mx, bx) + ox + 0.3, yTop + 1.0, Math.max(mz, bz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
       const rp = [[bx + ox * 0.95 - nx * (e.L - 6), yTop + 1.1, bz + oz * 0.95 - nz * (e.L - 6)], [bx + ox * 0.95, yTop + 1.1, bz + oz * 0.95]]; K.rail(rp, { color: '#e9e4f5', postColor: '#3a3550', round: 0 }); }
-    { const [ax, az] = at(-0.4), [bx, bz] = at(Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0)))); const gy = terrainAt((ax + bx) / 2, (az + bz) / 2);
+    { const [ax, az] = at(-e.pre - 0.4), [bx, bz] = at(Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0)))); const gy = terrainAt((ax + bx) / 2, (az + bz) / 2);
       B.box(Math.min(ax, bx) - Math.abs(sx) * (w + 0.6), p.y + CY, Math.min(az, bz) - Math.abs(sz) * (w + 0.6), Math.max(ax, bx) + Math.abs(sx) * (w + 0.6), Math.max(p.y + CY + 0.4, gy - 0.05), Math.max(az, bz) + Math.abs(sz) * (w + 0.6), '#d8d0c0', 'paving', { outlineT: 0, edges: false }); }
-    // street entrance: a little glass canopy on two posts and an M sign
-    { const [tx, tz] = at(e.L - 2), ty = yTop;
-      for (const sd2 of [-1, 1]) K.cyl(tx + sx * sd2 * (w + 0.3), ty, tz + sz * sd2 * (w + 0.3), 0.1, 3.1, '#3a3550', { outline: 0.03, seg: 6 });
-      B.box(tx - Math.abs(sx) * (w + 0.8) - Math.abs(nx) * 2, ty + 3.1, tz - Math.abs(sz) * (w + 0.8) - Math.abs(nz) * 2, tx + Math.abs(sx) * (w + 0.8) + Math.abs(nx) * 2, ty + 3.3, tz + Math.abs(sz) * (w + 0.8) + Math.abs(nz) * 2, '#7aa6b8', 'plain', { outlineT: 0.04 });
-      const [mx, mz] = at(e.L + 0.8), px = mx + sx * (w + 1.2), pz = mz + sz * (w + 1.2);
-      K.cyl(px, ty, pz, 0.08, 3.6, '#3a3550', { outline: 0.03, seg: 6 });
-      K.sphere(px, ty + 3.9, pz, 0.45, '#e4572e', { outline: 0.05 });
+    // street entrance, made to be seen from across the square: a red roof on four posts over the top of the
+    // stairs, a tall totem with a lit red disc, and a pale apron of paving round the well
+    { const ty = yTop, c0 = e.L - 9, c1 = e.L + 1.5, wr = w + 1.1;
+      for (const d of [c0, c1]) for (const sd2 of [-1, 1]) { const [qx, qz] = at(d); K.cyl(qx + sx * sd2 * wr, ty, qz + sz * sd2 * wr, 0.13, 3.5, '#2a2838', { outline: 0.03, seg: 6 }); }
+      const [ax, az] = at(c0 - 0.6), [bx, bz] = at(c1 + 0.6);
+      B.box(Math.min(ax, bx) - Math.abs(sx) * (wr + 0.5), ty + 3.5, Math.min(az, bz) - Math.abs(sz) * (wr + 0.5), Math.max(ax, bx) + Math.abs(sx) * (wr + 0.5), ty + 3.85, Math.max(az, bz) + Math.abs(sz) * (wr + 0.5), '#e4572e', 'plain', { outlineT: 0.07 });
+      B.box(Math.min(ax, bx) - Math.abs(sx) * (wr + 0.2), ty + 3.3, Math.min(az, bz) - Math.abs(sz) * (wr + 0.2), Math.max(ax, bx) + Math.abs(sx) * (wr + 0.2), ty + 3.5, Math.max(az, bz) + Math.abs(sz) * (wr + 0.2), '#fff2c8', 'lamp', { outlineT: 0, edges: false });
+      const [mx, mz] = at(e.L + 3.2), px = mx + sx * (w + 1.6), pz = mz + sz * (w + 1.6);
+      K.cyl(px, ty, pz, 0.16, 6.2, '#2a2838', { outline: 0.04, seg: 6 });
+      K.sphere(px, ty + 6.9, pz, 0.95, '#e4572e', { outline: 0.07 });
+      B.box(px - 0.5, ty + 6.75, pz - 0.5, px + 0.5, ty + 7.05, pz + 0.5, '#fff2c8', 'lamp', { outlineT: 0, edges: false });
+      W.boxes.push({ x0: px - 0.25, y0: ty, z0: pz - 0.25, x1: px + 0.25, y1: ty + 6, z1: pz + 0.25, tag: 'lamp' });
     }
   }
 }

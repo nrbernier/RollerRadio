@@ -356,6 +356,9 @@ function loop(now) {
     Game.hazardCD = Math.max(0, Game.hazardCD - dt);
     Input.poll();
     const moving = Math.hypot(Input.move.x, Input.move.y) > 0.15 || Input.kbActive || Input.jumpQ.length > 0;
+    // safety net: nobody falls out of the world
+    Game.cam.indoor = p.pos.y < terrainAt(p.pos.x, p.pos.z) - 3.5 && !!(W.metro && W.metro.pts.some((q, i) => i % 4 === 0 && Math.abs(q.x - p.pos.x) < 60 && Math.abs(q.z - p.pos.z) < 60 && q.y < p.pos.y + 3 && (q.bored)));
+    if (p.pos.y < -40 || p.pos.y < terrainAt(p.pos.x, p.pos.z) - 70 || !isFinite(p.pos.y)) { getUp(); Game.cam.snap(p); }
     if (Game.swim > 0) {
       Game.swim -= dt; Input.flush(); p.vel.multiplyScalar(0.9);
       if (Game.swim <= 0.6 && !Game.swimDone) { Game.swimDone = true; p.respawn(false); Game.cam.snap(p); }
