@@ -3300,6 +3300,20 @@ const Sound = (() => {
     clack(t, v = 1, d = musicOut) { if (!voice(0.1)) return; const g = gain(d, 0); env(g, t, 0.001, 0.4 * v, 0.06); noise(t, 0.08, filt('bandpass', 1200, 1.4, g)); const o = gain(d, 0); env(o, t, 0.001, 0.25 * v, 0.05); osc('triangle', 180, t, 0.07, o); },
   };
 
+  // more instruments (bass with harmonics so it carries on small speakers, guitar, clarinet, horns…)
+  Object.assign(I, {
+    // electric bass: a filtered saw with an octave on top, over a sine
+    ebass(t, m, dur, v = 1, d = musicOut, slap = false) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.004, 0.42 * v, Math.max(0.06, dur * 0.5), 0.0001, dur * 0.5); const f = filt('lowpass', 500, 2.5, g); f.frequency.setValueAtTime(slap ? 2400 : 1300, t); f.frequency.exponentialRampToValueAtTime(380, t + 0.14); osc('sawtooth', midiF(m), t, dur + 0.1, f); osc('square', midiF(m + 12), t, dur + 0.1, gain(f, 0.18)); osc('sine', midiF(m), t, dur + 0.1, gain(g, 0.8)); },
+    organ(t, notes, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.006, 0.045 * v, Math.max(0.04, dur * 0.4), 0.0001, dur * 0.6); for (const m of notes) { const f = midiF(m); osc('sine', f, t, dur + 0.05, g); osc('sine', f * 2, t, dur + 0.05, gain(g, 0.5)); osc('sine', f * 3, t, dur + 0.05, gain(g, 0.25)); } sends(g, 0.2, 0.1); },
+    // guitar: one note or a strummed chord; short and bright for a chop, longer and dull for nylon
+    chop(t, notes, v = 1, dec = 0.14, bright = 1, d = musicOut, dl = 0.1) { if (!voice(dec)) return; const g = gain(d, 0); env(g, t, 0.002, 0.1 * v, dec); const f = filt('lowpass', 3200 * bright, 2, g); f.frequency.setValueAtTime(3200 * bright, t); f.frequency.exponentialRampToValueAtTime(700, t + dec); notes.forEach((m, i) => { osc('sawtooth', midiF(m), t + i * 0.006, dec + 0.05, f); osc('triangle', midiF(m + 12), t + i * 0.006, dec + 0.05, gain(f, 0.4)); }); sends(g, 0.15, dl); },
+    clar(t, m, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.035, 0.085 * v, Math.max(0.05, dur * 0.5), 0.0001, dur * 0.5); const f = filt('lowpass', 1500, 1.2, g); const o = osc('square', midiF(m), t, dur + 0.1, f); osc('sine', midiF(m), t, dur + 0.1, gain(g, 0.5)); const lfo = ctx.createOscillator(); lfo.frequency.value = 5.4; const lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(9, t + dur); lfo.connect(lg); lg.connect(o.detune); lfo.start(t); lfo.stop(t + dur + 0.1); sends(g, 0.3, 0.12); },
+    // a horn section: one envelope, several saws opening up
+    brass(t, notes, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.02, 0.075 * v, Math.max(0.05, dur * 0.5), 0.0001, dur * 0.5); const f = filt('lowpass', 900, 1.5, g); f.frequency.setValueAtTime(600, t); f.frequency.linearRampToValueAtTime(2600, t + 0.05); f.frequency.exponentialRampToValueAtTime(1200, t + dur + 0.06); for (const m of notes) { const o = osc('sawtooth', midiF(m), t, dur + 0.1, f); o.detune.value = (Math.random() - 0.5) * 14; } sends(g, 0.25, 0.1); },
+    // sequencer note
+    seq(t, m, dur, v = 1, d = musicOut, cut = 1400) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.004, 0.07 * v, dur); const f = filt('lowpass', cut, 4, g); osc('sawtooth', midiF(m), t, dur + 0.05, f); osc('square', midiF(m), t, dur + 0.05, gain(f, 0.4)); sends(g, 0.3, 0.35); },
+  });
+
   // ---------- scales and harmony ----------
   const MODES = { major: [0, 2, 4, 5, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10], aeolian: [0, 2, 3, 5, 7, 8, 10], mixolydian: [0, 2, 4, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10], lydian: [0, 2, 4, 6, 7, 9, 11], hijaz: [0, 1, 4, 5, 7, 8, 10], harmonic: [0, 2, 3, 5, 7, 8, 11], penta: [0, 2, 4, 7, 9] };
   // brightest to darkest: at night a district's mood slides one step down this ladder
@@ -3328,157 +3342,241 @@ const Sound = (() => {
     return out;
   }
   const shift = (m, by) => m.map(([s, d, l]) => [s, d + by, l]);
+  const at = (pat, s, fn) => { for (const p of pat) if (p[0] === s) fn(p[1], p[2]); };
+  const low = m => m < 36 ? m + 12 : m;      // keep bass notes where a small speaker still says something
 
   // ---------- the recipes ----------
   // play(c): c.s = step in bar, c.bar, c.phrase, c.t = time, c.sd = step seconds, c.v = weight·volume,
   // c.r = this recipe's random, c.st = this recipe's state, c.e = energy 0..1 (slowly wandering)
   const REC = {
-    business: {   // fast, jazzy, syncopated
-      bpm: 124, beats: 4, sub: 4, swing: 0.16, root: 62, mode: 'dorian', rev: 0.25, dly: 0.18,
-      moods: ['dorian', 'mixolydian', 'aeolian'], nightTempo: 0.1, nightGain: 0.9,
-      prog: [[0, 7], [3, 7], [1, 7], [4, 7]],      // i9 – IV13 – ii – v (D dorian vamp)
+    // ---- DOWNTOWN: jazz-funk break. A broken beat, a slap bass riff, Rhodes stabs, scratch guitar,
+    //      a horn hook that comes back, a vibes solo, a stop-time fill every 8 bars.
+    business: {
+      bpm: 104, beats: 4, sub: 4, swing: 0.14, root: 62, mode: 'dorian', rev: 0.22, dly: 0.2,
+      moods: ['dorian', 'dorian', 'mixolydian'], nightTempo: 0.08, nightGain: 0.9,
+      prog: [[0], [0], [3], [3], [0], [0], [6], [4]],            // Dm9 – G13 – Dm9 – Cmaj7 Am7
+      BA: [[0, 0, 3], [3, 7, 1], [6, 4, 2], [8, 6, 1], [10, 7, 2], [14, 4, 1], [15, 6, 1]],
+      BB: [[0, 0, 2], [3, 0, 1], [4, 7, 1], [7, 6, 1], [8, 4, 2], [10, 2, 1], [12, 0, 2], [14, -1, 2]],
+      HK: [[[2, 4, 1], [3, 6, 1], [4, 7, 2], [7, 6, 1], [10, 4, 3]], [[2, 4, 1], [3, 6, 1], [4, 7, 2], [7, 8, 1], [8, 9, 1], [10, 7, 4]]],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c, n = 16;
-        if (!st.kick || c.newPhrase) { st.kick = euclid(r() < 0.5 ? 5 : 3, 16, Math.floor(r() * 3)); st.kick[0] = true; st.comp = [3, 6, 10, 14].map(x => (x + Math.floor(r() * 2)) % 16); st.horn = motif(r, 16, 5, 3); st.walk = 0; }
-        // ride cymbal: ding, ding-a-ding (swung)
-        if (s % 4 === 0 || s % 8 === 6) I.ride(t, v * (s % 8 === 0 ? 0.9 : 0.6));
-        if (s % 8 === 4) I.hat(t, v * 0.35, false);
-        if (st.kick[s] && c.night < 0.5) I.kick(t, v * 0.75, musicOut, 120, 48, 0.24);          // at night: a trio, no kick
-        if ((s === 4 || s === 12)) I.rim(t, v * 0.7);
-        if (e > 0.4 && (s % 2 === 1) && r() < 0.18 + c.crowd * 0.5) I.brush(t, v * (0.25 + r() * 0.3));
-        if (bar % 8 === 7 && s >= 12) I.snare(t, v * (0.25 + (s - 12) * 0.12));
-        // walking bass: chord tones on the beat, chromatic approach on the last beat
-        if (s % 4 === 0) {
-          const ct = chord(4, -2);
-          let m = s === 0 ? ct[0] : s === 12 ? (deg(c.nextDeg, -2) + (r() < 0.5 ? -1 : 1)) : ct[Math.floor(r() * 4)];
-          I.upright(t, m, sd * 3.6, v * 0.9);
-          if (r() < 0.2 && s !== 12) I.upright(t + sd * 2.6, m + (r() < 0.5 ? 2 : -1), sd * 1, v * 0.5);
+        const { s, t, sd, v, r, st, e, bar } = c, b16 = bar % 16, fill = bar % 8 === 7 && s >= 8, brk = b16 === 15;
+        if (!st.solo || c.newPhrase) st.solo = motif(r, 16, 6, 3, 0.2);
+        st.sec = brk ? 'stop-time' : b16 < 4 ? 'groove' : b16 < 8 ? 'horn hook' : b16 < 12 ? 'vibes solo' : 'horns again';
+        if (!fill) {
+          if ((bar % 2 ? [0, 6, 10, 11] : [0, 3, 10]).includes(s)) I.kick(t, v * 0.8, musicOut, 125, 50, 0.22);
+          if (s === 4 || s === 12) I.snare(t, v * (0.6 - c.night * 0.2));
+          if ((s === 7 || s === 9 || s === 15) && e > 0.3) I.brush(t, v * 0.45);
+          if (s % 2 === 0) I.hat(t, v * (s % 4 === 2 ? 0.5 : 0.3), s === 14 && bar % 2 === 1); else if (e > 0.6) I.shaker(t, v * 0.5);
+        } else {
+          if (s === 8) I.kick(t, v * 0.8, musicOut, 125, 50, 0.22);
+          if (s >= 9 && s < 12) I.conga(t, [300, 300, 230][s - 9], v * 0.6);
+          if (s >= 12) I.snare(t, v * (0.25 + (s - 12) * 0.1));
         }
-        // rhodes comping, charleston-ish
-        if (st.comp.includes(s)) I.ep(t, chord(4, 0).map((m, i) => i === 3 ? m - 12 + 12 : m), sd * 1.2, v * 0.8);
-        // muted trumpet answers on bars 2 and 4 of every 4 (call & response with the keys)
-        if ((e > 0.55 - c.night * 0.3 || c.listen > 0.5) && bar % 2 === 1) for (const [ss, d, l] of st.horn) if (ss === s) I.trumpet(t, nearest(deg(d, 1), chord(4, 1)), l * sd * 0.9, v * 0.8);
-        // vibes sparkle when the energy is up
-        if (e > 0.7 && s % 3 === 0 && r() < 0.3) I.vibes(t, deg(Math.floor(r() * 7), 1), v * 0.5);
+        if (!(brk && s >= 4)) at(bar % 2 ? this.BB : this.BA, s, (d, l) => I.ebass(t, low(deg(H.deg + d, -2)), l * sd * 0.9, v * 0.9, musicOut, d === 7));
+        if ((bar % 2 ? [3, 10] : [0, 7]).includes(s) && !(brk && s > 0)) I.ep(t, chord(4, 0), sd * (s === 0 ? 3 : 1.4), v * 0.85);
+        if (e > 0.35 && !brk && c.night < 0.6 && [2, 5, 6, 9, 13, 14].includes(s)) { const ct = chord(4, 0); I.chop(t, [ct[2], ct[3]], v * 0.5, 0.06, 1.2); }
+        if ((b16 >= 4 && b16 < 8) || (b16 >= 12 && b16 < 15) || c.listen > 0.5) at(this.HK[bar % 2], s, (d, l) => I.brass(t, [deg(d, 0), deg(d - 2, 0), deg(d, -1)], l * sd * 0.85, v));
+        if (b16 >= 8 && b16 < 12) at(st.solo, s, (d) => I.vibes(t, nearest(deg(d, 1), chord(4, 1)), v * 0.7));
       }
     },
-    park: {       // slow, wooden, dark: 12/8 under big trees
-      bpm: 66, beats: 4, sub: 3, swing: 0, root: 64, mode: 'aeolian', rev: 0.5, dly: 0.25,
-      moods: ['aeolian', 'dorian', 'aeolian', 'mixolydian'], nightTempo: 0.08, nightGain: 0.9,
-      prog: [[0, 7], [5, 7], [2, 7], [6, 7], [0, 7], [3, 7], [4, 7], [0, 7]],
+    // ---- FOREST PARK: five under the trees. 5/4 counted 3+2, a fingerpicked guitar, a clarinet tune
+    //      that a flute answers, a kalimba wandering in between.
+    park: {
+      bpm: 108, beats: 5, sub: 2, swing: 0, root: 64, mode: 'dorian', rev: 0.45, dly: 0.2,
+      moods: ['dorian', 'aeolian', 'dorian', 'mixolydian'], nightTempo: 0.08, nightGain: 0.9,
+      prog: [[0], [3], [0], [3], [6], [3], [4], [0]],
+      MEL: [
+        [[0, 4, 3], [3, 7, 2], [5, 6, 1], [6, 4, 4]], [[0, 5, 3], [3, 4, 1], [4, 3, 2], [6, 2, 2], [8, 3, 2]],
+        [[0, 4, 3], [3, 7, 2], [5, 8, 1], [6, 9, 4]], [[0, 8, 2], [2, 7, 1], [3, 5, 3], [6, 4, 4]],
+        [[0, 8, 3], [3, 10, 2], [5, 8, 1], [6, 6, 4]], [[0, 7, 3], [3, 5, 1], [4, 3, 2], [6, 5, 4]],
+        [[0, 6, 3], [3, 4, 2], [5, 6, 1], [6, 8, 4]], [[0, 9, 2], [2, 8, 1], [3, 7, 7]]],
+      PK: [-1, 2, 1, 2, 3, 2, -2, 2, 3, 1],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c;
-        if (!st.arp || c.newPhrase) { st.arp = [0, 2, 4, 6, 4, 2].map(x => x + (r() < 0.3 ? 1 : 0)); st.fl = motif(r, 12, 4, 3, 0.4); st.flBar = Math.floor(r() * 4); }
-        // heartbeat: soft frame drum, woodblock on the triplet
-        if (s === 0) I.frame(t, v * 0.6);
-        if (s === 7 && e > 0.3) I.frame(t, v * 0.3);
-        if (s % 3 === 2 && e > 0.5 && r() < 0.5) I.woodblock(t, deg(s % 6 === 2 ? 4 : 2, 1), v * 0.35);
-        // marimba / kalimba rolling arpeggio of the chord
-        if (e > 0.2) { const ct = chord(4, 0); const m = ct[st.arp[s % st.arp.length] % 4] + (s >= 6 ? 12 : 0); (s % 2 ? I.kalimba : I.marimba)(t, m, v * (s % 3 === 0 ? 0.7 : 0.45)); }
-        // low drone on the root
-        if (s === 0 && bar % 2 === 0) I.drone(t, deg(0, -2), sd * 24, v * 0.8);
-        // wooden flute: long, sparse
-        if ((bar % 4 === st.flBar || c.listen > 0.5) && e > 0.35) for (const [ss, d, l] of st.fl) if (ss === s) I.flute(t, deg(d, 1), Math.max(sd * 2, l * sd), v * 0.9);
-        // birds (a quick flute trill) now and then
+        const { s, t, sd, v, r, st, e, bar } = c, b8 = bar % 8, b16 = bar % 16;
+        if (!st.im || c.newPhrase) st.im = motif(r, 10, 4, 3, 0.3);
+        st.sec = b16 < 4 ? 'clarinet tune' : b8 >= 4 ? 'flute answer' : 'kalimba wanders';
+        if (s === 0) I.frame(t, v * 0.55); if (s === 6) I.rim(t, v * 0.5);
+        I.shaker(t, v * ([0, 3, 6, 8].includes(s) ? 0.7 : 0.35));
+        if (e > 0.4 && (s === 3 || s === 8 || s === 9)) I.conga(t, s === 9 ? 300 : 230, v * 0.4);
+        const ct = chord(4, 0), k = this.PK[s];
+        I.pluck(t, k === -1 ? deg(H.deg, -1) : k === -2 ? deg(H.deg + 4, -1) : ct[k], v * (s === 0 || s === 6 ? 0.8 : 0.5), musicOut, 0.7);
+        if (s === 0) I.upright(t, low(deg(H.deg, -2)), sd * 5, v * 0.9);
+        if (s === 6) I.upright(t, low(deg(H.deg + 4, -2)), sd * 3, v * 0.7);
+        if (s === 9 && bar % 2 === 1) I.upright(t, low(deg(c.nextDeg - 1, -2)), sd, v * 0.55);
+        if (e > 0.25 || c.listen > 0.5) {
+          if (b16 < 4) at(this.MEL[b8], s, (d, l) => I.clar(t, deg(d, 0), l * sd * 0.95, v));
+          else if (b8 >= 4) at(this.MEL[b8], s, (d, l) => I.flute(t, deg(d, 0), l * sd * 0.95, v * 0.9));
+          else at(st.im, s, (d) => I.kalimba(t, nearest(deg(d, 1), chord(3, 1)), v * 0.7));
+        }
+        if (s === 0 && bar % 4 === 0) I.drone(t, deg(0, -2), sd * 36, v * 0.4);
         if (r() < 0.012) { const m = deg(7 + Math.floor(r() * 5), 1); I.flute(t, m, 0.08, v * 0.5); I.flute(t + 0.09, m + 2, 0.08, v * 0.4); }
       }
     },
-    market: {     // bright, busy, 3 against 2
-      bpm: 100, beats: 4, sub: 3, swing: 0, root: 57, mode: 'hijaz', rev: 0.2, dly: 0.2,
-      moods: ['hijaz', 'harmonic', 'hijaz', 'phrygian'], nightTempo: 0.12, nightGain: 0.5,
-      prog: [[0, 3], [0, 3], [6, 3], [0, 3]],
+    // ---- MARKET: highlife. Two guitars that lock together, a clave bell, congas, organ on the offbeat,
+    //      horns in thirds, voices calling; every 16 bars the band drops out and the percussion carries it.
+    market: {
+      bpm: 112, beats: 4, sub: 4, swing: 0.06, root: 57, mode: 'major', rev: 0.18, dly: 0.15,
+      moods: ['major', 'mixolydian'], nightTempo: 0.1, nightGain: 0.55,
+      prog: [[0], [3], [0], [4]],
+      G1: { 0: 2, 2: 4, 3: 7, 5: 4, 6: 2, 8: 4, 10: 7, 11: 9, 13: 7, 14: 4 }, G2: { 1: 0, 4: 4, 7: 0, 9: 2, 12: 4, 15: 0 },
+      BS: [[0, 0, 3], [4, 2, 1], [6, 4, 2], [10, 7, 1], [11, 4, 1], [12, 2, 2], [14, 1, 2]],
+      HN: [[[0, 4, 2], [3, 5, 1], [4, 7, 2], [7, 5, 1], [8, 4, 2], [11, 2, 3]], [[0, 4, 2], [3, 5, 1], [4, 6, 2], [7, 8, 1], [8, 6, 4]]],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c;
-        if (!st.bell || c.newPhrase) { st.bell = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1]; st.riff = motif(r, 12, 7, 2, 0.15); st.callBar = Math.floor(r() * 2); }
-        // the 12/8 bell (the "standard pattern") on the agogo
-        if (st.bell[s]) I.agogo(t, s % 4 !== 1, v * 0.55, musicOut, deg(s % 4 !== 1 ? 4 : 0, 2));
-        // doum on 1 and the "and" of 2, teks filling in
-        if (s === 0 || s === 5 || (s === 8 && e > 0.5)) I.doum(t, v * 0.8);
-        else if ((s % 3 === 1 || s % 3 === 2) && r() < 0.55 + e * 0.3) I.tek(t, v * (0.3 + r() * 0.35));
-        // claps in twos against the triplet feel (polyrhythm)
-        if (e > 0.45 && c.night < 0.5 && (s === 3 || s === 9)) I.clap(t, v * 0.45);
-        // shaker on every triplet
-        I.shaker(t, v * (s % 3 === 0 ? 0.6 : 0.35));
-        // bass ostinato
-        if (s === 0 || s === 4 || s === 7 || s === 10) I.sub(t, deg(s === 7 ? 4 : 0, -2), sd * 2, v * 0.8);
-        // oud-like plucks play a running riff
-        for (const [ss, d, l] of st.riff) if (ss === s && (e > 0.3 || bar % 2 === 0)) I.pluck(t, deg(d, 0), v * 0.8, musicOut, 1.1);
-        // a call (voice) and the plucks answer
-        if (bar % 4 === 2 + st.callBar && (s === 0 || s === 3 || s === 6) && e > 0.5 && c.night < 0.5) I.vox(t, deg([4, 3, 1][s / 3], 0), v * 0.6, 'a', musicOut, sd * 2.5);
+        const { s, t, sd, v, r, st, e, bar } = c, b4 = bar % 4, brk = bar % 16 === 15 && s >= 8;
+        st.sec = bar % 16 === 15 ? 'percussion break' : b4 >= 2 ? 'horn riff' : 'guitars';
+        if ([0, 3, 6, 10, 12].includes(s)) { const lo = s === 3 || s === 10; I.agogo(t, !lo, v * 0.5, musicOut, deg(lo ? 0 : 4, 2)); }
+        I.shaker(t, v * (s % 4 === 2 ? 0.7 : s % 2 ? 0.3 : 0.45));
+        if (s === 6 || s === 7) I.conga(t, 330, v * 0.5); if (s === 14 || s === 15) I.conga(t, 250, v * 0.5);
+        if ((s === 2 || s === 10) && e > 0.4) I.tek(t, v * 0.4);
+        if (s in this.G1) I.chop(t, [deg(H.deg + this.G1[s], 0)], v * 0.9, 0.16, 1.1, musicOut, 0.2);
+        if (brk) { if (s >= 12) I.snare(t, v * (0.25 + (s - 12) * 0.1)); return; }
+        if (s === 0 || s === 10 || (s === 7 && bar % 2 === 1)) I.kick(t, v * 0.75, musicOut, 120, 50, 0.2);
+        if (s === 4 || s === 12) I.rim(t, v * 0.8);
+        if (s === 15 && e > 0.5) I.snare(t, v * 0.25);
+        if (s % 4 === 2) I.hat(t, v * 0.45, true);
+        if (e > 0.3 && s in this.G2) I.chop(t, [deg(H.deg + this.G2[s], -1)], v * 0.6, 0.08, 0.6, musicOut, 0);
+        at(this.BS, s, (d, l) => I.ebass(t, low(deg(H.deg + d, -2)), l * sd * 0.9, v * 0.9));
+        if (s === 2 || s === 10 || (s === 7 && bar % 2 === 1)) I.organ(t, chord(3, 0), sd * 0.8, v * 0.9);
+        if (b4 >= 2 && (e > 0.35 || c.listen > 0.5)) at(this.HN[b4 - 2], s, (d, l) => I.brass(t, [deg(d, 0), deg(d - 2, 0)], l * sd * 0.9, v));
+        if (bar % 8 === 5 && e > 0.45 && c.night < 0.5 && (s === 8 || s === 11 || s === 14)) I.vox(t, deg([7, 5, 3][(s - 8) / 3], 0), v * 0.55, 'oea'[(s - 8) / 3], musicOut, sd * 2);
       }
     },
-    canals: {     // dub: one drop, skank on the offbeat, melodica, deep bass
-      bpm: 84, beats: 4, sub: 4, swing: 0.1, root: 55, mode: 'dorian', rev: 0.35, dly: 0.5,
-      moods: ['dorian', 'mixolydian', 'aeolian'], nightTempo: 0.08, nightGain: 1,
-      prog: [[0, 3], [0, 3], [3, 3], [4, 3]],
+    // ---- CANALS: dub with an arrangement. One drop, a bass line that sings, organ bubble, a melodica theme
+    //      (the trumpet joins the second time), and four bars where everything falls away into echo.
+    canals: {
+      bpm: 80, beats: 4, sub: 4, swing: 0.16, root: 55, mode: 'aeolian', rev: 0.35, dly: 0.55,
+      moods: ['aeolian', 'dorian'], nightTempo: 0.08, nightGain: 1,
+      prog: [[0], [6], [0], [3]],                                  // Gm – F – Gm – Cm
+      B1: [[0, 0, 3], [3, 0, 1], [6, 2, 2], [8, 4, 2], [11, 2, 1], [12, 0, 2], [14, -1, 2]],
+      B2: [[0, 0, 2], [2, 0, 1], [4, 4, 2], [6, 2, 2], [10, 0, 3], [14, 4, 1], [15, 2, 1]],
+      TH: [[[0, 4, 4], [6, 2, 2], [8, 4, 2], [10, 3, 1], [11, 2, 5]], [[0, 3, 4], [6, 1, 2], [8, 3, 6]],
+        [[0, 4, 4], [6, 7, 2], [8, 6, 2], [10, 4, 1], [11, 2, 5]], [[0, 3, 4], [6, 5, 2], [8, 4, 8]]],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c;
-        if (!st.bass || c.newPhrase) { st.bass = [[0, 0, 3], [3, 0, 1], [6, 4, 2], [10, 2, 2], [12, 3, 2], [14, 4, 2]].filter(() => r() < 0.85); st.mel = motif(r, 16, 5, 3, 0.3); }
-        if (s === 8) { I.kick(t, v * 0.9, musicOut, 110, 45, 0.4); I.rim(t, v * 0.8); }
-        if (s % 2 === 0) I.hat(t, v * (s % 4 === 2 ? 0.35 : 0.2));
-        if (s === 14 && r() < 0.4) I.hat(t, v * 0.4, true);
-        if (s === 4 || s === 12) I.skank(t, chord(3, 0), v);
-        for (const [ss, d, l] of st.bass) if (ss === s) I.sub(t, deg(d, -2), l * sd * 0.95, v * 0.95);
-        if ((e > 0.45 || c.listen > 0.5) && bar % 4 >= 2) for (const [ss, d, l] of st.mel) if (ss === s) I.melodica(t, deg(d, 0), l * sd, v * 0.8);
-        if (r() < 0.02) I.metal(t, deg(4, 1), v * 0.3, musicOut, 0.8);   // a drip from the bridge
+        const { s, t, sd, v, r, st, e, bar } = c, b16 = bar % 16, drop = b16 >= 8 && b16 < 12, b4 = bar % 4;
+        st.sec = drop ? 'dub drop' : bar % 8 >= 4 ? (b16 >= 12 ? 'theme + trumpet' : 'melodica theme') : 'riddim';
+        if (s === 8) { I.kick(t, v * 0.9, musicOut, 110, 45, 0.4); I.rim(t, v * 0.85); }
+        if (bar % 8 === 7 && s >= 12) I.conga(t, [520, 520, 400, 330][s - 12], v * 0.6);
+        if (s % 2 === 0) I.hat(t, v * (s % 4 === 2 ? 0.4 : 0.22)); else if (!drop && (s === 3 || s === 11)) I.hat(t, v * 0.15);
+        if (s === 14 && bar % 2 === 1) I.hat(t, v * 0.4, true);
+        if (s === 13 && bar % 2 === 0 && e > 0.4) I.rim(t, v * 0.35);
+        at(bar % 2 ? this.B2 : this.B1, s, (d, l) => { const m = low(deg(H.deg + d, -2)); I.sub(t, m, l * sd * 0.95, v * 0.8); I.ebass(t, m + 12, l * sd * 0.8, v * 0.3); });
+        if (!drop) {
+          if (s === 4 || s === 12) I.chop(t, chord(3, 0), v, 0.11, 0.8, musicOut, 0.45);
+          if (e > 0.3 && s % 4 >= 2) I.organ(t, chord(3, 0), sd * 0.55, v * (s % 4 === 2 ? 0.7 : 0.4));
+          if (bar % 8 >= 4) at(this.TH[b4], s, (d, l) => { I.melodica(t, deg(d, 0), l * sd * 0.95, v * 0.85); if (b16 >= 12) I.trumpet(t, deg(d, -1), l * sd * 0.9, v * 0.6); });
+        } else {
+          if ((b16 === 8 && s === 4) || (b16 === 10 && s === 12)) I.chop(t, chord(3, 0), v * 1.2, 0.14, 1, musicOut, 1.0);
+          if (b16 === 11 && s === 8) I.whistle(t, deg(4, 1), deg(7, 1), sd * 6, v * 0.6);
+          if (r() < 0.04) I.metal(t, deg(4, 1), v * 0.3, musicOut, 0.8);
+        }
       }
     },
-    oldtown: {    // a waltz: accordion oom-pah-pah, glockenspiel tune, pizzicato bass
-      bpm: 96, beats: 3, sub: 2, swing: 0, root: 60, mode: 'major', rev: 0.3, dly: 0.12,
-      moods: ['major', 'lydian', 'mixolydian', 'major'], nightTempo: 0.1, nightGain: 0.85,
-      prog: [[0, 3], [3, 3], [4, 3], [0, 3], [5, 3], [1, 3], [4, 3], [0, 3]],
+    // ---- OLD TOWN: manouche swing. Guitar chords on every beat ("la pompe"), a two-feel bass that starts
+    //      walking, a clarinet tune; the second time round the accordion and glockenspiel take it.
+    oldtown: {
+      bpm: 116, beats: 4, sub: 3, swing: 0, root: 57, mode: 'harmonic', rev: 0.25, dly: 0.1,
+      moods: ['harmonic', 'harmonic', 'major'], nightTempo: 0.1, nightGain: 0.85,
+      prog: [[0], [0], [3], [3], [4], [4], [0], [4]],              // Am – Dm – E7 – Am E7
+      MEL: [
+        [[0, 4, 2], [2, 7, 1], [3, 9, 3], [6, 7, 2], [8, 4, 1], [9, 2, 3]], [[0, 4, 6], [8, 2, 1], [9, 3, 2], [11, 4, 1]],
+        [[0, 5, 2], [2, 7, 1], [3, 10, 3], [6, 7, 2], [8, 5, 1], [9, 3, 3]], [[0, 5, 6], [8, 3, 1], [9, 4, 2], [11, 5, 1]],
+        [[0, 6, 2], [2, 8, 1], [3, 10, 3], [6, 8, 2], [8, 6, 1], [9, 4, 3]], [[0, 5, 2], [2, 4, 1], [3, 6, 2], [5, 8, 1], [6, 10, 3], [9, 9, 3]],
+        [[0, 7, 6], [8, 4, 1], [9, 2, 2], [11, 0, 1]], [[0, 1, 2], [2, 4, 1], [3, 6, 6]]],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c;
-        if (!st.tune || c.newPhrase) { st.tune = motif(r, 6, 4, 3, 0.15); st.tune2 = shift(st.tune, 2); }
-        if (s === 0) I.upright(t, deg(bar % 2 ? 4 : 0, -2), sd * 1.8, v * 0.9);
-        if (s === 2 || s === 4) I.accordion(t, chord(3, 0), sd * 1.4, v);
-        if (s === 0) I.brush(t, v * 0.4, musicOut, true); if (s === 3 && e > 0.4) I.brush(t, v * 0.3);
-        if (e > 0.3 || c.listen > 0.5) for (const [ss, d, l] of (bar % 2 ? st.tune2 : st.tune)) if (ss === s) I.glock(t, nearest(deg(d, 0), chord(3, 0).concat(chord(3, 1))), v * 0.8);
-        if (e > 0.65 && s === 0 && bar % 4 === 0) I.accordion(t, [deg(4, 1)], sd * 5.5, v * 0.7);
+        const { s, t, sd, v, r, st, e, bar } = c, b8 = bar % 8, b16 = bar % 16, walk = b8 >= 6 || b16 >= 8;
+        st.sec = b16 < 8 ? 'clarinet tune' : 'accordion + glockenspiel';
+        const ct = chord(H.deg === 4 ? 4 : 3, 0);
+        if (s % 3 === 0) { const back = s === 3 || s === 9; I.chop(t, ct, v * (back ? 1 : 0.6), back ? 0.07 : 0.17, back ? 1.1 : 0.7, musicOut, 0.05); }
+        if (s === 11 && e > 0.4) I.chop(t, ct, v * 0.3, 0.04, 1.2, musicOut, 0);
+        if (s === 0) I.upright(t, low(deg(H.deg, -2)), sd * (walk ? 2.8 : 5), v * 0.9);
+        if (s === 6) I.upright(t, low(deg(H.deg + 4, -2)), sd * (walk ? 2.8 : 5), v * 0.8);
+        if (walk && s === 3) I.upright(t, low(deg(H.deg + 2, -2)), sd * 2.8, v * 0.75);
+        if (walk && s === 9) I.upright(t, low(deg(c.nextDeg, -2)) - 1, sd * 2.8, v * 0.75);
+        if (s % 3 === 0) I.brush(t, v * (s === 3 || s === 9 ? 0.5 : 0.3), musicOut, s === 0 || s === 6);
+        if (s === 2 || s === 8) I.brush(t, v * 0.25);
+        if (e > 0.2 || c.listen > 0.5) at(this.MEL[b8], s, (d, l) => {
+          if (b16 < 8) I.clar(t, deg(d, 0), l * sd * 0.92, v);
+          else { I.accordion(t, [deg(d, 0)], l * sd * 0.92, v * 1.3); if (l >= 2) I.glock(t, deg(d, 0), v * 0.6); }
+        });
+        if (b16 < 8 && e > 0.5 && s === 0) I.accordion(t, ct, sd * 10, v * 0.45);
       }
     },
-    docks: {      // techno: four on the floor, metal on a 7-step loop over 16 (polymeter), acid line
-      bpm: 128, beats: 4, sub: 4, swing: 0.02, root: 52, mode: 'phrygian', rev: 0.2, dly: 0.3,
-      moods: ['phrygian', 'aeolian', 'dorian'], nightTempo: -0.02, nightGain: 1.35, nightDark: false,
-      prog: [[0, 3], [0, 3], [1, 3], [0, 3]],
+    // ---- DOCKS: electro breaks with a real arc over 32 bars: groove, the arpeggio comes in (in threes
+    //      against the four), breakdown, snare build, drop with chord stabs and chopped voices.
+    docks: {
+      bpm: 126, beats: 4, sub: 4, swing: 0.04, root: 52, mode: 'phrygian', rev: 0.2, dly: 0.32,
+      moods: ['phrygian', 'phrygian', 'aeolian'], nightTempo: -0.02, nightGain: 1.3, nightDark: false,
+      prog: [[0], [0], [5], [6], [0], [0], [5], [3]],              // Em – C – Dm – Em – C – Am
+      BS: [[0, 0, 1], [3, 0, 1], [6, 7, 1], [8, 0, 2], [11, 0, 1], [14, 6, 1], [15, 7, 1]],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar, idx } = c;
-        if (!st.acid || c.newPhrase) { st.acid = []; for (let i = 0; i < 16; i++) st.acid.push(r() < 0.55 ? [Math.floor(r() * 5) - (r() < 0.3 ? 7 : 0), r() < 0.25] : null); st.mlen = 5 + Math.floor(r() * 3) * 2; st.metal = euclid(3, st.mlen, Math.floor(r() * st.mlen)); }
-        if (s % 4 === 0) I.kick(t, v * (bar % 8 === 7 && s === 12 ? 0.6 : 1));
-        if (s % 4 === 2) I.hat(t, v * 0.55, true);
-        if ((s === 4 || s === 12) && e > 0.3) I.clap(t, v * 0.5);
-        if (st.metal[idx % st.mlen]) I.clank(t, v * 0.5);
-        if (e > 0.4) { const a = st.acid[s]; if (a) I.acid(t, deg(a[0], -1), sd * 0.9, v * 0.9, a[1]); }
-        if (s % 2 === 1 && e > 0.7) I.hat(t, v * 0.25);
-        if (bar % 16 === 15 && s === 0) I.metal(t, deg(0, 0), v * 0.5, musicOut, 2.2);
-        if (c.night > 0.4 && s % 4 === 2) I.sub(t, deg(0, -2), sd * 1.5, v * 0.7 * c.night);       // night: the club opens
-        if (c.night > 0.6 && s % 8 === 4 && bar % 2 === 1) I.pad(t, chord(3, 0), sd * 3, v * 0.6, musicOut, 2.5);
+        const { s, t, sd, v, r, st, e, bar, idx } = c, b32 = bar % 32, intro = b32 < 8, down = b32 >= 16 && b32 < 24, drop = b32 >= 24, build = b32 === 23;
+        if (!st.metal) st.metal = euclid(3, 7, 2);
+        st.sec = intro ? 'groove' : b32 < 16 ? 'arpeggio in' : build ? 'build' : down ? 'breakdown' : 'drop';
+        if (!down) {
+          if ([0, 6, 10].includes(s) || (s === 13 && bar % 4 === 3)) I.kick(t, v * 0.95);
+          if (s === 4 || s === 12) { I.clap(t, v * 0.45); I.snare(t, v * 0.4); }
+          I.hat(t, v * (s % 4 === 2 ? 0.5 : s % 2 ? 0.18 : 0.28), s === 14 && bar % 2 === 1);
+          at(this.BS, s, (d, l) => I.ebass(t, low(deg(H.deg + d, -2)), l * sd * 0.85, v * 0.85, musicOut, d >= 6));
+        } else {
+          if (s % 4 === 2) I.hat(t, v * 0.3, true);
+          if (s === 0) I.sub(t, low(deg(H.deg, -2)), sd * 14, v * 0.6);
+          if (s === 0 && bar % 2 === 0) I.pad(t, chord(4, 0), sd * 30, v * 0.9, musicOut, 1 + (b32 - 16) / 4);
+          if (build && (s >= 8 || s % 2 === 0)) I.snare(t, v * (0.15 + s * 0.035));
+        }
+        if (st.metal[idx % 7]) I.clank(t, v * 0.45);
+        if (!intro) { const ct = chord(4, 0), x = down ? (b32 - 16 + s / 16) / 8 : drop ? 0.8 : 0.35; I.seq(t, ct[[0, 2, 1, 3, 2, 1][idx % 6]] + (s >= 12 ? 12 : 0), sd * 0.8, v * (0.6 + 0.3 * x), musicOut, 500 + 2600 * x); }
+        if (drop || (b32 >= 8 && b32 < 16 && e > 0.6)) { if (bar % 2 === 0 ? (s === 3 || s === 11) : s === 6) I.skank(t, chord(4, 0), v * 0.9); }
+        if (drop && bar % 2 === 1 && e > 0.3) { if (s === 13) I.vox(t, deg(4, 0), v * 0.5, 'e', musicOut, sd * 0.9); if (s === 14) I.vox(t, deg(7, 0), v * 0.5, 'a', musicOut, sd * 1.5); }
+        if (b32 === 24 && s === 0) I.metal(t, deg(0, 0), v * 0.6, musicOut, 2.2);
+        if (c.night > 0.4 && !down && s % 4 === 2) I.sub(t, low(deg(H.deg, -2)), sd * 1.5, v * 0.6 * c.night);
       }
     },
-    lake: {       // slow ambient dub: soft kick, rigging pings, long pads, waves
-      bpm: 70, beats: 4, sub: 4, swing: 0.05, root: 53, mode: 'lydian', rev: 0.6, dly: 0.45,
-      moods: ['lydian', 'major', 'mixolydian'], nightTempo: 0.08, nightGain: 1,
-      prog: [[0, 7], [0, 7], [4, 7], [1, 7]],
+    // ---- LAKESHORE: bossa-calypso on the beach. Bossa clave on the rim, nylon chords, a steel pan tune
+    //      you can hum, then flute and vibes while the waves come in.
+    lake: {
+      bpm: 92, beats: 4, sub: 4, swing: 0.08, root: 53, mode: 'major', rev: 0.4, dly: 0.3,
+      moods: ['major', 'major', 'mixolydian'], nightTempo: 0.08, nightGain: 1,
+      prog: [[0], [5], [1], [4], [0], [5], [3], [4]],              // Fmaj7 – Dm7 – Gm7 – C7 – Fmaj7 – Dm7 – Bbmaj7 – C7
+      MEL: [
+        [[0, 4, 2], [3, 7, 2], [6, 9, 3], [10, 8, 2], [12, 7, 4]], [[0, 9, 3], [3, 7, 2], [6, 5, 4], [12, 7, 2], [14, 8, 2]],
+        [[0, 10, 3], [3, 8, 2], [6, 7, 3], [10, 5, 2], [12, 5, 2], [14, 7, 2]], [[0, 8, 3], [3, 6, 2], [6, 4, 6], [14, 4, 1], [15, 6, 1]],
+        [[0, 7, 3], [3, 9, 2], [6, 11, 3], [10, 9, 2], [12, 7, 4]], [[0, 12, 3], [3, 11, 2], [6, 9, 4], [12, 7, 2], [14, 5, 2]],
+        [[0, 10, 3], [3, 9, 2], [6, 7, 3], [10, 5, 2], [12, 7, 4]], [[0, 8, 3], [3, 6, 3], [6, 4, 8]]],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c;
-        if (!st.ping || c.newPhrase) { st.ping = euclid(r() < 0.5 ? 3 : 5, 16, Math.floor(r() * 16)); }
-        if (s === 0 || (s === 10 && e > 0.5)) I.softKick(t, v * 0.8);
-        if (s === 8 && e > 0.35) I.rim(t, v * 0.45);
-        if (s === 0 && bar % 2 === 0) I.pad(t, chord(4, 0), sd * 30, v * 0.9, musicOut, 0.9);
-        if (s === 0) I.sub(t, deg(0, -2), sd * 10, v * 0.6);
-        if (st.ping[s] && r() < 0.6) I.steelpan(t, deg([0, 1, 2, 4, 5][Math.floor(r() * 5)] + (r() < 0.3 ? 7 : 0), 1), v * 0.55);
-        if (s === 0 && bar % 2 === 1) I.waves(t, sd * 28, v);
+        const { s, t, sd, v, r, st, e, bar } = c, b8 = bar % 8, b16 = bar % 16;
+        if (!st.im || c.newPhrase) st.im = motif(r, 16, 5, 3, 0.3);
+        st.sec = b16 < 8 ? 'steel pan tune' : 'flute and vibes';
+        if ([0, 3, 6, 10, 13].includes(s)) I.rim(t, v * 0.45);
+        if (s === 0 || s === 8) I.softKick(t, v * 0.75); if ((s === 7 || s === 15) && e > 0.3) I.softKick(t, v * 0.4);
+        I.shaker(t, v * (s % 4 === 0 ? 0.6 : s % 2 ? 0.3 : 0.45));
+        if (e > 0.4 && (s === 4 || s === 11 || s === 12)) I.conga(t, s === 4 ? 320 : 250, v * 0.4);
+        if ((bar % 2 ? [2, 6, 9, 12] : [0, 4, 7, 10, 14]).includes(s)) I.chop(t, chord(4, 0), v * 0.75, 0.26, 0.5, musicOut, 0.1);
+        at([[0, 0, 3], [7, 4, 1], [8, 4, 3]], s, (d, l) => I.upright(t, low(deg(H.deg + d, -2)), l * sd, v * 0.85));
+        if (s === 15) I.upright(t, low(deg(c.nextDeg, -2)), sd, v * 0.6);
+        if (b16 < 8 || c.listen > 0.5) at(this.MEL[b8], s, (d) => I.steelpan(t, deg(d, 0), v * 0.9));
+        else { if (s === 0 && bar % 2 === 0) I.flute(t, deg(H.deg + 2, 1), sd * 13, v * 0.7); at(st.im, s, (d) => I.vibes(t, nearest(deg(d, 1), chord(4, 1)), v * 0.55)); }
+        if (s === 0 && bar % 2 === 0) I.pad(t, chord(4, 0), sd * 30, v * 0.55, musicOut, 0.9);
+        if (s === 0 && bar % 4 === 3) I.waves(t, sd * 28, v);
       }
     },
-    obs: {        // no drums: drones, stars, voices
-      bpm: 60, beats: 4, sub: 4, swing: 0, root: 65, mode: 'lydian', rev: 0.85, dly: 0.5,
-      moods: ['lydian', 'major', 'dorian'], nightTempo: 0.05, nightGain: 1.1,
-      prog: [[0, 7], [1, 7], [0, 7], [4, 7]],
+    // ---- OBSERVATORY: star phases. Two mallet players on the same 12-step cell; one slips a step ahead
+    //      every four bars, so the pattern keeps turning into a new one. A third line in 4 against the 3.
+    obs: {
+      bpm: 72, beats: 4, sub: 3, swing: 0, root: 65, mode: 'lydian', rev: 0.75, dly: 0.5,
+      moods: ['lydian', 'major', 'lydian', 'dorian'], nightTempo: 0.05, nightGain: 1.1,
+      prog: [[0], [0], [1], [1], [0], [0], [4], [4]],
+      CELL: [0, null, 4, 7, null, 2, 4, null, 9, 7, null, 4],
       play(c) {
-        const { s, t, sd, v, r, st, e, bar } = c;
-        if (s === 0 && bar % 2 === 0) { I.drone(t, deg(0, -1), sd * 32, v * 0.9); I.choir(t, chord(3, 0), sd * 30, v * 0.6); }
-        if (r() < 0.07 + e * 0.05) I.bell(t + r() * sd, deg(Math.floor(r() * 9), 1), v * (0.25 + r() * 0.35), musicOut, 3.2);
-        if (r() < 0.03) I.musicbox(t, deg(Math.floor(r() * 7), 2), v * 0.3);
+        const { s, t, sd, v, r, st, e, bar } = c, ph = Math.floor(bar / 4) % 12;
+        st.sec = 'second player ' + ph + (ph === 1 ? ' step ahead' : ' steps ahead');
+        const a = this.CELL[s], b = this.CELL[(s + ph) % 12];
+        if (a != null) I.marimba(t, deg(H.deg + a, 0), v * (s === 0 ? 0.8 : 0.55));
+        if (b != null && bar % 48 >= 2) I.kalimba(t, fold(deg(H.deg + b, 1), 86), v * 0.5);
+        if (s % 4 === 0 && e > 0.4) I.glock(t, deg(H.deg + [4, 7, 9][(bar + s / 4) % 3], 0), v * 0.4);
+        if (s === 0 && bar % 2 === 0) { I.choir(t, chord(3, 0), sd * 22, v * 0.5); I.drone(t, deg(H.deg, -1), sd * 22, v * 0.55); }
+        if (s === 0) I.sub(t, deg(H.deg, -2), sd * 8, v * 0.45);
+        if ((e > 0.5 || c.night > 0.4) && s % 2 === 0) I.seq(t, chord(4, -1)[[0, 1, 2, 3, 2, 1][s / 2]], sd * 1.6, v * 0.5, musicOut, 800 + 500 * Math.sin(bar * 0.4));
+        if (r() < 0.04) I.bell(t + r() * sd, deg(Math.floor(r() * 9), 1), v * (0.2 + r() * 0.3), musicOut, 3.2);
       }
     },
   };
@@ -3688,7 +3786,7 @@ const Sound = (() => {
   // ---------- moods: each place drifts between a few modes; some corners have their own; night darkens ----------
   const ZONES = {
     pond: { key: 'park', mode: 'lydian' }, deepwood: { key: 'park', mode: 'phrygian' }, plaza: { key: 'business', mode: 'mixolydian' },
-    square: { key: 'oldtown', mode: 'lydian' }, cellar: { key: 'market', mode: 'harmonic' }, pier: { key: 'lake', mode: 'major' }, yard: { key: 'docks', mode: 'aeolian' },
+    square: { key: 'oldtown', mode: 'major' }, cellar: { key: 'market', mode: 'harmonic' }, pier: { key: 'lake', mode: 'major' }, yard: { key: 'docks', mode: 'aeolian' },
   };
   function moodOf(rc) {
     const z = R.zone && ZONES[R.zone];

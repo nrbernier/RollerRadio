@@ -1,0 +1,114 @@
+<title>Downtone Music A/B</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* layout: a mixing-desk list — one strip per district, "now" on the left channel, "new" on the right */
+:root {
+  --bg: #e8ebef; --panel: #f6f7f9; --ink: #16202b; --mute: #586675; --line: #cbd2da;
+  --now: #2c5f8f; --new: #cf4410; --on: #ffffff; --lit: #1e9e63;
+  --display: 'Space Grotesk', 'Inter', system-ui, sans-serif; --body: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10151b; --panel: #18202a; --ink: #e8edf2; --mute: #96a3b0; --line: #2a3541;
+  --now: #74aee6; --new: #ff8d52; --on: #0f141a; --lit: #4fd394; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #10151b; --panel: #18202a; --ink: #e8edf2; --mute: #96a3b0; --line: #2a3541;
+  --now: #74aee6; --new: #ff8d52; --on: #0f141a; --lit: #4fd394; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 20px; }
+h1 { font: 700 30px/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 6px 0 0; color: var(--mute); max-width: 62ch; }
+.deck { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.deck .what { flex: 1 1 220px; min-width: 0; }
+.deck .title { font: 700 16px/1.2 var(--display); }
+.deck .meta { font: 400 12px/1.4 var(--mono); opacity: 0.8; min-height: 1.4em; }
+.dots { display: flex; gap: 5px; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; opacity: 0.22; }
+.dots i.on { opacity: 1; background: var(--lit); }
+.deck button { font: 600 13px var(--body); color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+.deck button[aria-pressed="true"] { background: var(--bg); color: var(--ink); }
+button:focus-visible { outline: 3px solid var(--lit); outline-offset: 2px; }
+.strip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.strip h2 { font: 700 19px/1.2 var(--display); margin: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .pair { grid-template-columns: 1fr; } }
+.ch { text-align: left; font: inherit; color: var(--ink); background: var(--bg); border: 2px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ch .tag { font: 600 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+.ch.now .tag { color: var(--now); } .ch.new .tag { color: var(--new); }
+.ch .style { font: 700 16px/1.25 var(--display); }
+.ch .meta { font: 400 12px/1.4 var(--mono); color: var(--mute); font-variant-numeric: tabular-nums; }
+.ch:hover { border-color: var(--mute); }
+.ch.now.playing { background: var(--now); border-color: var(--now); color: var(--on); }
+.ch.new.playing { background: var(--new); border-color: var(--new); color: var(--on); }
+.ch.playing .tag, .ch.playing .meta { color: inherit; }
+.why { margin: 0; color: var(--mute); max-width: 68ch; }
+.why b { color: var(--ink); font-weight: 600; }
+.foot { color: var(--mute); font-size: 13px; max-width: 68ch; }
+</style>
+<div class="wrap">
+  <header>
+    <h1>Downtone music, now and proposed</h1>
+    <p class="lede">Tap a button to hear a district. Both sides run on the game's own synth engine, so what you hear is what the game would play. The new versions have written tunes and a form that unfolds over 16 or 32 bars, so give each one half a minute.</p>
+  </header>
+  <div class="deck" role="group" aria-label="Player">
+    <div class="what"><div class="title" id="npTitle">Nothing playing</div><div class="meta" id="npMeta">Sound starts when you tap a district</div></div>
+    <div class="dots" id="dots" aria-hidden="true"></div>
+    <button id="night" aria-pressed="false">Night</button>
+    <button id="stop">Stop</button>
+  </div>
+  <div id="rows" style="display:flex;flex-direction:column;gap:12px"></div>
+  <p class="foot">The 5/4 park and the triplet swing in the old town keep the game's shared clock: where two districts meet, their meters overlap as they do today. Tempos are chosen so neighbours still glide into each other. Night makes each version slower and a little darker, as in the game.</p>
+</div>
+<script>
+const U = { rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }, clamp: (x, a, b) => Math.max(a, Math.min(b, x)), lerp: (a, b, t) => a + (b - a) * t };
+/*ENGINE*/
+</script>
+<script>
+const ROWS = [
+  { k: 'business', name: 'Downtown', now: ['Swing jazz trio', '124 bpm · 4/4 swing'], neu: ['Jazz-funk break', '104 bpm · broken 16ths'],
+    why: '<b>A groove to skate to.</b> Broken beat, a slap bass riff, Rhodes stabs and scratch guitar. A written horn hook comes back every eight bars, a vibes solo sits between, and the band stops dead for a drum fill.' },
+  { k: 'park', name: 'Forest park', now: ['Marimba and flute', '66 bpm · 12/8'], neu: ['Five under the trees', '108 bpm · 5/4 as 3+2'],
+    why: '<b>An odd meter that still feels calm.</b> Fingerpicked guitar in five, hand drum and shaker. A clarinet plays the tune, a flute answers it, and a kalimba wanders in between.' },
+  { k: 'market', name: 'Market', now: ['Hijaz with oud', '100 bpm · 12/8'], neu: ['Highlife', '112 bpm · clave'],
+    why: '<b>Nothing like the old town any more.</b> Two guitars that lock together, a clave bell, congas, organ on the offbeat, horns in thirds and voices calling. Every 16 bars the band drops out and the percussion carries it.' },
+  { k: 'canals', name: 'Canals', now: ['Dub', '84 bpm · one drop'], neu: ['Dub, arranged', '80 bpm · one drop'],
+    why: '<b>Same genre, now with a shape.</b> A bass line that sings, organ bubble, and a melodica theme the trumpet joins the second time. In between, four bars where everything falls away into echo.' },
+  { k: 'oldtown', name: 'Old town', now: ['Accordion waltz', '96 bpm · 3/4'], neu: ['Manouche swing', '116 bpm · swung 4/4'],
+    why: '<b>The jazz moves here, on guitars.</b> Chords on every beat, a bass that starts in two and breaks into a walk, a clarinet tune in A minor. The accordion and glockenspiel take the second chorus, and the key turns major now and then.' },
+  { k: 'docks', name: 'Docks', now: ['Techno', '128 bpm · four on the floor'], neu: ['Electro breaks', '126 bpm · 32-bar arc'],
+    why: '<b>A track that goes somewhere.</b> Broken kick, then an arpeggio in threes against the four, a breakdown, a snare build and a drop with chord stabs and chopped voices. The bass has harmonics, so it survives a phone speaker.' },
+  { k: 'lake', name: 'Lakeshore', now: ['Ambient dub', '70 bpm · pads'], neu: ['Beach bossa', '92 bpm · bossa clave'],
+    why: '<b>Sunny instead of sleepy.</b> Bossa clave on the rim, soft nylon chords, and a steel pan tune you can hum. Then flute and vibes take over while the waves come in.' },
+  { k: 'obs', name: 'Observatory', now: ['Drones and bells', '60 bpm · no pulse'], neu: ['Star phases', '72 bpm · 12/8 phasing'],
+    why: '<b>Still weightless, but alive.</b> Two mallet players share one 12-step pattern; one slips a step ahead every four bars, so it keeps turning into a new pattern. A third line plays four against three, and a sequencer joins at night.' },
+];
+const NOTE = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const $ = id => document.getElementById(id);
+let cur = null, night = false;
+$('rows').innerHTML = ROWS.map(r => `<section class="strip"><h2>${r.name}</h2><div class="pair">
+  <button class="ch now" id="b_${r.k}" data-k="${r.k}"><span class="tag">Now</span><span class="style">${r.now[0]}</span><span class="meta">${r.now[1]}</span></button>
+  <button class="ch new" id="b_${r.k}2" data-k="${r.k}2"><span class="tag">New</span><span class="style">${r.neu[0]}</span><span class="meta">${r.neu[1]}</span></button>
+  </div><p class="why">${r.why}</p></section>`).join('');
+function mark() { document.querySelectorAll('.ch').forEach(b => { const on = b.dataset.k === cur; b.classList.toggle('playing', on); b.setAttribute('aria-pressed', on); }); }
+function play(k) {
+  Sound.init(); if (!Sound.ready) { $('npMeta').textContent = 'This browser has no Web Audio'; return; }
+  Sound.suspend(false); Sound.update(0.1, { night: night ? 1 : 0 });
+  Sound.jump(k); Sound.start(); cur = k; mark();
+}
+function stop() { if (Sound.ready) Sound.suspend(true); cur = null; mark(); $('npTitle').textContent = 'Nothing playing'; $('npMeta').textContent = 'Tap a district to listen'; $('dots').innerHTML = ''; }
+$('rows').addEventListener('click', e => { const b = e.target.closest('.ch'); if (!b) return; if (b.dataset.k === cur) stop(); else play(b.dataset.k); });
+$('stop').addEventListener('click', stop);
+$('night').addEventListener('click', () => { night = !night; $('night').setAttribute('aria-pressed', night); if (Sound.ready) Sound.update(0.1, { night: night ? 1 : 0 }); });
+setInterval(() => { if (cur && Sound.ready) Sound.setPlace({ [cur]: 1 }, 0.1); }, 100);
+let lastDots = 0;
+(function frame() {
+  requestAnimationFrame(frame); if (!cur) return;
+  const row = ROWS.find(r => cur.startsWith(r.k)), isNew = cur.endsWith('2'), rc = Sound.REC[cur], b = Sound.beat();
+  $('npTitle').textContent = row.name + ' — ' + (isNew ? row.neu[0] : row.now[0]);
+  const sec = rc.st && rc.st.sec ? ' · ' + rc.st.sec : '';
+  $('npMeta').textContent = `${Math.round(Sound.bpm)} bpm · ${NOTE[Sound.H.root % 12]} ${Sound.modeName} · bar ${Math.max(0, b.bar) + 1}${sec}`;
+  const n = rc.beats; if (n !== lastDots) { $('dots').innerHTML = '<i></i>'.repeat(n); lastDots = n; }
+  [...$('dots').children].forEach((d, i) => d.classList.toggle('on', b.playing && i === b.inBar));
+})();
+</script>

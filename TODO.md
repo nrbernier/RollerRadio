@@ -2,7 +2,7 @@
 
 ## Fixes and checks
 - Pedestrians seen on the rails in Central station: three walkers sit at platform depth nearby, cause not found yet
-- Mix is sub-bass heavy: on phone speakers the music is quiet and gappy (thin the sub/kick, add an octave harmonic) — needs a decision
+- Check the new district music on a phone speaker (basses now have harmonics); retune the per-district move sounds (grind, tricks) to the new styles if they clash
 - Turning circles at road ends look a bit blobby (make them true circles)
 - Physics/camera bot (`tools/bot.py`) not run yet on the latest build
 
@@ -35,6 +35,8 @@
   at the lift door on the top deck; something to ride down from it
 
 ## Done
+- New music in every district: jazz-funk downtown, 5/4 forest, highlife market, arranged dub canals, manouche old town,
+  electro breaks docks, bossa lakeshore, phasing mallets at the observatory (A/B page: tools/music_ab)
 - Central station: solid walls, safety net if you fall out of the world, entrances on the square with red
   roofs and totems, closer camera indoors
 - Record shop: a real roofed cellar, giant record on the roof, RECORDS board and a sign over the door
