@@ -7758,13 +7758,13 @@ function buildTower(H) {
   W.lifts = [{ ax: cx, ay: gy, az: gz + 1.6, bx: cx, by: deckY, bz: pz1 + 1.6, r: 1.5 }];
   // the way down: a red pipe winding five times round the tower, from the deck's east edge to the plaza
   const turns = 5, hr = dh + 3.2;
-  const helix = pHelix(cx, cz, hr, 0, turns + 0.25, deckY + 0.2, terrainAt(cx, cz + hr) + 1.1);
+  const helix = pHelix(cx, cz, hr, 0, turns, deckY + 0.2, terrainAt(cx + hr, cz) + 1.1);
   helix.unshift([cx + dh - 1, deckY + 0.5, cz - 6], [cx + dh + 1.6, deckY + 0.35, cz - 3]);
-  const last = helix[helix.length - 1]; helix.push([last[0] - 5, last[1] - 0.1, last[2] + 1.5], [last[0] - 10, terrainAt(last[0] - 10, last[2] + 2) + 0.9, last[2] + 2]);
+  const last = helix[helix.length - 1]; helix.push([last[0] - 0.5, last[1] - 0.1, last[2] + 5], [last[0] - 1, terrainAt(last[0] - 1, last[2] + 11) + 0.9, last[2] + 11]);   // (it lands on the east side, clear of the lift door)
   K.rail(helix, { kind: 'pipe', color: red, radius: 0.2, round: 0, stubs: false, collar: '#2a2838', minSpeed: 9, endBoost: 1 });
   // struts from the shaft out to the pipe, four a turn
   for (let k = 1; k < turns * 4; k++) {
-    const a = k * Math.PI / 2, t = k / ((turns + 0.25) * 4), hy = U.lerp(deckY + 0.2, terrainAt(cx, cz + hr) + 1.1, t) - 0.15, f = (hy - y) / (deckY - 1.2 - y), hw = f < 0.46 ? 15 : f < 0.8 ? 12 : 9.5;
+    const a = k * Math.PI / 2, t = k / (turns * 4), hy = U.lerp(deckY + 0.2, terrainAt(cx + hr, cz) + 1.1, t) - 0.15, f = (hy - y) / (deckY - 1.2 - y), hw = f < 0.46 ? 15 : f < 0.8 ? 12 : 9.5;
     K.rod(V3(cx + Math.cos(a) * hw, hy + 1.2, cz + Math.sin(a) * hw), V3(cx + Math.cos(a) * hr, hy, cz + Math.sin(a) * hr), 0.1, '#2a2838', 0.02);
   }
   // and for the brave: a cable from the deck's south rail all the way down to Central's plaza

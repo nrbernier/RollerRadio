@@ -17,27 +17,32 @@
 - More natural ways to ride up buildings generally (the old sky-rail pipe was too odd)
 
 ## Street-level variety (and easier to find your way)
-- Downtown: buildings vary only higher up; at street level they're too regular and self-similar (boring,
-  and hard to navigate). Vary the ground-floor shapes (arcades, set-backs, glass lobbies, steps, corners
-  cut off…) and add signs and landmark fronts: cinema, theatre, hotel, bank, diner… (`H.sign` exists now)
+- Downtown, still to do: look over every ground-floor kind on a phone (arcades, stilts, lobbies, plinths, cut corners,
+  forecourts); the library and the baths found no lot and are missing; a plinth rail by the bank runs through its steps
 - Old town & market: much more variety in the buildings, and more open spaces between them:
-  inner courtyards, small playgrounds, squares
+  inner courtyards, small playgrounds, squares (the ground for nine of them is levelled: `OLD_PADS` in relief.js; nothing built yet)
 - Market: too self-similar. One real big market instead of several similar ones; vary the rest of the
-  district, and make it less like the old town (needs ideas)
+  district, and make it less like the old town (idea: flat roofs, covered lanes, courtyard inns, a dyers' yard)
 
 ## World
 - Vineyards: improve them, make the grapes visible
-- More relief and bridges: downtown, some streets much higher than others, with at least one bridge crossing
-  a street far below. Where the metro crosses streets it's a mess: give the streets (or the line) proper bridges
+- More relief: only the sunken street so far. More streets at different heights, more bridges
 
-## New places (each with its own musical ambience)
-- Forest crag: a big rock / small mountain in the forest rising above the tree line; a path up with a rail;
-  you can grind down the cliff side
-- Construction site in the city: lots to ride (cranes, fences, scaffolding, etc.)
-- Downtown tower, well above the other buildings: lift with a door at street level, the character reappears
-  at the lift door on the top deck; something to ride down from it
+## New places: to check
+- Forest crag, building site, tower: built and looked at once each; not yet ridden end to end (path, zip line and
+  cliff rail on the crag; ramps, crane and girder on the site; the pipe and the cable down from the tower)
+- Their music (crag, site, skydeck in music.js) has not been listened to or balanced
+- The cliff rail dips into the rock for a few metres near (-886, -701)
+- `tools/geom.py` reports walkers through 'retain' boxes: those are bridges and the sunken street's walls, which
+  walkers cross on the decks (the tool does not know that yet)
 
 ## Done
+- Sunken street through downtown (twelve metres down, brick walls, three street bridges over it, slide rails, a ramp up)
+- Metro crossings: two streets bridge the cutting north of downtown; the line clears the avenue and the street by Hilltop
+- Downtown street level: ground floors of seven kinds, landmark fronts with signs (cinema, theatre, opera, hotel, bank,
+  diner, museum, post, arcade, Roller Radio), shop awnings and signs
+- New places with their own music: forest crag (path with rail, zip line, cliff rail), building site (frame, scaffold,
+  crane, girder), the Needle (lift to a sky deck, a pipe five times round the tower, a cable to Central)
 - New music in every district: jazz-funk downtown, 5/4 forest, highlife market, arranged dub canals, manouche old town,
   electro breaks docks, bossa lakeshore, phasing mallets at the observatory (A/B page: tools/music_ab)
 - Central station: solid walls, safety net if you fall out of the world, entrances on the square with red
