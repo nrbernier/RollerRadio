@@ -45,6 +45,15 @@
     if (W.carousel) add('Rides', 'Carousel', () => look(W.carousel.x, W.carousel.z, 12));
     if (W.cable) { add('Rides', 'Cable car — lake end', () => look(W.cable.A.x, W.cable.A.z, 16)); add('Rides', 'Cable car — top end', () => look(W.cable.B.x, W.cable.B.z, 16)); }
     for (const [i, d] of (W.dishes || []).entries()) add('Rides', 'Radio dish ' + (i + 1), () => look(d.x, d.z, d.r + 6));
+    add('New places', 'Forest crag — foot of the path', () => go(CRAG_LINK[2][0], CRAG_LINK[2][1], CRAG.spine[1][0], CRAG.spine[1][1]));
+    add('New places', 'Forest crag — summit', () => { const s = cragAt(0.97), e = cragZip().end; go(s[0], s[1], e[0], e[1]); });
+    add('New places', 'Building site — gate', () => go(SITE[2] + 6, (SITE[1] + SITE[3]) / 2 + 14, SITE[0], (SITE[1] + SITE[3]) / 2));
+    add('New places', 'Building site — crane jib', () => go(SITE[0] + 60, SITE[1] + 23, SITE[0], SITE[1] + 23, SITE.y + 27.3));
+    add('New places', 'Tower — lift door', () => go(TOWER.x, TOWER.z + 24, TOWER.x, TOWER.z));
+    add('New places', 'Tower — sky deck', () => go(TOWER.x + 8, TOWER.z + 12, TOWER.x + 30, TOWER.z - 4, TOWER.deckY));
+    add('New places', 'Sunken street', () => go(VALLEY.x, -560, VALLEY.x, -480));
+    add('New places', 'Bridge over the sunken street', () => go(VALLEY.x - 40, -492, VALLEY.x, -492));
+    add('New places', 'Vineyards', () => go(345, -1180, 345, -1260));
     add('Places', 'Music garden', () => look(-500, 905, 12));
     add('Places', 'Canal basin', () => look(PLAN.canal.bendX, canalEndZ() - 10, 18));
     add('Places', 'Skatepark', () => look(-545, 256, 16));

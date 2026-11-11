@@ -131,7 +131,7 @@ const Life = (() => {
     const r = U.rng(4242);
     // walkers' routes: cut out any stretch that runs through a building (or a pillar, a kiosk…), so people
     // turn back there instead of walking through it; little things (trees, lamps, rocks) they step past
-    const SOFT = new Set(['tree', 'canopy', 'bounce', 'lamp', 'bollard', 'benchleg', 'rock', 'stump', 'log', 'table', 'edge']), _nq = [];
+    const SOFT = new Set(['tree', 'canopy', 'bounce', 'lamp', 'bollard', 'benchleg', 'rock', 'stump', 'log', 'table', 'edge', 'retain']), _nq = [];
     const blocked = (x, z, y) => { if (!W.near) return false; _nq.length = 0; for (const b of W.near(x - 0.6, z - 0.6, x + 0.6, z + 0.6, _nq)) { if (b.dyn || SOFT.has(b.tag)) continue; if (x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5 && b.y0 < y + 1.7 && b.y1 > y + 0.3) return true; } return false; };
     function clearPaths(paths, yFix) {
       const out = [];
@@ -388,7 +388,7 @@ const Life = (() => {
     const R = Math.min(230, (Game.cellR || 360) * 0.64), cap = PM.torso.instanceMatrix.count;
     for (const w of walkers) {
       w.s += w.sp * dt * w.dir; if (w.s > w.len) { w.s = w.len; w.dir = -1; } else if (w.s < 0) { w.s = 0; w.dir = 1; }
-      if (Math.abs(w.x - fx) > R || Math.abs(w.z - fz) > R) { if (!w.y || Math.random() < 0.02) { pathPos(w.segs, w.s, _pp); w.x = _pp.x; w.z = _pp.z; w.y = w.y0 ?? terrainAt(w.x, w.z); } continue; }
+      if (Math.abs(w.x - fx) > R || Math.abs(w.z - fz) > R) { if (!w.y || Math.random() < 0.02) { pathPos(w.segs, w.s, _pp); w.x = _pp.x; w.z = _pp.z; w.y = w.y0 ?? walkY(w.x, w.z); } continue; }
       w.t += dt;
       pathPos(w.segs, w.s, _pp);
       // step aside when you come through
@@ -402,7 +402,7 @@ const Life = (() => {
         if (L.passes.length >= 3 && Game.t > (L.rippleCD || 0)) { Sound.sfx.ripple(); L.rippleCD = Game.t + 4; L.passes = []; }
       }
       const ox = -_pp.fz * (w.off + w.dodge), oz = _pp.fx * (w.off + w.dodge);
-      w.x = _pp.x + ox; w.z = _pp.z + oz; w.y = w.y0 ?? terrainAt(w.x, w.z);
+      w.x = _pp.x + ox; w.z = _pp.z + oz; w.y = w.y0 ?? walkY(w.x, w.z);
       w.yaw = Math.atan2(_pp.fx * w.dir, _pp.fz * w.dir);
       if (slot >= cap) continue;
       const f = w.sp * (w.jog ? 2.4 : 3.6) / w.sc, ph = w.t * f;

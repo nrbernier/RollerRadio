@@ -17,6 +17,10 @@ const METRO_SVG = [
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
 const DOWNTOWN = [-250, -700, 370, 250];
 const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
+// where the line meets a street at an awkward height it is pinned: `dy` metres from the ground at that point
+// (north of downtown two streets cross the cutting on bridges; a third, and the avenue, pass under a proper span)
+const METRO_WAY = [{ at: [-116, -908], dy: -7.4 }, { at: [-1, -920], dy: -7.6 }, { at: [132, -914], dy: 7.6 }, { at: [-224, 336], dy: 7.6 }];
+const METRO_LIFT = { hilltop: 2.5 };      // Hilltop stands a little taller, so the street just west of it clears the deck
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
@@ -57,17 +61,24 @@ function planMetro() {
   for (const st of stations) {
     st.under = under[st.i];
     let g = st.under ? 1e9 : -1e9; for (let d = -half; d <= half; d++) g = st.under ? Math.min(g, ground[(st.i + d + N) % N]) : Math.max(g, ground[(st.i + d + N) % N]);
-    st.y = st.under ? g - 10 : g + METRO.clear - 1;
+    st.y = st.under ? g - 10 : g + METRO.clear - 1 + (METRO_LIFT[st.key] || 0);
     for (let d = -half; d <= half; d++) fixed[(st.i + d + N) % N] = st.y;
   }
+  // street crossings: the line is pinned well under the street (which then bridges the cutting) or well over it
+  const ways = METRO_WAY.map(w => {
+    let bi = 0, bd = 1e9; pts.forEach((p, i) => { const d = Math.hypot(p.x - w.at[0], p.z - w.at[1]); if (d < bd) { bd = d; bi = i; } });
+    const wp = { i: bi, y: ground[bi] + w.dy, half: 2, way: true };
+    for (let d = -2; d <= 2; d++) fixed[(bi + d + N) % N] = wp.y;
+    return wp;
+  });
   // the approaches: free to dip below the ground for a few hundred metres either side of downtown
   const free = new Array(N).fill(false), reach = Math.round(330 / METRO.step);
   for (let i = 0; i < N; i++) if (under[i]) for (let d = -reach; d <= reach; d++) { const j = (i + d + N) % N; if (!under[j]) free[j] = true; }
   const y = new Array(N).fill(0);
-  const ord = stations.slice().sort((a, b) => a.i - b.i);
+  const ord = stations.concat(ways).sort((a, b) => a.i - b.i);
   for (let q = 0; q < ord.length; q++) {
     const A = ord[q], Bs = ord[(q + 1) % ord.length];
-    const i0 = A.i + half, i1 = (Bs.i - half + N) % N;
+    const i0 = (A.i + (A.half ?? half)) % N, i1 = (Bs.i - (Bs.half ?? half) + N) % N;
     const len = ((i1 - i0) % N + N) % N;
     for (let d = 0; d <= len; d++) { const i = (i0 + d) % N, t = U.smooth(d / len); y[i] = U.lerp(A.y, Bs.y, t); }
   }

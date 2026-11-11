@@ -84,6 +84,11 @@ function knockDown(b, quiet = false) {
   p.mode = 'air'; p.rail = null; p.spinX += Math.PI * 2;
 }
 // back on your feet somewhere safe (on the metro that means the nearest platform)
+let _liftEl = null;
+function liftFade(k) {
+  if (!_liftEl) { _liftEl = document.createElement('div'); _liftEl.style.cssText = 'position:fixed;inset:0;background:#14101f;opacity:0;pointer-events:none;z-index:5'; document.body.appendChild(_liftEl); }
+  _liftEl.style.opacity = U.clamp(k, 0, 1).toFixed(2);
+}
 function getUp() {
   const p = Game.player, W = Game.W;
   let onLine = false;
@@ -271,7 +276,7 @@ function updateWorld(dt, bi) {
   const spots = {};
   for (const sp of W.spots) {
     const d = Math.hypot(sp.x - pos.x, sp.z - pos.z), dy = Math.abs(sp.y - pos.y);
-    let w = U.clamp(1 - d / sp.r, 0, 1); if (dy > 6) w *= U.clamp(1 - (dy - 6) / 6, 0, 1);
+    let w = U.clamp(1 - d / sp.r, 0, 1); if (dy > 6 && !sp.tall) w *= U.clamp(1 - (dy - 6) / 6, 0, 1);
     sp.w = U.damp(sp.w, U.smooth(w), 2, dt);
     if (sp.w > 0.01) spots[sp.key] = sp.w;
   }
@@ -285,6 +290,17 @@ function updateWorld(dt, bi) {
   for (const dsh of (W.dishes || [])) { const k = U.clamp(1 - (Math.hypot(dsh.x - pos.x, dsh.z - pos.z) - dsh.r) / 10, 0, 1); if (k > rk) { rk = k; Game.radio = dsh.remote; } }
   Game.radioK = U.damp(Game.radioK || 0, rk, 1.2, dt); if (Game.radioK > 0.02) spots.radio = Game.radioK;
   Game.spots = spots;
+  // lifts: step into the doorway and you come out of the other one (the doors chime)
+  for (const L of (W.lifts || [])) {
+    const da = Math.hypot(L.ax - pos.x, L.az - pos.z) + Math.abs(L.ay - pos.y) * 0.5, db = Math.hypot(L.bx - pos.x, L.bz - pos.z) + Math.abs(L.by - pos.y) * 0.5;
+    if (L.t > 0) {
+      const t0 = L.t; L.t -= dt;
+      if (t0 > 0.45 && L.t <= 0.45) { const up = L.to === 'b'; p.pos.set(up ? L.bx : L.ax, (up ? L.by : L.ay) + 0.05, (up ? L.bz : L.az) + 1.2); p.vel.set(0, 0, 0); p.mode = 'ground'; p.yaw = 0; Game.cam.snap(p); Game.cam.yaw = Math.PI; W.updateCells(p.pos.x, p.pos.z, 360); Sound.sfx.touch('chime'); }
+      liftFade(L.t > 0.45 ? (0.9 - L.t) / 0.4 : L.t / 0.45);
+      if (L.t <= 0) liftFade(0);
+    } else if (!L.armed) { if (da > 3.2 && db > 3.2) L.armed = true; }
+    else if ((da < L.r || db < L.r) && p.mode === 'ground') { L.to = da < L.r ? 'b' : 'a'; L.t = 0.9; L.armed = false; Sound.sfx.touch('lamp'); }
+  }
   // a little chime when a train pulls in near you
   for (const T of W.trains) if (T.arrived) { T.arrived = false; const f = metroAt(W.metro, T.s, 0); if (Math.hypot(f.x - pos.x, f.z - pos.z) < 220) Sound.sfx.touch('chime'); }
   Game.bellCD = (Game.bellCD || 0) - dt;

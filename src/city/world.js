@@ -19,6 +19,7 @@ function paintGround(x, z, y, steep, out) {
   const n = Math.sin(x * 0.05) * Math.sin(z * 0.043) * 0.5 + Math.sin(x * 0.013 + z * 0.021) * 0.5;
   out.multiplyScalar(0.95 + n * 0.06);
   if (y < -0.5) out.lerp(_gc.set('#6f8a8a'), U.clamp(-y / 4, 0, 0.7));
+  reliefPaint(x, z, y, steep, out);
 }
 
 // a ribbon laid on the ground (roads, paths, quays): pts [[x,z],...]
@@ -79,6 +80,7 @@ function buildCity() {
   buildHeights();
   const P = PLAN.pond; P.y = landH(P.x, P.z) + 6;
   pondBowl(P.x, P.z, P.r, P.y);
+  prepRelief();
   const M = planMetro();
   // the gallery: dig the line into the ridge
   // (downtown is bored, not dug: only the approaches where the deck runs at or just below the ground are cut)

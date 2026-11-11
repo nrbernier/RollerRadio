@@ -464,6 +464,32 @@ const Sound = (() => {
     },
     // the radio dishes: another district's music comes in, with static
     radio: (c, w) => { I.crackle(c.t, w * 1.2); if (Math.random() < 0.3) I.crackle(c.t + c.dsd / 2, w); },
+    // the crag: wind on the rock, an alphorn's slow call somewhere below, a cowbell now and then
+    crag: (c, w) => {
+      const st = SPOTS.st;
+      if (c.ds === 0 && c.idx % 16 === 0) I.waves(c.t, c.dsd * 18, w * 0.55);
+      if (!st.alp || c.newPhrase) st.alp = motif(U.rng(c.dbar + 41), 16, 4, 3, 0.1);
+      if (c.dbar % 4 < 2) for (const [ss, d, l] of st.alp) if (ss === c.idx % 16) I.brass(c.t, [nearest(deg(d, -1), chord(3, -1))], Math.max(2, l) * c.dsd * 2.2, w * 0.5);
+      if (c.ds % 2 === 1 && Math.random() < 0.07) I.cowbell(c.t, w * (0.15 + Math.random() * 0.25));
+      if (c.ds === 2 && c.dbar % 4 === 3 && Math.random() < 0.5) I.flute(c.t, deg(4 + Math.floor(Math.random() * 3), 1), c.dsd * 3, w * 0.25);
+    },
+    // the building site: hammers in three against the bar, a rattle of rivets, the reversing beeper, a thud on the one
+    site: (c, w) => {
+      const b = c.idx % 16;
+      if (b % 3 === 0) I.clank(c.t, w * (b === 0 ? 0.5 : 0.3));
+      if (b === 4 || b === 12) I.metal(c.t, deg(b === 4 ? 0 : 4, 0), w * 0.4, musicOut, 0.5);
+      if (c.dbar % 2 === 1 && b >= 8 && b < 12) I.rim(c.t, w * 0.35);
+      if (c.dbar % 4 === 2 && c.ds === 0) I.glock(c.t, deg(4, 2), w * 0.3);
+      if (b === 0 && c.dbar % 2 === 0) I.sub(c.t, deg(0, -2), c.dsd * 2, w * 0.7);
+      if ((b === 6 || b === 14) && Math.random() < 0.6) I.woodblock(c.t, deg(2, 1), w * 0.4);
+    },
+    // the sky deck: thin air — a high bright pad, slow glass notes falling, the city far below
+    skydeck: (c, w) => {
+      if (c.ds === 0 && c.idx % 32 === 0) I.pad(c.t, chord(4, 1), c.dsd * 32, w * 1.1, musicOut, 2.6);
+      if (c.ds === 0 && c.idx % 32 === 16) I.choir(c.t, chord(3, 1), c.dsd * 14, w * 0.35);
+      if (c.ds % 2 === 0) { const k = (c.idx / 2) % 16, ct = chord(4, 2); if ([0, 3, 6, 10, 13].includes(k)) I.bell(c.t, ct[(7 - Math.floor(k / 3)) % 4] + (k > 8 ? -12 : 0), w * 0.3, musicOut, 3.2); }
+      if (c.ds === 0 && c.idx % 8 === 4 && Math.random() < 0.5) I.waves(c.t, c.dsd * 8, w * 0.3);
+    },
     // buskers: a tune on their instrument, livelier when you sit and listen
     busk_trumpet: (c, w) => busk(c, w, 'trumpet'), busk_oud: (c, w) => busk(c, w, 'oud'), busk_accordion: (c, w) => busk(c, w, 'accordion'),
     busk_pan: (c, w) => busk(c, w, 'pan'), busk_flute: (c, w) => busk(c, w, 'flute'), busk_sax: (c, w) => busk(c, w, 'sax'),
@@ -666,14 +692,14 @@ const Sound = (() => {
     let rev = 0, dl = 0, tw = 0; for (const k in REC) { const w = REC[k].w; rev += REC[k].rev * w; dl += REC[k].dly * w; tw += w; }
     if (tw > 0) { rev /= tw; dl /= tw; }
     const sp = R.spots;
-    rev = Math.min(1, rev + (sp.arch || 0) * 0.6 + (sp.glasshouse || 0) * 0.3 + R.night * 0.12 + R.under * 0.25);
+    rev = Math.min(1, rev + (sp.arch || 0) * 0.6 + (sp.glasshouse || 0) * 0.3 + (sp.crag || 0) * 0.3 + (sp.skydeck || 0) * 0.35 + R.night * 0.12 + R.under * 0.25);
     revIn.gain.setTargetAtTime(rev * 0.7, now, 0.5);
-    dlyIn.gain.setTargetAtTime(dl * 0.6 + (sp.arch || 0) * 0.6, now, 0.5);
+    dlyIn.gain.setTargetAtTime(dl * 0.6 + (sp.arch || 0) * 0.6 + (sp.crag || 0) * 0.3, now, 0.5);
     dlyFb.gain.setTargetAtTime(0.32 + (sp.arch || 0) * 0.42 + (sp.lighthouse || 0) * 0.2, now, 0.5);
     const spbDom = 60 / clk.bpm * dom.f;
     dly.delayTime.setTargetAtTime(Math.min(2.5, spbDom * ((sp.arch || 0) > 0.3 ? 1.5 : 0.75)), now, 0.4);
     crushMix.gain.setTargetAtTime((sp.cellar || 0) * 0.55, now, 0.3); cleanMix.gain.setTargetAtTime(1 - (sp.cellar || 0) * 0.45, now, 0.3);
-    const lpf = R.water > 0 ? 380 : 18000 * Math.pow(0.1, (sp.cellar || 0) * 0.9) * (1 - R.under * 0.4);
+    const lpf = R.water > 0 ? 380 : 18000 * Math.pow(0.1, (sp.cellar || 0) * 0.9 + (sp.skydeck || 0) * 0.55) * (1 - R.under * 0.4);
     mlp.frequency.setTargetAtTime(lpf, now, R.water > 0 ? 0.05 : 0.3);
   }
   function tick(T, t, td) {
