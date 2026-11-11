@@ -1,7 +1,10 @@
 # Downtone — to do
 
 ## Fixes and checks
-- Pedestrians seen on the rails in Central station: three walkers sit at platform depth nearby, cause not found yet
+- Pedestrians on the metro rails: seen in Central station and again near the forest (three walkers sit at platform
+  depth near Central; cause not found yet)
+- Central station exits need cleaning up: passageways too narrow, handrails not visible, and you can still fall
+  through gaps between walls
 - Check the new district music on a phone speaker (basses now have harmonics); retune the per-district move sounds (grind, tricks) to the new styles if they clash
 - Turning circles at road ends look a bit blobby (make them true circles)
 - Physics/camera bot (`tools/bot.py`) not run yet on the latest build
@@ -24,8 +27,8 @@
 
 ## World
 - Vineyards: improve them, make the grapes visible
-- More relief overall; downtown, some streets much higher than others, with at least one bridge crossing
-  a street far below
+- More relief and bridges: downtown, some streets much higher than others, with at least one bridge crossing
+  a street far below. Where the metro crosses streets it's a mess: give the streets (or the line) proper bridges
 
 ## New places (each with its own musical ambience)
 - Forest crag: a big rock / small mountain in the forest rising above the tree line; a path up with a rail;
