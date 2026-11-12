@@ -33,12 +33,13 @@ const hooks = {
   },
   land(impact) {
     const p = Game.player, g = p.ground;
-    if (g && g.tag === 'bounce' && impact > 2.5) {
+    if (g && g.tag === 'bounce' && impact > (g.kick ? 0.8 : 2.5)) {
       // a canvas awning: back up you go, a little higher each time you keep it going
       Game.bounceN = Game.t - (Game.bounceT || 0) < 2.5 ? (Game.bounceN || 0) + 1 : 0; Game.bounceT = Game.t;
       // keep steering (or jumping) to keep it going; let go and the bounces die down
       const driving = Math.hypot(Input.move.x, Input.move.y) > 0.15 || Input.kbActive || Input.jumpHeld;
-      const vy = driving ? U.clamp(impact * 0.82 + 2, 9, 15.5) : impact * 0.55;
+      // (the shades set out as steps up a wall always throw you high enough to reach the next one)
+      const vy = driving || g.kick ? U.clamp(impact * 0.82 + 2, g.kick || 9, 15.5) : impact * 0.55;
       if (vy < 3) { Sound.sfx.land(0.3); return; }
       p.mode = 'air'; p.vel.y = vy; p.pos.y += 0.05; p.airTime = 0; p.ground = null;
       Sound.sfx.touch(g.drum !== undefined ? 'drum' : 'bounce', g.drum ?? Game.bounceN);

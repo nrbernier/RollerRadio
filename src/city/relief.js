@@ -74,7 +74,9 @@ function prepRelief() {
   SITE.y = mean(SITE); flattenRect([SITE[0] + 8, SITE[1] + 8, SITE[2] - 8, SITE[3] - 8], SITE.y, 10, 'set');
   TOWER.y = cityHeight(TOWER.x, TOWER.z + 24); flattenRect([TOWER.x - 24, TOWER.z - 24, TOWER.x + 24, TOWER.z + 26], TOWER.y, 14, 'set');
   // the old town's squares and playgrounds sit on little terraces
-  for (const p of OLD_PADS) { p.y = cityHeight(p[0], p[1]); flattenRect([p[0] - p[2], p[1] - p[2], p[0] + p[2], p[1] + p[2]], p.y, 12, 'set'); }
+  // (levelled out to the next terrain grid line, so the paving laid on them is flat right to its edge)
+  const gdn = (v, o) => Math.floor((v - o) / cell) * cell + o, gup = (v, o) => Math.ceil((v - o) / cell) * cell + o;
+  for (const p of OLD_PADS) { p.y = cityHeight(p[0], p[1]); flattenRect([gdn(p[0] - p[2], x0), gdn(p[1] - p[2], z0), gup(p[0] + p[2], x0), gup(p[1] + p[2], z0)], p.y, 12, 'set'); }
 }
 // ground colours for the new places (rock, bare earth)
 const _rc = new THREE.Color();

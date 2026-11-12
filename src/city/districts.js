@@ -300,13 +300,14 @@ function buildBusiness(H) {
   // the rooftop garden: a car park with ramps up to a roof full of plants
   const sp = PLAN.spots.find(s => s.key === 'rooftop').at;
   buildGarage(H, sp[0] - 22, sp[1] - 16, sp[0] + 22, sp[1] + 16);
-  // blocks
+  // blocks (a landmark that finds no lot on its own block moves on to the next block that has room)
+  const waiting = [];
   for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
     let bx0 = xs[i] + jog[i][j] + street / 2 + 5, bx1 = xs[i + 1] + jog[i + 1][j] - street / 2 - 5; const bz0 = zs[j] + street / 2 + 5, bz1 = zs[j + 1] - street / 2 - 5;
     // (the blocks either side of the sunken street stand back behind the walks along its rims)
     if (valleyRow(j) && i === 0) bx1 = VALLEY.x - VALLEY.rimHalf - 4; if (valleyRow(j) && i === 1) bx0 = VALLEY.x + VALLEY.rimHalf + 7;
     if (bx1 - bx0 < 20 || bz1 - bz0 < 20) continue;
-    let land = BIZ_LAND[i + ',' + j];
+    let land = BIZ_LAND[i + ',' + j] || null; const own = !!land;
     // centrality: taller near Central and the middle of the district
     const cx = (bx0 + bx1) / 2, cz = (bz0 + bz1) / 2, core = Math.exp(-Math.hypot(cx - 60, cz + 280) / 520);
     // split into lots
@@ -330,9 +331,10 @@ function buildBusiness(H) {
         continue;
       }
       const tall = 14 + r() * 20 + core * (40 + r() * 70);
-      const lm = land && x1 - x0 > 22 && z1 - z0 > 22 && faces.includes('s') ? land : null; if (lm) land = null;
+      let lm = null; if (x1 - x0 > 22 && z1 - z0 > 22 && faces.includes('s')) { if (land) { lm = land; land = null; } else if (!own && waiting.length) lm = waiting.shift(); }
       bizBuilding(H, x0, z0, x1, z1, tall, r, { faces, land: lm });
     }
+    if (land) waiting.push(land);
     // street trees + lamps along the block edges
     for (let t = bz0 + 6; t < bz1 - 4; t += 18) {
       if (H.clearOf(bx0 - 7, t - 1, bx0 - 5, t + 1, 0)) H.tree(bx0 - 6, t, { s: 0.75, color: '#5aa35a', color2: '#4a8f4a' });
@@ -358,7 +360,7 @@ function bizBuilding(H, x0, z0, x1, z1, tall, r, o = {}) {
   const sr = U.rng(((x0 * 73 + z0 * 131) | 0) ^ 0x9e37), faces = o.faces || [];
   for (let k = 0; k < 3; k++) sr();
   const style = o.land ? LAND_STYLE[o.land] : pick(sr, ['band', 'band', 'arcade', 'arcade', 'pilotis', 'lobby', 'lobby', 'steps', 'corner', 'setback']);
-  const pod = bizPodium(H, x0, z0, x1, z1, (o.land === 'diner' ? 5 : 6) + r() * 5, pick(r, ['#d9d3c4', '#c8bfae', '#b5a993', '#e6dfd0', '#a8a49a']), style, sr, faces);
+  const pod = bizPodium(H, x0, z0, x1, z1, (o.land === 'diner' ? 5 : 6) + r() * 5, pick(r, ['#d9d3c4', '#c8bfae', '#b5a993', '#e6dfd0', '#a8a49a']), style, sr, faces, o.land);
   if (o.land) bizLandmark(H, o.land, pod, faces, sr); else bizShop(H, pod, faces, sr);
   W.bizTop = Math.max(W.bizTop || 0, pod.top + tall);
   [x0, z0, x1, z1] = pod.box;

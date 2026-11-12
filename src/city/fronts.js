@@ -24,7 +24,7 @@ const frYaw = (fr) => Math.atan2(fr.nx, fr.nz);
 function frGround(fr, o = 1.5) { let lo = 1e9, hi = -1e9; for (const u of [-fr.L / 2 + 1, 0, fr.L / 2 - 1]) { const [x, z] = frPt(fr, u, o), y = terrainAt(x, z); lo = Math.min(lo, y); hi = Math.max(hi, y); } return [lo, hi]; }
 
 // the podium of a downtown building. Returns what H.bldg returns, plus `box`: the footprint the tower may use
-function bizPodium(H, x0, z0, x1, z1, h, col, style, sr, faces) {
+function bizPodium(H, x0, z0, x1, z1, h, col, style, sr, faces, land) {
   const { K, W, B, F } = H, put = H.put, M = W.metro;
   const [lo, hi] = groundSpan(x0, z0, x1, z1), top = hi + h;
   let base = lo - 1.5;
@@ -67,7 +67,12 @@ function bizPodium(H, x0, z0, x1, z1, h, col, style, sr, faces) {
     const s = 1.3;
     K.box(x0, base, z0, x1, hi + 0.42, z1, '#cfc6b4', 'paving', { outlineT: 0.05 });
     K.box(x0 + s, base, z0 + s, x1 - s, hi + 0.84, z1 - s, '#d8cfbf', 'paving', { outlineT: 0.05 });
-    for (const [k, y] of [[0.12, hi + 0.45], [s + 0.12, hi + 0.87]]) K.rail([[x0 + k, y, z0 + k], [x1 - k, y, z0 + k], [x1 - k, y, z1 - k], [x0 + k, y, z1 - k]], { hidden: true, loop: true, round: 0 });
+    // (a landmark's own steps and columns stand on its front side: the plinth's edges don't grind there)
+    const skip = land ? ['n', 'e', 's', 'w'].indexOf(['s', 'e', 'w', 'n'].find(q => faces.includes(q)) || 's') : -1;
+    for (const [k, y] of [[0.12, hi + 0.45], [s + 0.12, hi + 0.87]]) {
+      const c = [[x0 + k, y, z0 + k], [x1 - k, y, z0 + k], [x1 - k, y, z1 - k], [x0 + k, y, z1 - k]];
+      if (skip < 0) K.rail(c, { hidden: true, loop: true, round: 0 }); else K.rail([0, 1, 2, 3].map(i => c[(skip + 1 + i) % 4]), { hidden: true, round: 0 });
+    }
     box = [x0 + 2 * s, z0 + 2 * s, x1 - 2 * s, z1 - 2 * s];
     body(box[0], box[1], box[2], box[3], hi + 0.8, top);
     band(box[0], box[1], box[2], box[3], hi + 1.0, hi + 4.2);

@@ -54,6 +54,16 @@
     add('New places', 'Sunken street', () => go(VALLEY.x, -560, VALLEY.x, -480));
     add('New places', 'Bridge over the sunken street', () => go(VALLEY.x - 40, -492, VALLEY.x, -492));
     add('New places', 'Vineyards', () => go(345, -1180, 345, -1260));
+    for (const p of OLD_PADS) add('Old town', 'Open place: ' + p[3], () => go(p[0], p[1] + p[2] + 6, p[0], p[1]));
+    add('Old town', 'A courtyard', () => { const c = (W.roofsOld || []).find(q => q.noWay && q.type === 'gable'); if (c) go(c.x0 - 8, c.z0 - 8, c.x1, c.z1); });
+    for (const way of ['stair', 'catslide', 'shades']) add('Old town', 'Way up: ' + way, () => { const L = (W.roofsOld || []).filter(q => q.way === way), c = L[Math.floor(Math.random() * L.length)]; if (c) { const dx = c.wayAt[0] - (c.x0 + c.x1) / 2, dz = c.wayAt[1] - (c.z0 + c.z1) / 2, l = Math.hypot(dx, dz) || 1; go(c.wayAt[0] + dx / l * 6, c.wayAt[1] + dz / l * 6, c.wayAt[0], c.wayAt[1]); } });
+    add('Old town', 'On a roof', () => { const L = (W.roofsOld || []).filter(q => q.flat && q.type !== 'tower'), c = L[Math.floor(Math.random() * L.length)]; if (c) go((c.x0 + c.x1) / 2, (c.z0 + c.z1) / 2, c.x1 + 20, c.z1 + 20, c.top + 0.1); });
+    add('Market', 'Great market (by the tower)', () => go(MKT.tower[0] - 14, MKT.tower[1] + 14, MKT.tower[0], MKT.tower[1]));
+    add('Market', 'Covered lane', () => go(760, -250, 800, -250));
+    MKT.inns.forEach(n => add('Market', n[4], () => go((n[0] + n[2]) / 2, n[1] - 8, (n[0] + n[2]) / 2, n[3])));
+    add('Market', "Dyers' yard", () => go((MKT.dyers[0] + MKT.dyers[2]) / 2, MKT.dyers[1] - 8, (MKT.dyers[0] + MKT.dyers[2]) / 2, MKT.dyers[3]));
+    for (const way of ['stair', 'shades']) add('Market', 'Way up: ' + way, () => { const L = (W.roofsMkt || []).filter(q => q.way === way), c = L[Math.floor(Math.random() * L.length)]; if (c) { const dx = c.wayAt[0] - (c.x0 + c.x1) / 2, dz = c.wayAt[1] - (c.z0 + c.z1) / 2, l = Math.hypot(dx, dz) || 1; go(c.wayAt[0] + dx / l * 6, c.wayAt[1] + dz / l * 6, c.wayAt[0], c.wayAt[1]); } });
+    add('Market', 'On the roofs', () => { const L = W.roofsMkt || [], c = L[Math.floor(Math.random() * L.length)]; if (c) go((c.x0 + c.x1) / 2, (c.z0 + c.z1) / 2, c.x1 + 20, c.z1 + 20, c.top + 0.1); });
     add('Places', 'Music garden', () => look(-500, 905, 12));
     add('Places', 'Canal basin', () => look(PLAN.canal.bendX, canalEndZ() - 10, 18));
     add('Places', 'Skatepark', () => look(-545, 256, 16));

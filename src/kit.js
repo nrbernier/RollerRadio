@@ -47,6 +47,7 @@ function wedgeGeo(x0, z0, x1, z1, axis, h0, h1, base, plank) {
     p.setXYZ(i, U.lerp(x0, x1, x + 0.5), y > 0 ? top : (plank ? top - 0.35 : base), U.lerp(z0, z1, z + 0.5));
   }
   g.computeVertexNormals();
+  g.userData.wedge = true;
   return g;
 }
 function at(m, x, y, z) { m.position.set(x, y, z); return m; }
@@ -890,11 +891,22 @@ function makeKit(meta) {
         }
       }
       if (d.laundry) {
-        const cols = ['#e9e4f5', '#c9c4d8', '#e9e4f5', '#ff2e88', '#c9c4d8', '#e9e4f5', '#c9c4d8'];
-        let k = 0;
-        for (let t = 2; t < L - 1; t += 2.6) {
-          const pp = railPoint(r, t);
-          B.add(new THREE.BoxGeometry(1.1, 1.3, 0.05), new THREE.Matrix4().makeTranslation(pp.x, pp.y - 0.7, pp.z), cols[k++ % cols.length], 'plain', { outlineT: 0.03, edges: false });
+        // washing pegged to the line: sheets, towels, shirts, trousers, socks; they hang square to the line
+        const cols = Array.isArray(d.laundry) ? d.laundry : ['#f6f1e7', '#e9e4f5', '#7fb7d8', '#ff5a8a', '#f2c14e', '#f6f1e7', '#6fb38a', '#e4572e', '#c9c4d8', '#3a5a8a'];
+        const lr = U.rng((P[0].x * 13 + P[0].z * 7) | 0); let k = Math.floor(lr() * cols.length);
+        const _lm = new THREE.Matrix4(), _lp = V3();
+        const piece = (pp, yaw, du, dy, w, h, c) => { _lm.makeRotationY(yaw).setPosition(pp.x + Math.cos(yaw) * du, pp.y + dy, pp.z - Math.sin(yaw) * du); B.add(new THREE.BoxGeometry(w, h, 0.05), _lm.clone(), c, 'plain', { outlineT: 0.025, edges: false }); };
+        for (let t = 1.6; t < L - 1.2;) {
+          const pp = railPoint(r, t, _lp), dr = railDir(r, t), yaw = Math.atan2(-dr.z, dr.x), c = cols[k++ % cols.length], what = lr();
+          let w = 1.0;
+          if (d.cloth) { w = 1.3; piece(pp, yaw, 0, -0.06 - d.cloth / 2, w, d.cloth * (0.75 + lr() * 0.25), c); }
+          else if (what < 0.3) { w = 1.7; piece(pp, yaw, 0, -0.75, w, 1.4, c); }                                                   // a sheet
+          else if (what < 0.5) { w = 0.8; piece(pp, yaw, 0, -0.55, w, 1.0, c); piece(pp, yaw, 0, -0.3, w + 0.02, 0.14, '#f6f1e7'); }  // a towel with a stripe
+          else if (what < 0.75) { w = 1.2; piece(pp, yaw, 0, -0.5, 0.7, 0.9, c); piece(pp, yaw, -0.47, -0.26, 0.26, 0.42, c); piece(pp, yaw, 0.47, -0.26, 0.26, 0.42, c); }   // a shirt
+          else if (what < 0.9) { w = 0.8; piece(pp, yaw, 0, -0.2, 0.7, 0.3, c); piece(pp, yaw, -0.19, -0.75, 0.3, 0.9, c); piece(pp, yaw, 0.19, -0.75, 0.3, 0.9, c); }       // trousers
+          else { w = 0.7; piece(pp, yaw, -0.18, -0.25, 0.16, 0.42, c); piece(pp, yaw, 0.18, -0.25, 0.16, 0.42, c); }                // a pair of socks
+          for (const s of [-1, 1]) piece(pp, yaw, s * Math.min(0.5, w * 0.36), 0.0, 0.07, 0.2, '#c9a878');                          // clothes pegs
+          t += w + 0.45 + lr() * 0.5;
         }
       }
       if (d.lanterns) {

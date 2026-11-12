@@ -23,6 +23,9 @@ class CellBatch extends StaticBatch {
   }
   // same as StaticBatch.add, but edges are filed by cell
   add(geo, matrix, color, kind = 'plain', o = {}) {
+    // a kit ramp is a box pulled into a wedge: it must not take the fast box path (that drew a unit cube at the origin).
+    // Roofs are shown by their far copy; every other ramp is drawn here
+    if (geo.userData && geo.userData.wedge) { if (kind !== 'roof') super.add(geo.toNonIndexed(), matrix, color, kind, Object.assign({}, o, { edges: false })); return; }
     if (geo.type === 'BoxGeometry') this.addBox(geo.parameters, matrix, color, kind, o);
     else super.add(geo, matrix, color, kind, Object.assign({}, o, { edges: false }));
     if (o.edges === false) return;
