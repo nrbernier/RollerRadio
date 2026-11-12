@@ -28,6 +28,11 @@
 - The roof slides (`catslide`) are drawn by the far copy only, like every roof: check they look right close up
 - Roof links (plank bridges, washing lines, lanterns): check none crosses a tower or a chapel roof
 
+## Graphics: model sheets (models/)
+- `models/kit.js` + `models/preview.html`: a house kit (windows, doors, shop front, balcony, timbering, tiled roof,
+  dormer, chimney; five houses) and eight pedestrians, as data. Not in the game yet. `models/README.md` says how
+  to wire them in and what they cost. Start with the light version on one quarter and measure on a phone
+
 ## World
 - Vineyards: improve them, make the grapes visible
 - More relief: only the sunken street so far. More streets at different heights, more bridges

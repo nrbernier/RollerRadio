@@ -1,0 +1,177 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RollerRadio Model Sheet</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* layout: a modeller's contact sheet — plates on a grid, each a turntable with its part and triangle count underneath */
+:root {
+  --bg: #f1eff6; --panel: #ffffff; --ink: #1d1a26; --mute: #655f76; --line: #d9d4e6; --accent: #d9482a; --sky0: #bcd9ee; --sky1: #f3efe6; --ground: #cfc4a6; --chip: #e7e2f2;
+  --display: 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif; --body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #15131c; --panel: #1f1c29; --ink: #efeaf7; --mute: #a59fb8; --line: #353044; --accent: #ff7a5a; --sky0: #2c3f5c; --sky1: #4a4458; --ground: #5a5448; --chip: #2b2738; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #15131c; --panel: #1f1c29; --ink: #efeaf7; --mute: #a59fb8; --line: #353044; --accent: #ff7a5a; --sky0: #2c3f5c; --sky1: #4a4458; --ground: #5a5448; --chip: #2b2738; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 36px; }
+header h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 5vw, 44px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 10px; text-wrap: balance; }
+header p, .note p { max-width: 66ch; margin: 0 0 8px; color: var(--mute); }
+header p strong, .note strong { color: var(--ink); font-weight: 600; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; margin: 0; }
+section { display: flex; flex-direction: column; gap: 14px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+.head span { color: var(--mute); font-size: 14px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.grid.big { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.plate { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.plate canvas { display: block; width: 100%; aspect-ratio: 8 / 7; background: linear-gradient(var(--sky0), var(--sky1) 72%, var(--ground) 72%); cursor: grab; touch-action: pan-y; }
+.plate canvas:active { cursor: grabbing; }
+.plate canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cap { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+.cap b { font-family: var(--display); font-weight: 500; font-size: 16px; }
+.cap small { color: var(--mute); font-size: 13px; }
+.nums { font-family: var(--mono); font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 2px; }
+.nums i { font-style: normal; background: var(--chip); border-radius: 3px; padding: 1px 6px; color: var(--ink); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 500 14px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 7px 12px; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.note { border-top: 1px solid var(--line); padding-top: 18px; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 14px; min-width: 460px; }
+th, td { text-align: left; padding: 6px 18px 6px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+th { font-weight: 600; color: var(--mute); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+td.n { font-family: var(--mono); font-size: 13px; }
+#fail { color: var(--accent); font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>RollerRadio model sheet</h1>
+    <p><strong>A house kit and eight pedestrians</strong>, drawn from the same boxes, cylinders and low-poly blobs the game already uses. Drag a plate to turn it. Nothing here is in the game yet: this sheet is for judging the look before another model wires it in.</p>
+    <p>The outline and flat shading are approximations of the game's own. Colours are the old town's and the market's existing palettes.</p>
+    <p id="fail" hidden>The 3D library did not load, so the plates are empty. The counts below are still right.</p>
+  </header>
+
+  <section>
+    <div class="head"><h2>Houses</h2><span>five kinds, each assembled from the pieces below</span></div>
+    <div class="bar" role="group" aria-label="Level of detail">
+      <button id="lodFull" aria-pressed="true">Close-up version</button><button id="lodLite" aria-pressed="false">Light version</button>
+      <span style="color:var(--mute);font-size:13px">The light version is what every house not near the player would use.</span>
+    </div>
+    <div class="grid big" id="houses"></div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Pieces</h2><span>what the houses are made of</span></div>
+    <div class="grid" id="pieces"></div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Pedestrians</h2><span>eight people from four torsos, two legs, four haircuts, four hats and nine things to carry</span></div>
+    <div class="bar" role="group" aria-label="Pose"><button id="walk" aria-pressed="true">Walking</button><button id="stand" aria-pressed="false">Standing</button></div>
+    <div class="grid" id="people"></div>
+  </section>
+
+  <section class="note">
+    <div class="head"><h2>What it costs</h2><span>triangles per model, against what the game draws today</span></div>
+    <div class="tbl"><table id="cost"><thead><tr><th>Model</th><th>Parts</th><th>Triangles</th><th>Light version</th></tr></thead><tbody></tbody></table></div>
+    <p>A house in the game today is about <strong>40 triangles</strong> (a box and a roof), with its windows painted on. The old town has roughly 1,100 houses, so the close-up version can only be used for the few dozen nearest the player. The light version is the one to use everywhere else, and even it is a real cost on a phone: it should be measured before it goes in across a whole district.</p>
+    <p>A pedestrian today is about 400 triangles. These are 800 to 1,100, and need about 25 draw calls for all the variants where the game now uses 9.</p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
+<script src="kit.js"></script>
+<script>
+(() => {
+  const K = KIT, $ = (id) => document.getElementById(id), still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const plates = []; let lite = false, walking = true;
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  function plate(host, name, sub, nums) {
+    const p = el('div', 'plate'), c = el('canvas'); c.width = 640; c.height = 560; c.tabIndex = 0; c.setAttribute('role', 'img'); c.setAttribute('aria-label', name + ', turntable view');
+    const cap = el('div', 'cap', `<b>${name}</b>${sub ? `<small>${sub}</small>` : ''}<div class="nums"></div>`);
+    p.append(c, cap); host.append(p);
+    const P = { c, ctx: c.getContext('2d'), nums: cap.querySelector('.nums'), yaw: 0.6, spin: true, seen: true, dirty: true };
+    P.setNums = (a) => { P.nums.innerHTML = a.map(t => `<i>${t}</i>`).join(''); }; P.setNums(nums);
+    let drag = null;
+    c.addEventListener('pointerdown', (e) => { drag = [e.clientX, P.yaw]; P.spin = false; c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', (e) => { if (drag) { P.yaw = drag[1] + (e.clientX - drag[0]) * 0.012; P.dirty = true; } });
+    c.addEventListener('pointerup', () => { drag = null; });
+    c.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { P.yaw += e.key === 'ArrowLeft' ? -0.2 : 0.2; P.spin = false; P.dirty = true; e.preventDefault(); } });
+    plates.push(P); return P;
+  }
+  // captions and the cost table need no 3D
+  const HP = K.HOUSES.map(h => { const P = plate($('houses'), h.name, h.where, []); P.house = h; return P; });
+  const PP = K.PIECES.map(([name, fn, hi]) => { const parts = fn(), P = plate($('pieces'), name, '', [parts.length + ' parts', K.count(parts) + ' tris']); P.parts = parts; P.pal = K.HOUSES[hi].pal; return P; });
+  const MP = K.PEOPLE.map(m => { const bits = [m.torso, m.hair + ' hair'].concat(m.hat ? [m.hat] : [], m.acc || []); const P = plate($('people'), m.name, m.where, [K.personTris(m) + ' tris', ...bits]); P.person = m; return P; });
+  const tb = $('cost').tBodies[0];
+  for (const h of K.HOUSES) { const a = h.build(false), b = h.build(true); tb.append(el('tr', '', `<td>${h.name}</td><td class="n">${a.parts.length}</td><td class="n">${K.count(a.parts).toLocaleString()}</td><td class="n">${K.count(b.parts).toLocaleString()}</td>`)); }
+  for (const m of K.PEOPLE) tb.append(el('tr', '', `<td>${m.name}</td><td class="n">—</td><td class="n">${K.personTris(m).toLocaleString()}</td><td class="n">—</td>`));
+  const houseNums = () => HP.forEach(P => { const b = P.house.build(lite); P.setNums([b.parts.length + ' parts', K.count(b.parts).toLocaleString() + ' tris', b.size.map(v => v.toFixed(1)).join(' × ') + ' m']); });
+  houseNums();
+  if (!window.THREE) { $('fail').hidden = false; return; }
+
+  // ---- three: one renderer, drawn into each plate's 2D canvas ----
+  const T = THREE, R = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); R.setSize(640, 560, false); R.setClearColor(0x000000, 0);
+  const cam = new T.PerspectiveCamera(32, 640 / 560, 0.1, 300);
+  const inkMat = new T.ShaderMaterial({ side: T.BackSide, uniforms: { t: { value: 0.03 } }, vertexShader: 'uniform float t; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * t, 1.0); }', fragmentShader: 'void main(){ gl_FragColor = vec4(0.114, 0.102, 0.149, 1.0); }' });
+  const mats = new Map(), mat = (hex) => { if (!mats.has(hex)) mats.set(hex, new T.MeshLambertMaterial({ color: hex, flatShading: true })); return mats.get(hex); };
+  function prism(len, h, base) { const g = new T.BufferGeometry(), x = len / 2, z = base / 2, v = [[-x, 0, -z], [-x, 0, z], [-x, h, 0], [x, 0, -z], [x, 0, z], [x, h, 0]], f = [0, 1, 2, 3, 5, 4, 1, 4, 5, 1, 5, 2, 3, 0, 2, 3, 2, 5, 0, 3, 4, 0, 4, 1]; g.setAttribute('position', new T.Float32BufferAttribute(f.flatMap(i => v[i]), 3)); g.computeVertexNormals(); return g; }
+  function geo(p) {
+    const s = p.size, sg = p.seg;
+    return p.s === 'box' ? new T.BoxGeometry(s[0], s[1], s[2]) : p.s === 'cyl' ? new T.CylinderGeometry(s[0], s[1], s[2], sg || 8) : p.s === 'cone' ? new T.ConeGeometry(s[0], s[1], sg || 6)
+      : p.s === 'sph' ? new T.SphereGeometry(s[0], sg || 8, 6) : p.s === 'dome' ? new T.SphereGeometry(s[0], sg || 8, 4, 0, Math.PI * 2, 0, Math.PI / 2) : p.s === 'ico' ? new T.IcosahedronGeometry(s[0], 0) : prism(s[0], s[1], s[2]);
+  }
+  const shade = (hex, k) => '#' + new T.Color(hex).multiplyScalar(k).getHexString();
+  function mesh(p, hex, ink) {
+    const g = geo(p), m = new T.Mesh(g, mat(hex)); m.position.set(p.at[0], p.at[1], p.at[2]);
+    if (p.rot) m.rotation.set(p.rot[0], p.rot[1], p.rot[2], 'YXZ'); if (p.scale) m.scale.set(p.scale[0], p.scale[1], p.scale[2]);
+    const o = new T.Mesh(g, ink); m.add(o); return m;
+  }
+  const inkFor = (t) => { const m = inkMat.clone(); m.uniforms.t.value = t; return m; };
+  const INK_H = inkFor(0.035), INK_P = inkFor(0.013), INK_S = inkFor(0.018);
+  function fromParts(parts, pal, ink) { const g = new T.Group(); for (const p of parts) g.add(mesh(p, p.col[0] === '#' ? p.col : (pal[p.col] || '#ff00ff'), ink)); return g; }
+  function scene(obj, size) {
+    const sc = new T.Scene(); sc.add(new T.HemisphereLight(0xffffff, 0x8a8094, 0.78)); const d = new T.DirectionalLight(0xfff2dc, 0.62); d.position.set(4, 8, 6); sc.add(d);
+    const turn = new T.Group(); turn.add(obj); sc.add(turn); return { sc, turn, size };
+  }
+  function person(m) {
+    const b = K.BODY, c = m.c, root = new T.Group(), J = {};
+    const put = (parts, col, into) => { for (const p of parts) into.add(mesh(p, p.col ? p.col : shade(col, p.sh), INK_P)); };
+    put(b.torso[m.torso], c.top, root); put(b.head, c.skin, root); put(b.hair[m.hair], c.hair, root); if (m.hat) put(b.hat[m.hat], c.hat, root);
+    for (const j of ['legL', 'legR', 'armL', 'armR']) { J[j] = new T.Group(); J[j].position.fromArray(b.pivots[j]); root.add(J[j]); }
+    for (const j of ['legL', 'legR']) put(b.leg[m.leg], m.leg === 'bare' ? c.skin : c.legs, J[j]);
+    for (const j of ['armL', 'armR']) { put(b.arm.sleeve, m.torso === 'dress' ? c.skin : c.top, J[j]); put(b.hand, c.skin, J[j]); }
+    for (const a of (m.acc || [])) { const A = b.acc[a]; put(A.parts, c[a] || '#ffffff', A.at === 'body' ? root : J[A.at]); }
+    root.scale.setScalar(m.scale || 1); root.userData.J = J; return root;
+  }
+  const buildHouse = (P) => { const b = P.house.build(lite); P.view = scene(fromParts(b.parts, P.house.pal, INK_H), b.size); P.dirty = true; };
+  HP.forEach(buildHouse);
+  PP.forEach(P => { const box = new T.Box3().setFromObject(fromParts(P.parts, P.pal, INK_S)), sz = box.getSize(new T.Vector3()), ct = box.getCenter(new T.Vector3()), g = fromParts(P.parts, P.pal, INK_S); g.position.set(-ct.x, -box.min.y, -ct.z); P.view = scene(g, [sz.x, sz.y, sz.z]); });
+  MP.forEach(P => { const g = person(P.person); P.view = scene(g, [0.9, 1.95, 0.9]); P.J = g.userData.J; });
+
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach(e => { const P = plates.find(q => q.c === e.target); if (P) { P.seen = e.isIntersecting; P.dirty = true; } }), { rootMargin: '120px' }) : null;
+  if (io) plates.forEach(P => io.observe(P.c));
+  function draw(P, time) {
+    const V = P.view, [w, h, d] = V.size, r = Math.max(h * 0.62, Math.hypot(w, d) * 0.62) / Math.tan(16 * Math.PI / 180) * 1.02;
+    V.turn.rotation.y = P.yaw;
+    if (P.J) { const s = walking ? Math.sin(time * 6.5) : 0; P.J.legL.rotation.x = s * 0.55; P.J.legR.rotation.x = -s * 0.55; P.J.armL.rotation.x = -s * 0.45; P.J.armR.rotation.x = s * 0.45 - (P.person.acc || []).includes('phone') * 0.0; }
+    cam.position.set(0, h * 0.5 + r * 0.3, r * 0.95); cam.lookAt(0, h * 0.47, 0);
+    R.render(V.sc, cam); P.ctx.clearRect(0, 0, 640, 560); P.ctx.drawImage(R.domElement, 0, 0); P.dirty = false;
+  }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    for (const P of plates) { if (!P.seen) continue; const moving = !still && (P.spin || (P.J && walking)); if (P.spin && !still) P.yaw += dt * 0.35; if (moving || P.dirty) draw(P, now / 1000); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  const press = (on, off) => { on.setAttribute('aria-pressed', 'true'); off.setAttribute('aria-pressed', 'false'); };
+  $('lodFull').onclick = () => { lite = false; press($('lodFull'), $('lodLite')); HP.forEach(buildHouse); houseNums(); };
+  $('lodLite').onclick = () => { lite = true; press($('lodLite'), $('lodFull')); HP.forEach(buildHouse); houseNums(); };
+  $('walk').onclick = () => { walking = true; press($('walk'), $('stand')); MP.forEach(P => P.dirty = true); };
+  $('stand').onclick = () => { walking = false; press($('stand'), $('walk')); MP.forEach(P => P.dirty = true); };
+})();
+</script>
