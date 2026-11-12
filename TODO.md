@@ -32,6 +32,9 @@
 - `models/kit.js` + `models/preview.html`: a house kit (windows, doors, shop front, balcony, timbering, tiled roof,
   dormer, chimney; five houses) and eight pedestrians, as data. Not in the game yet. `models/README.md` says how
   to wire them in and what they cost. Start with the light version on one quarter and measure on a phone
+- `models/kit-street.js`: the skater redrawn on the present rig (three colour sets), fourteen pieces of street
+  furniture (finger post for finding your way, lamps, kiosk, tram shelter, bike rack…) and seven vehicles. Not in
+  the game yet; README has the wiring. Looked at once in the preview, front three-quarter view only
 
 ## World
 - Vineyards: improve them, make the grapes visible

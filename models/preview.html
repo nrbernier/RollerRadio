@@ -49,7 +49,7 @@ td.n { font-family: var(--mono); font-size: 13px; }
 <div class="wrap">
   <header>
     <h1>RollerRadio model sheet</h1>
-    <p><strong>A house kit and eight pedestrians</strong>, drawn from the same boxes, cylinders and low-poly blobs the game already uses. Drag a plate to turn it. Nothing here is in the game yet: this sheet is for judging the look before another model wires it in.</p>
+    <p><strong>A house kit, eight pedestrians, the skater, street furniture and vehicles</strong>, drawn from the same boxes, cylinders and low-poly blobs the game already uses. Drag a plate to turn it. Nothing here is in the game yet: this sheet is for judging the look before another model wires it in.</p>
     <p>The outline and flat shading are approximations of the game's own. Colours are the old town's and the market's existing palettes.</p>
     <p id="fail" hidden>The 3D library did not load, so the plates are empty. The counts below are still right.</p>
   </header>
@@ -74,20 +74,40 @@ td.n { font-family: var(--mono); font-size: 13px; }
     <div class="grid" id="people"></div>
   </section>
 
+  <section>
+    <div class="head"><h2>The skater</h2><span>the same rig and joints as today, redrawn: cropped jacket, radio on the back, headphones, buckled skates</span></div>
+    <div class="bar" role="group" aria-label="Skater pose"><button id="stride" aria-pressed="true">Striding</button><button id="rest" aria-pressed="false">Standing</button>
+      <span style="color:var(--mute);font-size:13px">The face stays the game's drawn one, so the head is blank here.</span></div>
+    <div class="grid big" id="skater"></div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Street furniture</h2><span>fourteen pieces; several are things to grind or bounce on</span></div>
+    <div class="grid" id="furniture"></div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Vehicles</h2><span>rigid and instanced as cars are now: one body colour per vehicle, the rest fixed</span></div>
+    <div class="bar"><button id="paint">Next colour</button></div>
+    <div class="grid big" id="vehicles"></div>
+  </section>
+
   <section class="note">
     <div class="head"><h2>What it costs</h2><span>triangles per model, against what the game draws today</span></div>
     <div class="tbl"><table id="cost"><thead><tr><th>Model</th><th>Parts</th><th>Triangles</th><th>Light version</th></tr></thead><tbody></tbody></table></div>
     <p>A house in the game today is about <strong>40 triangles</strong> (a box and a roof), with its windows painted on. The old town has roughly 1,100 houses, so the close-up version can only be used for the few dozen nearest the player. The light version is the one to use everywhere else, and even it is a real cost on a phone: it should be measured before it goes in across a whole district.</p>
     <p>A pedestrian today is about 400 triangles. These are 800 to 1,100, and need about 25 draw calls for all the variants where the game now uses 9.</p>
+    <p>The skater is one model on screen, so its triangles hardly matter. A car today is about 200 triangles and there are 24; these are 300 to 700. Furniture is 80 to 450 a piece and goes into the cell batches, so what counts is how many are put on each street.</p>
   </section>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
 <script src="kit.js"></script>
+<script src="kit-street.js"></script>
 <script>
 (() => {
   const K = KIT, $ = (id) => document.getElementById(id), still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const plates = []; let lite = false, walking = true;
+  const plates = []; let lite = false, walking = true, striding = true;
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   function plate(host, name, sub, nums) {
     const p = el('div', 'plate'), c = el('canvas'); c.width = 640; c.height = 560; c.tabIndex = 0; c.setAttribute('role', 'img'); c.setAttribute('aria-label', name + ', turntable view');
@@ -106,9 +126,14 @@ td.n { font-family: var(--mono); font-size: 13px; }
   const HP = K.HOUSES.map(h => { const P = plate($('houses'), h.name, h.where, []); P.house = h; return P; });
   const PP = K.PIECES.map(([name, fn, hi]) => { const parts = fn(), P = plate($('pieces'), name, '', [parts.length + ' parts', K.count(parts) + ' tris']); P.parts = parts; P.pal = K.HOUSES[hi].pal; return P; });
   const MP = K.PEOPLE.map(m => { const bits = [m.torso, m.hair + ' hair'].concat(m.hat ? [m.hat] : [], m.acc || []); const P = plate($('people'), m.name, m.where, [K.personTris(m) + ' tris', ...bits]); P.person = m; return P; });
+  const SKP = K.SKATER.looks.map(l => { const P = plate($('skater'), l.name, l.note, [K.skaterTris().toLocaleString() + ' tris']); P.look = l; return P; });
+  const FP = K.FURNITURE.map(([name, fn, note]) => { const parts = fn(), tags = [...new Set(parts.map(q => q.tag).filter(t => t && t !== 'solid'))]; const P = plate($('furniture'), name, note, [parts.length + ' parts', K.count(parts) + ' tris', ...tags]); P.parts = parts; return P; });
+  const VP = K.VEHICLES.map(v => { const parts = v.build(), P = plate($('vehicles'), v.name, v.note, [parts.length + ' parts', K.count(parts) + ' tris', v.box.join(' × ') + ' m']); P.veh = v; P.parts = parts; return P; });
   const tb = $('cost').tBodies[0];
   for (const h of K.HOUSES) { const a = h.build(false), b = h.build(true); tb.append(el('tr', '', `<td>${h.name}</td><td class="n">${a.parts.length}</td><td class="n">${K.count(a.parts).toLocaleString()}</td><td class="n">${K.count(b.parts).toLocaleString()}</td>`)); }
   for (const m of K.PEOPLE) tb.append(el('tr', '', `<td>${m.name}</td><td class="n">—</td><td class="n">${K.personTris(m).toLocaleString()}</td><td class="n">—</td>`));
+  tb.append(el('tr', '', `<td>Skater</td><td class="n">—</td><td class="n">${K.skaterTris().toLocaleString()}</td><td class="n">—</td>`));
+  for (const P of FP.concat(VP)) tb.append(el('tr', '', `<td>${P.veh ? P.veh.name : P.c.getAttribute('aria-label').split(',')[0]}</td><td class="n">${P.parts.length}</td><td class="n">${K.count(P.parts).toLocaleString()}</td><td class="n">—</td>`));
   const houseNums = () => HP.forEach(P => { const b = P.house.build(lite); P.setNums([b.parts.length + ' parts', K.count(b.parts).toLocaleString() + ' tris', b.size.map(v => v.toFixed(1)).join(' × ') + ' m']); });
   houseNums();
   if (!window.THREE) { $('fail').hidden = false; return; }
@@ -122,7 +147,8 @@ td.n { font-family: var(--mono); font-size: 13px; }
   function geo(p) {
     const s = p.size, sg = p.seg;
     return p.s === 'box' ? new T.BoxGeometry(s[0], s[1], s[2]) : p.s === 'cyl' ? new T.CylinderGeometry(s[0], s[1], s[2], sg || 8) : p.s === 'cone' ? new T.ConeGeometry(s[0], s[1], sg || 6)
-      : p.s === 'sph' ? new T.SphereGeometry(s[0], sg || 8, 6) : p.s === 'dome' ? new T.SphereGeometry(s[0], sg || 8, 4, 0, Math.PI * 2, 0, Math.PI / 2) : p.s === 'ico' ? new T.IcosahedronGeometry(s[0], 0) : prism(s[0], s[1], s[2]);
+      : p.s === 'sph' ? new T.SphereGeometry(s[0], sg || 8, 6) : p.s === 'dome' ? new T.SphereGeometry(s[0], sg || 8, 4, 0, Math.PI * 2, 0, Math.PI / 2) : p.s === 'ico' ? new T.IcosahedronGeometry(s[0], 0)
+      : p.s === 'cap' ? new T.CapsuleGeometry(s[0], s[1], 3, 8) : p.s === 'torus' ? new T.TorusGeometry(s[0], s[1], 5, sg || 12) : prism(s[0], s[1], s[2]);
   }
   const shade = (hex, k) => '#' + new T.Color(hex).multiplyScalar(k).getHexString();
   function mesh(p, hex, ink) {
@@ -147,6 +173,22 @@ td.n { font-family: var(--mono); font-size: 13px; }
     for (const a of (m.acc || [])) { const A = b.acc[a]; put(A.parts, c[a] || '#ffffff', A.at === 'body' ? root : J[A.at]); }
     root.scale.setScalar(m.scale || 1); root.userData.J = J; return root;
   }
+  function skater(c) {
+    const S = K.SKATER, pv = S.pivots, J = {}, grp = (at, into) => { const g = new T.Group(); g.position.fromArray(at); into.add(g); return g; };
+    const put = (parts, into, sx) => { for (const p of parts) { const q = sx < 0 && p.side ? Object.assign({}, p, { at: [-p.at[0], p.at[1], p.at[2]] }) : p; into.add(mesh(q, c[q.col] || q.col, INK_P)); } };
+    const root = new T.Group(), hips = grp([0, 1.115, 0], root); put(S.hips, hips, 1);
+    J.torso = grp(pv.torso, hips); put(S.torso, J.torso, 1); put(S.head, grp(pv.head, J.torso), 1);
+    for (const sx of [1, -1]) { const k = sx > 0 ? 'L' : 'R';
+      const a = J['arm' + k] = grp([sx * pv.arm[0], pv.arm[1], 0], J.torso); put(S.arm, a, sx); const f = J['fore' + k] = grp(pv.fore, a); put(S.fore, f, sx);
+      const l = J['leg' + k] = grp([sx * pv.leg[0], pv.leg[1], 0], hips); put(S.leg, l, sx); const s = J['shin' + k] = grp(pv.shin, l); put(S.shin, s, sx); put(S.skate, grp(pv.skate, s), sx); }
+    J.hips = hips; root.userData.SK = J; return root;
+  }
+  const centred = (parts, pal, ink) => { const g = fromParts(parts, pal, ink), box = new T.Box3().setFromObject(g), sz = box.getSize(new T.Vector3()), ct = box.getCenter(new T.Vector3()); g.position.set(-ct.x, -box.min.y, -ct.z); return scene(g, [sz.x, sz.y, sz.z]); };
+  SKP.forEach(P => { const g = skater(P.look.c); P.view = scene(g, [1.3, 2.3, 1.3]); P.SK = g.userData.SK; });
+  FP.forEach(P => { P.view = centred(P.parts, K.STREET_PAL, INK_S); });
+  let paintI = 0; const INK_V = inkFor(0.03);
+  const buildVeh = (P) => { const ps = P.veh.paints; P.view = centred(P.parts, { paint: ps[paintI % ps.length] }, INK_V); P.dirty = true; };
+  VP.forEach(buildVeh);
   const buildHouse = (P) => { const b = P.house.build(lite); P.view = scene(fromParts(b.parts, P.house.pal, INK_H), b.size); P.dirty = true; };
   HP.forEach(buildHouse);
   PP.forEach(P => { const box = new T.Box3().setFromObject(fromParts(P.parts, P.pal, INK_S)), sz = box.getSize(new T.Vector3()), ct = box.getCenter(new T.Vector3()), g = fromParts(P.parts, P.pal, INK_S); g.position.set(-ct.x, -box.min.y, -ct.z); P.view = scene(g, [sz.x, sz.y, sz.z]); });
@@ -158,19 +200,27 @@ td.n { font-family: var(--mono); font-size: 13px; }
     const V = P.view, [w, h, d] = V.size, r = Math.max(h * 0.62, Math.hypot(w, d) * 0.62) / Math.tan(16 * Math.PI / 180) * 1.02;
     V.turn.rotation.y = P.yaw;
     if (P.J) { const s = walking ? Math.sin(time * 6.5) : 0; P.J.legL.rotation.x = s * 0.55; P.J.legR.rotation.x = -s * 0.55; P.J.armL.rotation.x = -s * 0.45; P.J.armR.rotation.x = s * 0.45 - (P.person.acc || []).includes('phone') * 0.0; }
+    if (P.SK) { const J = P.SK, s = striding ? Math.sin(time * 3.2) : 0, k = striding ? 1 : 0, up = Math.max(0, s), dn = Math.max(0, -s);
+      J.hips.rotation.x = 0.16 * k; J.hips.position.y = 1.115 - 0.07 * k; J.torso.rotation.x = 0.22 * k; J.torso.rotation.y = s * 0.18;
+      J.legL.rotation.x = -0.3 * k - s * 0.35; J.legR.rotation.x = -0.3 * k + s * 0.35; J.legL.rotation.z = dn * 0.28; J.legR.rotation.z = -up * 0.28;
+      J.shinL.rotation.x = 0.5 * k + dn * 0.5; J.shinR.rotation.x = 0.5 * k + up * 0.5;
+      J.armL.rotation.x = s * 0.7; J.armR.rotation.x = -s * 0.7; J.armL.rotation.z = 0.12; J.armR.rotation.z = -0.12; J.foreL.rotation.x = -0.5 * k - up * 0.4; J.foreR.rotation.x = -0.5 * k - dn * 0.4; }
     cam.position.set(0, h * 0.5 + r * 0.3, r * 0.95); cam.lookAt(0, h * 0.47, 0);
     R.render(V.sc, cam); P.ctx.clearRect(0, 0, 640, 560); P.ctx.drawImage(R.domElement, 0, 0); P.dirty = false;
   }
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    for (const P of plates) { if (!P.seen) continue; const moving = !still && (P.spin || (P.J && walking)); if (P.spin && !still) P.yaw += dt * 0.35; if (moving || P.dirty) draw(P, now / 1000); }
+    for (const P of plates) { if (!P.seen) continue; const moving = !still && (P.spin || (P.J && walking) || (P.SK && striding)); if (P.spin && !still) P.yaw += dt * 0.35; if (moving || P.dirty) draw(P, now / 1000); }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
   const press = (on, off) => { on.setAttribute('aria-pressed', 'true'); off.setAttribute('aria-pressed', 'false'); };
   $('lodFull').onclick = () => { lite = false; press($('lodFull'), $('lodLite')); HP.forEach(buildHouse); houseNums(); };
   $('lodLite').onclick = () => { lite = true; press($('lodLite'), $('lodFull')); HP.forEach(buildHouse); houseNums(); };
+  $('stride').onclick = () => { striding = true; press($('stride'), $('rest')); SKP.forEach(P => P.dirty = true); };
+  $('rest').onclick = () => { striding = false; press($('rest'), $('stride')); SKP.forEach(P => P.dirty = true); };
+  $('paint').onclick = () => { paintI++; VP.forEach(buildVeh); };
   $('walk').onclick = () => { walking = true; press($('walk'), $('stand')); MP.forEach(P => P.dirty = true); };
   $('stand').onclick = () => { walking = false; press($('stand'), $('walk')); MP.forEach(P => P.dirty = true); };
 })();
