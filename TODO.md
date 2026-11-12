@@ -17,12 +17,16 @@
 - More natural ways to ride up buildings generally (the old sky-rail pipe was too odd)
 
 ## Street-level variety (and easier to find your way)
-- Downtown, still to do: look over every ground-floor kind on a phone (arcades, stilts, lobbies, plinths, cut corners,
-  forecourts); the library and the baths found no lot and are missing; a plinth rail by the bank runs through its steps
-- Old town & market: much more variety in the buildings, and more open spaces between them:
-  inner courtyards, small playgrounds, squares (the ground for nine of them is levelled: `OLD_PADS` in relief.js; nothing built yet)
-- Market: too self-similar. One real big market instead of several similar ones; vary the rest of the
-  district, and make it less like the old town (idea: flat roofs, covered lanes, courtyard inns, a dyers' yard)
+- Downtown: look over every ground-floor kind on a phone (arcades, stilts, lobbies, plinths, cut corners, forecourts)
+- Old town & market: rebuilt (see Done). Still to do: ride them end to end on a phone; thin out anything that
+  crowds the lanes; check the far view of the market's domes and wind towers
+
+## Old town & market: life at roof level — what's left
+- Shades set out as steps up a wall (`shadeSteps` in roofs.js, tagged `kick`): landing on one does not bounce you
+  up yet (tested headless: the player stops on it). Look at `land()` in game.js: probably the ground found
+  under the player is not the shade box
+- The roof slides (`catslide`) are drawn by the far copy only, like every roof: check they look right close up
+- Roof links (plank bridges, washing lines, lanterns): check none crosses a tower or a chapel roof
 
 ## World
 - Vineyards: improve them, make the grapes visible
@@ -37,6 +41,14 @@
   walkers cross on the decks (the tool does not know that yet)
 
 ## Done
+- Old town: five quarters with their own colours and house kinds (gabled, timbered, crow-stepped, stone, towers,
+  flat terraces); nine open places (chapel, two playgrounds, well, fountain square, two walled gardens, boules,
+  a courtyard block); courtyard blocks with galleries and stairs
+- Market: one great market round the hall (cloth, spice, fruit, flower rows) under a clock tower; covered lanes
+  to the north; three courtyard inns; the dyers' yard; flat roofs with terraces, pergolas, domes, wind towers
+- Roof level: outside stairs and low-swept roofs up; plank bridges, washing lines (clothes on pegs) and lanterns
+  between roofs, all grindable; galleries on the fronts
+- Downtown: library and baths placed; the bank's plinth rail stays off its steps; kit ramps draw in the city
 - Sunken street through downtown (twelve metres down, brick walls, three street bridges over it, slide rails, a ramp up)
 - Metro crossings: two streets bridge the cutting north of downtown; the line clears the avenue and the street by Hilltop
 - Downtown street level: ground floors of seven kinds, landmark fronts with signs (cinema, theatre, opera, hotel, bank,
