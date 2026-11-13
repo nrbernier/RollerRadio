@@ -9,6 +9,10 @@ function makeNao() {
   return new Rig({
     colors: { skin: '#d9a07a', jacket: '#6f9a92', pants: '#3b3f4f', boot: '#efe6d2', bootCuff: '#c98a4a', wheels: '#c9b48a' },
     sleeve: '#6f9a92', gloves: '#d9a07a', legs: '#3b3f4f', collar: '#d9a441', stripe: '#d9a441',
+    // the body, knee pads and buckled skates of the model sheet, in her colours (no radio, no headphones: she keeps her own hair)
+    kit: KIT.SKATER, kitOpts: [],
+    kitColors: { jacket: '#6f9a92', jacket2: '#5d857e', sleeve: '#6f9a92', accent: '#d9a441', shirt: '#efe6d2', pants: '#3b3f4f', pants2: '#474b5c',
+      boot: '#efe6d2', boot2: '#c98a4a', frame: '#3a3550', wheels: '#c9b48a', skin: '#d9a07a', glove: '#d9a07a', ink: '#1d1a26', hair: '#2d2522' },
     hair(head, R, T) {
       const hair = part(new THREE.SphereGeometry(R * 1.08, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), '#2d2522', T); hair.position.y = R * 0.05; hair.scale.set(1.04, 1.04, 1.06); head.add(hair);
       const back = part(new THREE.SphereGeometry(R * 1.08, 14, 10, Math.PI * 1.1, Math.PI * 0.8, 0, Math.PI * 0.7), '#2d2522', T); head.add(back);

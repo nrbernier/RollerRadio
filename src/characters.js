@@ -78,19 +78,31 @@ class Rig {
     this.spin = new THREE.Group(); this.spin.position.y = this.piv; this.body.add(this.spin);   // trick rotations pivot at the hips
     this.hips = new THREE.Group(); this.spin.add(this.hips);
     const T = 0.03 * s, c = spec.colors;
+    // spec.kit: the body drawn from the model sheet (KIT.SKATER in models/kit-street.js), joint by joint, in place of the
+    // shapes below. The face, hair (spec.hair), sign and prop stay the Rig's own. spec.kitOpts: 'radio', 'phones', 'hair', 'hood'.
+    const KS = spec.kit, kpal = KS && Object.assign({}, KS.looks[0].c, spec.kitColors), kopt = new Set(spec.kitOpts || []);
+    const kit = (joint, list, mirror) => {
+      const h = new THREE.Group(); h.scale.setScalar(s); joint.add(h);
+      for (const p of list) {
+        if ((p.opt && !kopt.has(p.opt)) || p.id === 'skull') continue;
+        const [geo, m, col] = Models.parts([p], kpal, { mirror })[0], mesh = part(geo, col, p.size[0] < 0.05 && p.s !== 'box' ? 0 : 0.03);
+        m.decompose(mesh.position, mesh.quaternion, mesh.scale); h.add(mesh); if (p.id === 'antTip') this.antTip = mesh;
+      }
+    };
     // pelvis
-    this.hips.add(part(new THREE.SphereGeometry(0.2 * s, 12, 8), c.pants, T));
+    if (KS) kit(this.hips, KS.hips); else this.hips.add(part(new THREE.SphereGeometry(0.2 * s, 12, 8), c.pants, T));
     // torso
     this.torso = new THREE.Group(); this.torso.position.y = 0.04 * s; this.hips.add(this.torso);
-    const chest = part(new THREE.CapsuleGeometry(0.24 * s, 0.26 * s, 4, 10), c.jacket, T); chest.position.y = 0.3 * s; chest.scale.set(1.08, 1, 0.82); this.torso.add(chest);
-    if (spec.stripe) { const st = part(new THREE.CylinderGeometry(0.255 * s, 0.255 * s, 0.07 * s, 14), spec.stripe, 0); st.position.y = 0.26 * s; st.scale.set(1.08, 1, 0.82); this.torso.add(st); }
-    if (spec.backpack) {
+    if (KS) kit(this.torso, KS.torso);
+    const chest = KS ? null : part(new THREE.CapsuleGeometry(0.24 * s, 0.26 * s, 4, 10), c.jacket, T); if (chest) { chest.position.y = 0.3 * s; chest.scale.set(1.08, 1, 0.82); this.torso.add(chest); }
+    if (spec.stripe && !KS) { const st = part(new THREE.CylinderGeometry(0.255 * s, 0.255 * s, 0.07 * s, 14), spec.stripe, 0); st.position.y = 0.26 * s; st.scale.set(1.08, 1, 0.82); this.torso.add(st); }
+    if (spec.backpack && !KS) {
       const bp = part(new THREE.BoxGeometry(0.42 * s, 0.48 * s, 0.22 * s), spec.backpack, T); bp.position.set(0, 0.34 * s, -0.27 * s); this.torso.add(bp);
       const ant = part(new THREE.CylinderGeometry(0.012 * s, 0.012 * s, 0.6 * s, 5), PAL.ink, 0); ant.position.set(0.14 * s, 0.82 * s, -0.3 * s); ant.rotation.z = -0.25; this.torso.add(ant);
       const tip = part(new THREE.SphereGeometry(0.04 * s, 8, 6), toon(PAL.magenta, { noCache: true }), 0.01); tip.position.set(0.21 * s, 1.1 * s, -0.3 * s); this.torso.add(tip); this.antTip = tip;
     }
     // collar
-    const collar = part(new THREE.TorusGeometry(0.17 * s, 0.06 * s, 6, 14), spec.collar || c.jacket, T); collar.rotation.x = Math.PI / 2; collar.position.y = 0.58 * s; this.torso.add(collar);
+    if (!KS) { const collar = part(new THREE.TorusGeometry(0.17 * s, 0.06 * s, 6, 14), spec.collar || c.jacket, T); collar.rotation.x = Math.PI / 2; collar.position.y = 0.58 * s; this.torso.add(collar); }
     // head
     this.head = new THREE.Group(); this.head.position.y = 0.78 * s; this.torso.add(this.head);
     const R = 0.21 * s;
@@ -107,11 +119,13 @@ class Rig {
       face.scale.set(1, 1.05, 0.98); face.renderOrder = 2; this.head.add(face);
     }
     spec.hair && spec.hair(this.head, R, T, s);
+    if (KS) kit(this.head, KS.head);
     // neck
-    const neck = part(new THREE.CylinderGeometry(0.07 * s, 0.08 * s, 0.14 * s, 8), c.skin, 0); neck.position.y = 0.66 * s; this.torso.add(neck);
+    if (!KS) { const neck = part(new THREE.CylinderGeometry(0.07 * s, 0.08 * s, 0.14 * s, 8), c.skin, 0); neck.position.y = 0.66 * s; this.torso.add(neck); }
     // arms
     const mkArm = (side) => {
       const g = new THREE.Group(); g.position.set(side * 0.31 * s, 0.5 * s, 0); this.torso.add(g);
+      if (KS) { kit(g, KS.arm, side < 0); const fore = new THREE.Group(); fore.position.y = -0.31 * s; g.add(fore); kit(fore, KS.fore, side < 0); return { g, fore }; }
       const up = part(new THREE.CapsuleGeometry(0.075 * s, 0.2 * s, 3, 8), c.jacket, T); up.position.y = -0.15 * s; g.add(up);
       const fore = new THREE.Group(); fore.position.y = -0.31 * s; g.add(fore);
       const fm = part(new THREE.CapsuleGeometry(0.065 * s, 0.18 * s, 3, 8), spec.sleeve || c.jacket, T); fm.position.y = -0.13 * s; fore.add(fm);
@@ -139,6 +153,10 @@ class Rig {
     // legs
     const mkLeg = (side) => {
       const g = new THREE.Group(); g.position.set(side * this.hipW, -0.05 * s, 0); this.hips.add(g);
+      if (KS) {
+        kit(g, KS.leg, side < 0); const shin = new THREE.Group(); shin.position.y = -this.L1; g.add(shin); kit(shin, KS.shin, side < 0);
+        const skate = new THREE.Group(); skate.position.y = -this.L2; shin.add(skate); kit(skate, KS.skate, side < 0); return { g, shin, skate };
+      }
       const th = part(new THREE.CapsuleGeometry(0.1 * s, this.L1 - 0.1 * s, 3, 8), c.pants, T); th.position.y = -this.L1 / 2; g.add(th);
       const shin = new THREE.Group(); shin.position.y = -this.L1; g.add(shin);
       const sh = part(new THREE.CapsuleGeometry(0.09 * s, this.L2 - 0.08 * s, 3, 8), spec.legs || c.pants, T); sh.position.y = -this.L2 / 2; shin.add(sh);
