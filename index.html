@@ -806,7 +806,9 @@ const Sound = (() => {
   const midiF = m => 440 * Math.pow(2, (m - 69) / 12);
 
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return; }
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, () => { if (ctx && ctx.state !== 'running' && !Sound.held) ctx.resume().catch(() => {}); }, { capture: true, passive: true });
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC({ latencyHint: 'interactive' });
@@ -1619,7 +1621,7 @@ const Sound = (() => {
     if (music != null) { S.musicVol = music; if (musicOut) musicOut.gain.setTargetAtTime(music * ((S.song && S.song.gain) ?? 1), ctx.currentTime, 0.05); }
     if (sfxV != null) { S.sfxVol = sfxV; if (sfxOut) sfxOut.gain.setTargetAtTime(sfxV, ctx.currentTime, 0.05); }
   }
-  function suspend(on) { if (!ctx) return; if (on) ctx.suspend(); else ctx.resume(); }
+  function suspend(on) { if (!ctx) return; Sound.held = on; if (on) ctx.suspend(); else ctx.resume().catch(() => {}); }
 
   // debug: an analyser on the final mix (used by the loudness check)
   function debugTap() { if (!ctx) return null; const a = ctx.createAnalyser(); a.fftSize = 2048; S.lim.connect(a); return a; }
@@ -2301,11 +2303,11 @@ function makeKit(meta) {
     W.ramps.push({ x0, z0, x1, z1, axis, h0, h1, base: plank ? null : base });
   };
   K.cyl = (x, y0, z, r, h, color, o = {}) => {
-    const g = new THREE.CylinderGeometry(r, o.r2 ?? r, h, o.seg || 14);
+    const g = new THREE.CylinderGeometry(r, o.r2 ?? r, h, o.seg || (meta.lowPoly ? 8 : 14));
     B.add(g, new THREE.Matrix4().makeTranslation(x, y0 + h / 2, z), color, o.kind || 'plain', { outlineT: o.outline ?? 0.07, edges: false });
   };
   K.sphere = (x, y, z, r, color, o = {}) => {
-    const g = new THREE.SphereGeometry(r, o.seg || 12, o.seg ? Math.ceil(o.seg * 0.7) : 9);
+    const g = meta.lowPoly ? new THREE.SphereGeometry(r, Math.min(o.seg || 8, 10), Math.min(o.seg ? Math.ceil(o.seg * 0.7) : 6, 7)) : new THREE.SphereGeometry(r, o.seg || 12, o.seg ? Math.ceil(o.seg * 0.7) : 9);
     const m = new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion(), V3(o.sx || 1, o.sy || 1, o.sz || 1));
     B.add(g, m, color, o.kind || 'plain', { outlineT: o.outline ?? 0.1, edges: false });
   };

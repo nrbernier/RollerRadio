@@ -1265,11 +1265,11 @@ function makeKit(meta) {
     W.ramps.push({ x0, z0, x1, z1, axis, h0, h1, base: plank ? null : base });
   };
   K.cyl = (x, y0, z, r, h, color, o = {}) => {
-    const g = new THREE.CylinderGeometry(r, o.r2 ?? r, h, o.seg || 14);
+    const g = new THREE.CylinderGeometry(r, o.r2 ?? r, h, o.seg || (meta.lowPoly ? 8 : 14));
     B.add(g, new THREE.Matrix4().makeTranslation(x, y0 + h / 2, z), color, o.kind || 'plain', { outlineT: o.outline ?? 0.07, edges: false });
   };
   K.sphere = (x, y, z, r, color, o = {}) => {
-    const g = new THREE.SphereGeometry(r, o.seg || 12, o.seg ? Math.ceil(o.seg * 0.7) : 9);
+    const g = meta.lowPoly ? new THREE.SphereGeometry(r, Math.min(o.seg || 8, 10), Math.min(o.seg ? Math.ceil(o.seg * 0.7) : 6, 7)) : new THREE.SphereGeometry(r, o.seg || 12, o.seg ? Math.ceil(o.seg * 0.7) : 9);
     const m = new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion(), V3(o.sx || 1, o.sy || 1, o.sz || 1));
     B.add(g, m, color, o.kind || 'plain', { outlineT: o.outline ?? 0.1, edges: false });
   };
@@ -3178,10 +3178,15 @@ class CellBatch extends StaticBatch {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
       const ck = key.split('|')[1];
-      if (name === 'outline') { cellOf(ck).add(new THREE.Mesh(g, G.outlineMat)); continue; }
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+      if (name === 'outline') { b.pos = null; cellOf(ck).add(new THREE.Mesh(g, G.outlineMat)); continue; }
+      // normals and colours as bytes, not floats: 26 bytes a vertex instead of 44 (the look is the same)
+      const n = b.nor, cl = b.col, N8 = new Int8Array(n.length), C8 = new Uint8Array(cl.length);
+      for (let i = 0; i < n.length; i++) N8[i] = Math.round(Math.max(-1, Math.min(1, n[i])) * 127);
+      for (let i = 0; i < cl.length; i++) C8[i] = Math.round(Math.max(0, Math.min(1, cl[i])) * 255);
+      g.setAttribute('normal', new THREE.BufferAttribute(N8, 3, true));
+      g.setAttribute('color', new THREE.BufferAttribute(C8, 3, true));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      b.pos = b.nor = b.col = b.uv = null;
       const mesh = new THREE.Mesh(g, materials[name] || materials.plain);
       if (name === 'water' || name === 'glow' || name === 'lamp' || name === 'pool') mesh.renderOrder = 3;
       cellOf(ck).add(mesh);
@@ -3190,10 +3195,21 @@ class CellBatch extends StaticBatch {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(this.cellLines[key], 3));
       cellOf(key).add(new THREE.LineSegments(lg, G.lineMat));
     }
+    // the plain JS arrays the geometry was gathered in are twice the size of the meshes made from them: let them go
+    this.buckets = {}; this.cellLines = {}; this._lb = null; this._ln = null;
+    for (const g of cells.values()) g.traverse(o => { if (o.geometry) freeOnUpload(o.geometry); });
     return cells;
   }
 }
 
+// once a static mesh is on the GPU its arrays are only a second copy in memory (and phones run out of it): drop them.
+// The bounds are worked out first, for culling. Nothing raycasts against city meshes.
+function freeOnUpload(g) {
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  if (!g.boundingBox) g.computeBoundingBox();
+  for (const k in g.attributes) g.attributes[k].onUpload(function () { this.array = new this.array.constructor(0); });
+  if (g.index) g.index.onUpload(function () { this.array = new this.array.constructor(0); });
+}
 // far skyline: plain coloured boxes and blobs merged into a few tiles, no outlines, no textures
 const _nm3 = new THREE.Matrix3(), _sc = new THREE.Color(); let _tp = new Float32Array(0), _tn = new Float32Array(0);
 function prepShape(geo) { const g = geo.index ? geo.toNonIndexed() : geo; if (!g.attributes.normal) g.computeVertexNormals(); return { pos: g.attributes.position.array, nor: g.attributes.normal.array }; }
@@ -3232,8 +3248,9 @@ class FarBatch {
       g.setAttribute('position', new THREE.Float32BufferAttribute(T.pos, 3));
       g.setAttribute('normal', new THREE.Float32BufferAttribute(T.nor, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(T.col, 3));
-      group.add(new THREE.Mesh(g, mat));
+      group.add(new THREE.Mesh(g, mat)); freeOnUpload(g);
     }
+    this.tiles = {};
     return group;
   }
 }
@@ -3379,10 +3396,24 @@ const Sound = (() => {
   const S = { musicVol: 0.85, sfxVol: 0.8 };
   let rng = U.rng(9001);
 
+  // Phones only let sound start from a real gesture: pointerUP/touchend/click/keydown, never pointerdown on a touch screen
+  // (the game starts on pointerdown). iOS can also leave the context "interrupted" after a call or an app switch.
+  // So every gesture nudges it awake, and the first one plays the silent buffer iOS wants.
+  let wantSound = false, unlocked = false;
+  function wake() {
+    if (!ctx || !wantSound) return;
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (!unlocked) { unlocked = true; try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) {} }
+  }
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, wake, { capture: true, passive: true });
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    wantSound = true;
+    if (ctx) { wake(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    // iOS 17+: play like a video, not like a ringtone, so the silent switch does not mute the game
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     ctx = new AC({ latencyHint: 'interactive' });
+    ctx.onstatechange = () => { if (ctx.state === 'interrupted' && wantSound) setTimeout(wake, 300); };
     master = ctx.createGain(); master.gain.value = 0.8;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.2;
     const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
@@ -4269,7 +4300,7 @@ const Sound = (() => {
     comboL += (target - comboL) * (1 - Math.exp(-dt / (target > comboL ? 0.3 : 3)));
   }
   function setVolume(music, fx) { if (music != null) { S.musicVol = music; if (musicOut) musicOut.gain.setTargetAtTime(music, ctx.currentTime, 0.05); } if (fx != null) { S.sfxVol = fx; if (sfxOut) sfxOut.gain.setTargetAtTime(fx, ctx.currentTime, 0.05); } }
-  function suspend(on) { if (!ctx) return; if (on) ctx.suspend(); else ctx.resume(); }
+  function suspend(on) { if (!ctx) return; wantSound = !on; if (on) ctx.suspend(); else ctx.resume().catch(() => {}); }
   function debugTap() { if (!ctx) return null; const a = ctx.createAnalyser(); a.fftSize = 2048; master.connect(a); return a; }
   return { init, start, beat, judge, sfx, update, R, setPlace, knock, knocked, resume, quant, setVolume, suspend, debugTap, REC, H, clk,
     get ready() { return !!ctx; }, get place() { return dom.key; }, get modeName() { return H.modeName; }, get bpm() { return clk.bpm; }, get vol() { return S.musicVol; }, get ctx() { return ctx; } };
@@ -4983,7 +5014,7 @@ function buildCity() {
   const B = new CellBatch(), F = new FarBatch(), S = makeSlabs();
   const mats = cityMaterials();
   const K = makeKit({
-    name: 'Downtone', killY: -30, batch: B,
+    name: 'Downtone', killY: -30, batch: B, lowPoly: true,
     phys: { friction: 0.5, fastFriction: 0.55, overDecay: 0.6, slopeK: 0.45, drag: 0.0012, climb: 1.6 },
     buildBatch: (b, W) => {
       W.cells = b.buildCells(mats);
