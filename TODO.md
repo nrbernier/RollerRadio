@@ -36,6 +36,11 @@
   furniture (finger post for finding your way, lamps, kiosk, tram shelter, bike rack…) and seven vehicles. Not in
   the game yet; README has the wiring. Looked at once in the preview, front three-quarter view only
 
+## Music: move sounds (music/)
+- `music/moves.js` + `music/preview.html`: a proposal for how grinds, tricks, landings, pushes and runs sound, per
+  district (written licks on the district's own grid, a figure per trick, cadences, bass riffs). Not in the game;
+  `music/README.md` has the wiring. Run without errors in a browser, never listened to: levels are guesses
+
 ## World
 - Vineyards: improve them, make the grapes visible
 - More relief: only the sunken street so far. More streets at different heights, more bridges

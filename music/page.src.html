@@ -1,0 +1,178 @@
+<title>RollerRadio Moves A/B</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* layout: a mixing-desk — a sticky transport with the now/proposed switch, then one strip per kind of move */
+:root {
+  --bg: #e8ebef; --panel: #f6f7f9; --ink: #16202b; --mute: #586675; --line: #cbd2da;
+  --now: #2c5f8f; --new: #cf4410; --on: #ffffff; --lit: #1e9e63;
+  --display: 'Space Grotesk', 'Inter', system-ui, sans-serif; --body: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10151b; --panel: #18202a; --ink: #e8edf2; --mute: #96a3b0; --line: #2a3541;
+  --now: #74aee6; --new: #ff8d52; --on: #0f141a; --lit: #4fd394; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #10151b; --panel: #18202a; --ink: #e8edf2; --mute: #96a3b0; --line: #2a3541;
+  --now: #74aee6; --new: #ff8d52; --on: #0f141a; --lit: #4fd394; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+h1 { font: 700 30px/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 6px 0 0; color: var(--mute); max-width: 64ch; }
+.deck { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.deck .what { flex: 1 1 200px; min-width: 0; }
+.deck .title { font: 700 16px/1.2 var(--display); }
+.deck .meta { font: 400 12px/1.4 var(--mono); opacity: 0.85; min-height: 2.8em; }
+.ab { display: flex; border: 1px solid currentColor; border-radius: 9px; overflow: hidden; }
+.ab button { font: 600 13px var(--body); color: inherit; background: transparent; border: 0; padding: 9px 14px; cursor: pointer; }
+.ab button[aria-pressed="true"]#abNow { background: var(--now); color: var(--on); }
+.ab button[aria-pressed="true"]#abNew { background: var(--new); color: var(--on); }
+.deck > button { font: 600 13px var(--body); color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--lit); outline-offset: 2px; }
+.strip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.strip h2 { font: 700 18px/1.2 var(--display); margin: 0; }
+.strip p { margin: 0; color: var(--mute); max-width: 68ch; font-size: 14px; }
+.strip p b { color: var(--ink); font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { font: 600 14px var(--body); color: var(--ink); background: var(--bg); border: 2px solid var(--line); border-radius: 10px; padding: 9px 13px; cursor: pointer; }
+.btn:hover { border-color: var(--mute); }
+.btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.btn.go { border-color: var(--lit); }
+.btn.go[aria-pressed="true"] { background: var(--lit); border-color: var(--lit); color: var(--on); }
+.btn small { display: block; font: 400 11px var(--mono); color: var(--mute); }
+.btn[aria-pressed="true"] small { color: inherit; }
+label.sl { display: flex; align-items: center; gap: 8px; font: 500 13px var(--body); color: var(--mute); flex: 1 1 220px; min-width: 0; }
+label.sl input { flex: 1; min-width: 0; accent-color: var(--new); }
+label.sl output { font: 400 12px var(--mono); min-width: 6ch; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.count { font: 600 13px var(--mono); padding: 6px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-top: 1px solid var(--line); }
+th { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); border-top: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.foot { color: var(--mute); font-size: 13px; max-width: 68ch; }
+</style>
+<div class="wrap">
+  <header>
+    <h1>How your moves sound, now and proposed</h1>
+    <p class="lede">Pick a district, then grind, do tricks and land, and switch between <b>Now</b> and <b>Proposed</b> while it plays. Both run on the game's own synth, over the district's real music. Nothing here is in the game yet.</p>
+  </header>
+  <div class="deck" role="group" aria-label="Player">
+    <div class="what"><div class="title" id="npTitle">Nothing playing</div><div class="meta" id="npMeta">Sound starts when you tap a district</div></div>
+    <div class="ab" role="group" aria-label="Version"><button id="abNow" aria-pressed="false">Now</button><button id="abNew" aria-pressed="true">Proposed</button></div>
+    <button id="stop">Stop</button>
+  </div>
+  <section class="strip">
+    <h2>District</h2>
+    <div class="row" id="places"></div>
+  </section>
+  <section class="strip">
+    <h2>A whole run</h2>
+    <p>Four pushes on the beat, a jump, two tricks, a grind with a switch in the middle, off the rail on the beat, two more tricks and a clean landing. About twenty seconds. Play it once each way.</p>
+    <div class="row"><button class="btn go" id="run" aria-pressed="false">Play the run</button></div>
+  </section>
+  <section class="strip">
+    <h2>Grind</h2>
+    <p><b>Now:</b> a random line of even notes that doubles its rate with speed, the same shape in every district. <b>Proposed:</b> a written two-bar lick in the district's style and meter. Speed adds ornaments. Every two bars it develops: a second voice, a third higher, then bass and stabs. A switch turns the tune upside down. Leaving the rail plays a cadence, bigger the longer you held on.</p>
+    <div class="row"><button class="btn go" id="grind" aria-pressed="false">Grind</button><button class="btn" id="newRail">Another rail</button><button class="btn" id="switch">Grind switch</button><button class="btn" id="hop">Jump off on the beat</button></div>
+    <div class="row" id="rails" role="group" aria-label="Kind of rail"></div>
+    <div class="row"><label class="sl">Speed <input type="range" id="speed" min="2" max="16" step="0.5" value="8"><output id="speedO">8 m/s</output></label><label class="sl">Height <input type="range" id="height" min="0" max="12" step="1" value="1"><output id="heightO">1 m</output></label></div>
+  </section>
+  <section class="strip">
+    <h2>Tricks and landing</h2>
+    <p><b>Now:</b> every trick is the same arpeggio, a little longer as the run grows; a missed one sounds like a good one. <b>Proposed:</b> each trick has its own figure, a run climbs the chord, from the third trick a second voice joins, a perfect one gets a high echo, a missed one stumbles. A clean landing after two or more tricks is a chord from the band; a sloppy one is a rim shot and a wrong note.</p>
+    <div class="row" id="tricks"></div>
+    <div class="row"><button class="btn" id="timing" aria-pressed="false">Timing: good</button><span class="count" id="combo">run: 0</span><button class="btn" id="landC">Land clean</button><button class="btn" id="landS">Land sloppy</button></div>
+  </section>
+  <section class="strip">
+    <h2>Pushing and jumping</h2>
+    <p><b>Proposed:</b> pushes on the beat count up, and the district's hand percussion follows the count. A jump on the beat gets one soft note. A long jump with no tricks climbs the chord, beat by beat, until you land.</p>
+    <div class="row"><button class="btn" id="pushOn">Push on the beat</button><button class="btn" id="pushOff">Push off the beat</button><button class="btn" id="jump">Jump on the beat</button><button class="btn" id="long">Long jump (3 s)</button></div>
+  </section>
+  <section class="strip">
+    <h2>What changes</h2>
+    <div class="tbl"><table><thead><tr><th>Move</th><th>Now</th><th>Proposed</th></tr></thead><tbody>
+      <tr><td>Grid</td><td>Always sixteenths</td><td>The district's own: triplets in the old town and at the observatory, five beats in the park, swing where the band swings</td></tr>
+      <tr><td>Grind voice</td><td>Often the instrument that already has the tune (melodica, steel pan, vibes)</td><td>An instrument the band is not using: Rhodes, marimba, third guitar, dub vibes, solo guitar, acid, nylon guitar, bells</td></tr>
+      <tr><td>Rail noise</td><td>None</td><td>A quiet scrape tuned to the chord, louder and brighter with speed</td></tr>
+      <tr><td>Run without landing</td><td>Percussion and a bass note on the beat</td><td>The district's bass riff, then its stabs</td></tr>
+      <tr><td>Borders</td><td>Two districts' kits at once</td><td>The leading district only</td></tr>
+      <tr><td>Crag, building site, sky deck</td><td>The district's kit</td><td>Their own voices: flute, struck metal, bells</td></tr>
+    </tbody></table></div>
+    <p class="foot">Levels are set by reading the code, not by ear: I could not listen to this. Expect to rebalance volumes after hearing it on a phone.</p>
+  </section>
+</div>
+<script>
+const U = { rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }, clamp: (x, a, b) => Math.max(a, Math.min(b, x)), lerp: (a, b, t) => a + (b - a) * t };
+/*ENGINE*/
+</script>
+<script>
+/*MOVES*/
+</script>
+<script>
+(() => {
+  const PLACES = [['business', 'Downtown', 'jazz-funk'], ['park', 'Forest park', 'five to the bar'], ['market', 'Market', 'highlife'], ['canals', 'Canals', 'dub'], ['oldtown', 'Old town', 'manouche'], ['docks', 'Docks', 'electro'], ['lake', 'Lakeshore', 'bossa'], ['obs', 'Observatory', 'star phases']];
+  const RAILS = [['rail', 'Rail'], ['ledge', 'Ledge'], ['pipe', 'Pipe'], ['cable', 'Cable'], ['balcony', 'Balcony'], ['metro', 'Metro track']];
+  const TRICKS = ['360 SPIN', 'BACKFLIP', 'FRONTFLIP', 'FLATSPIN 540', 'CORKSCREW', 'MISTY 720'];
+  const NOTE = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+  const $ = id => document.getElementById(id), E = () => Sound._E;
+  const st = { place: null, isNew: true, grinding: false, rail: 'rail', seed: 1, combo: 0, perfect: false, air: false, airT: 0, running: false };
+  $('places').innerHTML = PLACES.map(([k, n, s]) => `<button class="btn" data-k="${k}" aria-pressed="false">${n}<small>${s}</small></button>`).join('');
+  $('rails').innerHTML = RAILS.map(([k, n]) => `<button class="btn" data-k="${k}" aria-pressed="${k === 'rail'}">${n}</button>`).join('');
+  $('tricks').innerHTML = TRICKS.map(n => `<button class="btn" data-n="${n}">${n[0] + n.slice(1).toLowerCase()}</button>`).join('') + '<button class="btn" data-n="FLAIL">Missed trick</button>';
+  const press = (sel, k) => document.querySelectorAll(sel).forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k));
+  const state = () => ({ grinding: st.grinding, speed: +$('speed').value, grindH: +$('height').value, combo: st.combo, air: st.air, airTime: st.air ? (performance.now() - st.airT) / 1000 : 0, night: 0, spots: {} });
+  function ready() { if (!st.place) play('business'); return Sound.ready; }
+  function play(k) {
+    Sound.init(); if (!Sound.ready) { $('npMeta').textContent = 'This browser has no Web Audio'; return; }
+    if (!E().moves && !MOVES.M.inst) { MOVES.install(E()); MOVES.M.inst = true; }
+    Sound.suspend(false); setAB(st.isNew); Sound.jump(k); Sound.start(); st.place = k; press('#places .btn', k);
+  }
+  function setAB(isNew) {
+    st.isNew = isNew; $('abNew').setAttribute('aria-pressed', isNew); $('abNow').setAttribute('aria-pressed', !isNew);
+    if (!Sound.ready) return;
+    if (st.grinding) { stopGrind('good'); startGrind(isNew); }
+    E().moves = isNew ? MOVES : null; MOVES.useLeads(isNew);
+  }
+  // every move goes to the game's present code or to the proposal
+  function startGrind(isNew = st.isNew) { st.grinding = true; st.combo++; Sound.update(0.1, state()); const info = { voice: st.rail, seed: st.seed, h: +$('height').value }; if (isNew) MOVES.grindStart(info); else Sound.sfx.grindStart(info); $('grind').setAttribute('aria-pressed', true); $('grind').textContent = 'Stop grinding'; }
+  function stopGrind(q) { if (!st.grinding) return; st.grinding = false; Sound.update(0.1, state()); if (st.isNew) MOVES.grindEnd(q); else Sound.sfx.grindEnd(); $('grind').setAttribute('aria-pressed', false); $('grind').textContent = 'Grind'; }
+  function trick(name, q, where = 'air') { st.combo++; const miss = name === 'FLAIL'; if (st.isNew) MOVES.trick(st.combo, miss ? 'miss' : q, name, where); else Sound.sfx.trick(st.combo); }
+  function land(clean) { stopGrind('good'); st.air = false; if (st.isNew) MOVES.land(0.8, { combo: st.combo, clean }); else Sound.sfx.land(0.8); st.combo = 0; }
+  function push(on) { if (st.isNew) MOVES.push(on); else Sound.sfx.push(on); }
+  function jump(on) { if (st.isNew) MOVES.jump(on); else Sound.sfx.jump(on); }
+  const q = () => st.perfect ? 'perfect' : 'good';
+  $('places').addEventListener('click', e => { const b = e.target.closest('.btn'); if (b) play(b.dataset.k); });
+  $('rails').addEventListener('click', e => { const b = e.target.closest('.btn'); if (!b) return; st.rail = b.dataset.k; press('#rails .btn', st.rail); if (st.grinding) { stopGrind('good'); startGrind(); } });
+  $('tricks').addEventListener('click', e => { const b = e.target.closest('.btn'); if (b && ready()) trick(b.dataset.n, q()); });
+  $('abNow').onclick = () => setAB(false); $('abNew').onclick = () => setAB(true);
+  $('stop').onclick = () => { stopGrind('good'); st.combo = 0; st.running = false; if (Sound.ready) Sound.suspend(true); st.place = null; press('#places .btn', ''); $('npTitle').textContent = 'Nothing playing'; $('npMeta').textContent = 'Tap a district to listen'; };
+  $('grind').onclick = () => { if (!ready()) return; if (st.grinding) stopGrind('good'); else startGrind(); };
+  $('newRail').onclick = () => { st.seed++; if (st.grinding) { stopGrind('good'); startGrind(); } };
+  $('switch').onclick = () => { if (ready() && st.grinding) trick('GRIND SWITCH', q(), 'grind'); };
+  $('hop').onclick = () => { if (!st.grinding) return; stopGrind('perfect'); jump(true); };
+  $('timing').onclick = () => { st.perfect = !st.perfect; $('timing').setAttribute('aria-pressed', st.perfect); $('timing').textContent = 'Timing: ' + (st.perfect ? 'perfect' : 'good'); };
+  $('landC').onclick = () => ready() && land(true); $('landS').onclick = () => ready() && land(false);
+  $('pushOn').onclick = () => ready() && push(true); $('pushOff').onclick = () => ready() && push(false); $('jump').onclick = () => ready() && jump(true);
+  $('long').onclick = () => { if (!ready() || st.air) return; jump(true); st.air = true; st.airT = performance.now(); setTimeout(() => { if (st.air) land(true); }, 3000); };
+  $('speed').oninput = () => { $('speedO').textContent = $('speed').value + ' m/s'; }; $('height').oninput = () => { $('heightO').textContent = $('height').value + ' m'; };
+  // the scripted run, timed in beats of the district
+  $('run').onclick = () => {
+    if (!ready() || st.running) return; st.running = true; $('run').setAttribute('aria-pressed', true); stopGrind('good'); st.combo = 0;
+    const spb = Sound.beat().spb || 0.6, B = Sound.beat().beats || 4, at = (b, f) => setTimeout(() => { if (st.running) f(); }, b * spb * 1000);
+    [0, 1, 2, 3].forEach(b => at(b, () => push(true)));
+    at(4, () => jump(true)); at(4.5, () => trick('360 SPIN', 'good')); at(6.5, () => trick('BACKFLIP', 'good'));
+    at(8.5, () => startGrind()); at(8.5 + B * 2, () => trick('GRIND SWITCH', 'good', 'grind')); at(8.5 + B * 4, () => { stopGrind('perfect'); jump(true); });
+    at(9.5 + B * 4, () => trick('MISTY 720', 'perfect')); at(12.5 + B * 4, () => trick('CORKSCREW', 'perfect')); at(15 + B * 4, () => land(true));
+    at(18 + B * 4, () => { st.running = false; $('run').setAttribute('aria-pressed', false); });
+  };
+  setInterval(() => {
+    if (!st.place || !Sound.ready) return;
+    Sound.setPlace({ [st.place]: 1 }, 0.1); Sound.update(0.1, state());
+    const b = Sound.beat(), p = PLACES.find(x => x[0] === st.place);
+    $('npTitle').textContent = `${p[1]} · ${st.isNew ? 'proposed' : 'now'}`;
+    $('npMeta').innerHTML = `${Math.round(Sound.bpm)} bpm · ${NOTE[Sound.H.root % 12]} ${Sound.modeName} · bar ${Math.max(0, b.bar) + 1}<br>${st.isNew ? (MOVES.M.last || '') : ''}`;
+    $('combo').textContent = 'run: ' + st.combo;
+  }, 100);
+})();
+</script>
