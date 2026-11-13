@@ -4,7 +4,7 @@ Models are designed here as data, looked at in `preview.html`, and only then wir
 `kit.js` (houses, pedestrians) and `kit-street.js` (skater, street furniture, vehicles; load it after `kit.js`) have no three.js and no game code in them: they are lists of primitives and a few pure functions.
 Open `preview.html` in a browser to see everything (it loads three r149 from cdnjs).
 
-**Status: nothing in this folder is used by the game yet.**
+**Status: in the game since Nov 13** for traffic, Nao, pedestrians, bench, lamps, bins and old-town house fronts (see TODO.md for what is not used yet). `src/city/models.js` turns primitives into geometry; `H.kitPut` (districts.js) puts a piece into the cell batch.
 
 ## The format
 

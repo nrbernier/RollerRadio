@@ -29,12 +29,16 @@
 - Roof links (plank bridges, washing lines, lanterns): check none crosses a tower or a chapel roof
 
 ## Graphics: model sheets (models/)
-- `models/kit.js` + `models/preview.html`: a house kit (windows, doors, shop front, balcony, timbering, tiled roof,
-  dormer, chimney; five houses) and eight pedestrians, as data. Not in the game yet. `models/README.md` says how
-  to wire them in and what they cost. Start with the light version on one quarter and measure on a phone
-- `models/kit-street.js`: the skater redrawn on the present rig (three colour sets), fourteen pieces of street
-  furniture (finger post for finding your way, lamps, kiosk, tram shelter, bike rack…) and seven vehicles. Not in
-  the game yet; README has the wiring. Looked at once in the preview, front three-quarter view only
+In the game since Nov 13 (models/kit*.js are part of the city build; src/city/models.js turns them into geometry):
+traffic (city car, saloon, taxi, van, pickup), Nao's body and skates, pedestrians (all variants), bench, lamps
+(lantern / double street lamp with banner), litter bin, and the street fronts of 701 old-town houses (light version).
+Not yet used:
+- finger posts at crossroads (one board per neighbouring district: helps finding the way), kiosk, tram shelter,
+  café table with parasol, bike rack, bollards, post box, hydrant, traffic lights, tree in a planter
+- bus and scooter; the skater's radio / headphones look (kitOpts); house roofs and back faces from the kit
+- market and other districts' houses (flatHouse in oldmarket.js) still have painted windows
+- memory after all this: 323 MB of vertex data, 422 MB JS heap at the title screen (was 1,655 MB before Nov 13).
+  Measure on a phone before adding more
 
 ## Music: move sounds (music/)
 - `src/city/moves.js`: grinds, tricks, landings, pushes and runs sound per district (written licks on the district's

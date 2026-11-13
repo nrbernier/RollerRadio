@@ -7221,6 +7221,7 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   if (o.front) {
     const fr = faceFrame(o.front, x0, z0, x1, z1), [gl, gh] = frGround(fr, 0.6);
     if (type !== 'tower' && r() < (o.shop ?? 0.28)) shopFront(H, fr, gh, r, c);
+    else if (type !== 'tower' && fr.L > 4.5 && bb.top - gh > 4.2) kitFront(H, fr, gh, bb.top, c, Q, r);
     else {
       // a door with a step, sometimes a pot of flowers
       const u = (r() - 0.5) * (fr.L - 3), b = frBox(fr, u - 0.55, u + 0.55, 0, 0.09), s = frBox(fr, u - 0.8, u + 0.8, 0, 0.7);
@@ -7233,6 +7234,26 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   H.reserve([x0, z0, x1, z1]);
   (o.list || (W.roofsOld = W.roofsOld || [])).push(c);
   return c;
+}
+// the street front of the model sheet's house (KIT.house, light version): real windows with shutters and sills, a door
+// with its hood and step, timbers or quoins. A plain panel in the wall colour covers the painted windows of that face.
+const SHUT = ['#3e6f5a', '#2f5f6a', '#7a2f2f', '#5a6a7a', '#6a4a2a', '#2f4f7a', '#8a6a3a'];
+const DOORS = ['#5a3a2a', '#2f5f6a', '#3e6f4a', '#7a2f2f', '#2f4f7a', '#3a3550'];
+function kitFront(H, fr, gh, top, c, Q, r) {
+  const wallH = top - gh, floors = Math.max(1, Math.min(4, Math.floor((wallH - 0.9) / 2.8))), bays = Math.max(1, Math.min(5, Math.round((fr.L - 1) / 2.6)));
+  const kind = c.type === 'timber' ? 'timber' : c.type === 'stone' ? 'stone' : 'town', d = 6;
+  const h = KIT.house({ w: fr.L - 0.4, d, floors, kind, bays, lite: true }), fz = d / 2;
+  const parts = h.parts.filter(p => p.at[2] > fz - 0.6 && p.tag !== 'solid' && p.tag !== 'roof' && p.s !== 'prism' && p.at[1] < h.eave)
+    .map(p => Object.assign({}, p, { at: [p.at[0], p.at[1], p.at[2] - fz] }));
+  const wall = '#' + new THREE.Color(c.col).getHexString(), sh = pick(r, SHUT), dr = pick(r, DOORS);
+  const pal = Object.assign({}, KIT.HOUSES[0].pal, { wall, wall2: '#' + new THREE.Color(c.col).multiplyScalar(0.86).getHexString(), shutter: sh, shutter2: '#' + new THREE.Color(sh).multiplyScalar(0.85).getHexString(),
+    door: dr, door2: '#' + new THREE.Color(dr).multiplyScalar(0.85).getHexString(), roof: c.rc, trim: c.type === 'timber' ? '#4a3628' : Q.trim === '#4a4a52' ? '#d8d4c8' : '#f4ecd8' });
+  // cover the painted windows: a thin panel on the face, from the ground to just under the eaves
+  const pb = frBox(fr, -fr.L / 2 + 0.02, fr.L / 2 - 0.02, 0, 0.03);
+  H.B.box(pb[0], gh - 0.4, pb[1], pb[2], top - 0.05, pb[3], c.col, 'plain', { outlineT: 0, edges: false });
+  const [x, z] = frPt(fr, 0, 0.03);
+  H.kitPut(parts, pal, x, gh, z, frYaw(fr), 1, { outline: 0.02 });
+  (H.W.kitFronts = H.W.kitFronts || []).push([x, z, fr.nx, fr.nz]);
 }
 // a row of houses wall to wall (their ridges line up into one long run). `c` is the front line, `dir` the side the houses stand on
 function terraceRow(H, alongX, a0, a1, c, dir, r, o = {}) {
