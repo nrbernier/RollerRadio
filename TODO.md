@@ -37,9 +37,9 @@
   the game yet; README has the wiring. Looked at once in the preview, front three-quarter view only
 
 ## Music: move sounds (music/)
-- `music/moves.js` + `music/preview.html`: a proposal for how grinds, tricks, landings, pushes and runs sound, per
-  district (written licks on the district's own grid, a figure per trick, cadences, bass riffs). Not in the game;
-  `music/README.md` has the wiring. Run without errors in a browser, never listened to: levels are guesses
+- `src/city/moves.js`: grinds, tricks, landings, pushes and runs sound per district (written licks on the district's
+  own grid, a figure per trick, cadences, bass riffs). In the game; `music/preview.html` compares with the old code.
+  Never listened to: levels are guesses, check on a phone (list in `music/README.md`)
 
 ## World
 - Vineyards: improve them, make the grapes visible

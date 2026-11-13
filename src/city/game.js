@@ -21,17 +21,19 @@ function makeNao() {
   });
 }
 
+// the player's own sounds come from moves.js (a written lick per district for grinds, a figure per trick…)
+function useMoves() { if (typeof MOVES === 'undefined' || !Sound.ready || Sound._E.moves) return; MOVES.install(Sound._E); Sound._E.moves = MOVES; MOVES.useLeads(true); }
 // ---------- hooks: the player's moves, answered softly by the music ----------
 const hooks = {
   jump(q) { Sound.sfx.jump(q !== 'miss'); Game.usedJump = true; },
   push(q) { Sound.sfx.push(q !== 'miss'); },
-  trick(q) {
+  trick(q, name, where) {
     const b = Game.W.bell, p = Game.player.pos;
     if (b && Math.hypot(b.x - p.x, b.z - p.z) < 12 && Game.bellCD <= 0) { Sound.sfx.ringBell(); Game.bellCD = 20; }
     Game.combo = (Game.combo || 0) + 1;
-    Sound.sfx.trick(Game.combo); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
+    Sound.sfx.trick(Game.combo, q, name, where); Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 1.2, 0)), 6, ['#f6f1e7', '#ffe9b0'], 3, 0.6, 3);
   },
-  land(impact) {
+  land(impact, airTime, spinLeft) {
     const p = Game.player, g = p.ground;
     if (g && g.tag === 'bounce' && impact > (g.kick ? 0.8 : 2.5)) {
       // a canvas awning: back up you go, a little higher each time you keep it going
@@ -48,13 +50,13 @@ const hooks = {
     }
     // landing a run of tricks in front of people: they clap
     if ((Game.combo || 0) >= 2 && Game.t > (Game.clapCD || 0)) { const n = Life.applaud(p.pos.x, p.pos.z, Game.combo >= 4); if (n >= 2) { Sound.sfx.applause(n); Game.clapCD = Game.t + 6; } }
-    Sound.sfx.land(Math.min(1.4, impact / 18)); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
+    Sound.sfx.land(Math.min(1.4, impact / 18), { combo: Game.combo || 0, clean: !(spinLeft > 0.5) }); if (impact > 10) Game.fx.burst(V3().copy(Game.player.pos).add(V3(0, 0.1, 0)), 6, ['#ffffff', '#e9e4f5'], 2.5, 0.4, 4); if (impact > 24) Game.cam.shake = 0.4; },
   grindStart(r) {
     Sound.sfx.land(0.4); Game.combo = (Game.combo || 0) + 1;
     const p0 = r && r.pts[0], pp = Game.player.pos;
     Sound.sfx.grindStart({ voice: r ? (r.voice || (r.kind === 'cable' ? 'cable' : r.kind === 'pipe' ? 'pipe' : r.hidden ? 'ledge' : 'rail')) : 'rail', seed: p0 ? Math.floor(p0.x * 7.3 + p0.z * 13.1) : 1, h: pp.y - terrainAt(pp.x, pp.z) });
   },
-  grinding() {}, grindEnd() { Sound.sfx.grindEnd(); }, railHop() { Sound.sfx.jump(true); },
+  grinding() {}, grindEnd(q) { Sound.sfx.grindEnd(q || 'good'); }, railHop() { Sound.sfx.jump(true); },
   padLaunch() {},
   bonk() { Game.cam.shake = 0.25; Sound.sfx.land(0.6); },
   fell() { knockDown(null, true); },
@@ -133,7 +135,7 @@ async function boot() {
 function bindUI() {
   const begin = () => {
     if (Game.state !== 'title') return;
-    Sound.init(); Sound.start();
+    Sound.init(); useMoves(); Sound.start();
     $('title').hidden = true; Game.state = 'play'; Input.enabled = true; Input.flush();
     document.body.classList.add('playing');
     const p = Game.player; p.pos.copy(Game.W.spawn); p.yaw = Game.W.spawnYaw; p.vel.set(0, 0, 0); p.lastSafe.copy(p.pos);

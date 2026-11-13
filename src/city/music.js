@@ -734,6 +734,7 @@ const Sound = (() => {
       // energy wanders on 8-bar phrases
       if (bar % 8 === 0) for (const k in REC) { const rc = REC[k]; rc.e = U.clamp(rc.e + (rc.r() - 0.5) * 0.5 + (0.6 - rc.e) * 0.2, 0.15, 1); }
     }
+    if (_E.moves) _E.moves.tick(T, t, td);
     // each audible recipe plays its own steps (its own meter: polymeter in the overlaps)
     const total = Object.values(REC).reduce((a, rc) => a + rc.w, 0) || 1;
     for (const k in REC) {
@@ -754,7 +755,7 @@ const Sound = (() => {
       for (const k in R.spots) { const w = R.spots[k]; if (w > 0.03 && SPOTS[k]) SPOTS[k](c, w); }
       if (R.train > 0.5 && ds % 2 === 0) I.clack(t, (ds === 0 ? 0.5 : 0.3) * R.train);
       const gc = { t, ds, di, dsd: dstep * td };
-      grindStep(gc); comboStep(gc); birdsong(gc);
+      if (!_E.moves) { grindStep(gc); comboStep(gc); } birdsong(gc);
       // night: a soft pad under the places that have no bed of their own
       if (ds === 0 && di % (4 * dom.beats * 2) === 0 && R.night > 0.3 && !['lake', 'obs', 'park'].includes(dom.key)) I.pad(t, chord(3, 0), dstep * td * 4 * dom.beats * 2, R.night * 0.5, musicOut, 0.7);
       // quantized one-shots from the world (lamps, bollards, landings…)
@@ -838,9 +839,9 @@ const Sound = (() => {
       noise(t, 0.24, f); const o = osc('sawtooth', 160, t, 0.2, gain(g, 0.2)); o.frequency.linearRampToValueAtTime(420, t + 0.08); o.frequency.linearRampToValueAtTime(120, t + 0.18);
     },
     // soft, musical feedback for moves (no "scores")
-    jump(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.01, 0.25, 0.18); const f = filt('bandpass', 700, 1.6, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 2600 : 1600, t + 0.18); noise(t, 0.22, f); },
-    land(h = 1) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.002, 0.22 * Math.min(1.3, h), 0.1); const o = osc('sine', 110, t, 0.13, g); o.frequency.exponentialRampToValueAtTime(50, t + 0.09); if (h > 0.5) quant((tt) => withKits((k, w) => k.land(tt, 0.5 * Math.min(1.3, h) * w))); },
-    trick(n = 0) { quant((t, sd) => { withKits((k, w) => k.trick(t, sd, 0.8 * w, n)); const a = buskAnswer(sd); if (a) a(t); }); },
+    jump(onBeat) { if (_E.moves) return _E.moves.jump(onBeat); if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.01, 0.25, 0.18); const f = filt('bandpass', 700, 1.6, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 2600 : 1600, t + 0.18); noise(t, 0.22, f); },
+    land(h = 1, info) { if (_E.moves && info) return _E.moves.land(h, info); if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.002, 0.22 * Math.min(1.3, h), 0.1); const o = osc('sine', 110, t, 0.13, g); o.frequency.exponentialRampToValueAtTime(50, t + 0.09); if (h > 0.5) quant((tt) => withKits((k, w) => k.land(tt, 0.5 * Math.min(1.3, h) * w))); },
+    trick(n = 0, q, name, where) { if (_E.moves) return _E.moves.trick(n, q, name, where); quant((t, sd) => { withKits((k, w) => k.trick(t, sd, 0.8 * w, n)); const a = buskAnswer(sd); if (a) a(t); }); },
     // people: brush past someone and they make a little sound of their own, in key
     person(style, i = 0) {
       quant((t, sd) => {
@@ -865,9 +866,9 @@ const Sound = (() => {
     // a little crowd claps you in, on the beat
     applause(n) { quant((t, sd) => { const k = Math.min(1, n / 6); for (let i = 0; i < 6; i++) I.clap(t + i * sd * 2 + Math.random() * 0.02, (0.5 + k * 0.6) * (1 - i * 0.1)); if (n > 3) I.vox(t, chord(1, 0)[0], 0.25 * k, 'e', musicOut, sd * 3); }); },
     bark() { quant((t, sd) => { I.bark(t, 1.1); if (Math.random() < 0.5) I.bark(t + sd * 2, 0.9); }); },
-    grindStart(info) { if (ctx) grindBegin(info); },
-    grindEnd() { grindFinish(); },
-    push(onBeat) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.003, onBeat ? 0.12 : 0.07, 0.16); const f = filt('bandpass', 900, 1.5, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 3000 : 1400, t + 0.15); noise(t, 0.18, f); if (onBeat) quant((tt) => withKits((k, w) => k.push(tt, 0.7 * w))); },
+    grindStart(info) { if (_E.moves) return _E.moves.grindStart(info); if (ctx) grindBegin(info); },
+    grindEnd(q) { if (_E.moves) return _E.moves.grindEnd(q); grindFinish(); },
+    push(onBeat) { if (_E.moves) return _E.moves.push(onBeat); if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.003, onBeat ? 0.12 : 0.07, 0.16); const f = filt('bandpass', 900, 1.5, g); f.frequency.exponentialRampToValueAtTime(onBeat ? 3000 : 1400, t + 0.15); noise(t, 0.18, f); if (onBeat) quant((tt) => withKits((k, w) => k.push(tt, 0.7 * w))); },
     splash(v = 1) { if (!ctx) return; const t = T0(), g = gain(sfxOut, 0); env(g, t, 0.005, 0.2 * v, 0.3); const f = filt('bandpass', 1400, 0.8, g); f.frequency.exponentialRampToValueAtTime(500, t + 0.3); noise(t, 0.35, f); },
     bubbles() { if (!ctx) return; const t = T0(); for (let i = 0; i < 10; i++) { const tt = t + i * 0.07 + Math.random() * 0.05, g = gain(sfxOut, 0); env(g, tt, 0.002, 0.06, 0.06); const o = osc('sine', 300 + Math.random() * 500, tt, 0.08, g); o.frequency.exponentialRampToValueAtTime(900 + Math.random() * 600, tt + 0.06); } },
     // the world as an instrument
@@ -920,6 +921,11 @@ const Sound = (() => {
   function setVolume(music, fx) { if (music != null) { S.musicVol = music; if (musicOut) musicOut.gain.setTargetAtTime(music, ctx.currentTime, 0.05); } if (fx != null) { S.sfxVol = fx; if (sfxOut) sfxOut.gain.setTargetAtTime(fx, ctx.currentTime, 0.05); } }
   function suspend(on) { if (!ctx) return; wantSound = !on; if (on) ctx.suspend(); else ctx.resume().catch(() => {}); }
   function debugTap() { if (!ctx) return null; const a = ctx.createAnalyser(); a.fftSize = 2048; master.connect(a); return a; }
-  return { init, start, beat, judge, sfx, update, R, setPlace, knock, knocked, resume, quant, setVolume, suspend, debugTap, REC, H, clk,
+  // what the move sounds (moves.js) play with
+  const _E = { moves: null, I, deg, chord, nearest, fold, H, R, REC, KIT, clk, TPB, midiF, buskAnswer, env, osc, noise, gain, filt,
+    get dom() { return dom; }, get ctx() { return ctx; }, get musicOut() { return musicOut; }, get sfxOut() { return sfxOut; }, get noiseBuf() { return noiseBuf; } };
+  // (the listening page in music/ only) be in a district at once
+  function jump(k) { for (const q in REC) { REC[q].w = REC[q].wt = q === k ? 1 : 0; } dom = REC[k]; dom.f = 1; H.next = null; H.root = dom.root; H.modeName = moodOf(dom); H.mode = MODES[H.modeName]; clk.bpm = clk.target = dom.bpm; }
+  return { _E, jump, init, start, beat, judge, sfx, update, R, setPlace, knock, knocked, resume, quant, setVolume, suspend, debugTap, REC, H, clk,
     get ready() { return !!ctx; }, get place() { return dom.key; }, get modeName() { return H.modeName; }, get bpm() { return clk.bpm; }, get vol() { return S.musicVol; }, get ctx() { return ctx; } };
 })();

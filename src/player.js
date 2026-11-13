@@ -256,7 +256,7 @@ class Player {
     } else this.vel.y = Math.max(this.vel.y, 0) + 2.5 + (r.endBoost || 0);
     this.lastRail = r; this.lastRailT = 0;
     this.mode = 'air'; this.airTime = 0; this.rail = null; this.grindCD = 0.06;
-    this.hooks.grindEnd?.();
+    this.hooks.grindEnd?.(jump ? beatQ : null);
   }
   doJump(tStamp) {
     const q = Sound.judge(tStamp);

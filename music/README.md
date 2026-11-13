@@ -1,14 +1,14 @@
 # Move sounds: a proposal
 
-`moves.js` redesigns what the player's own moves sound like: grinds, tricks, landings, pushes, jumps, and the extra
+`src/city/moves.js` redesigns what the player's own moves sound like: grinds, tricks, landings, pushes, jumps, and the extra
 groove of a run without touching the ground. The district music (`REC` in `src/city/music.js`) is not touched.
 
-**Status: not in the game.** `preview.html` plays it on the game's own synth, over the real district music, with a
+**Status: in the game** (since Nov 13). `preview.html` plays it on the game's own synth, over the real district music, with a
 switch between the present code and the proposal. Rebuild it after changing `moves.js` or `music.js`:
 
     python3 music/build_preview.py
 
-The levels were set by reading the code, not by ear. Nobody has listened to this yet. Listen first, wire second.
+The levels were set by reading the code, not by ear: rebalance them after listening on a phone.
 
 ## What is wrong today (the reasons for each change)
 
@@ -41,7 +41,7 @@ up. `x.5` is the semitone below the next step (an approach note). So licks follo
 - `licks`: three of them, each `[[step, p, lengthInSteps, level]]` over two bars
 - `riff`: one bar of bass, `[[step, p, length]]`; `comp`: the steps the stabs fall on
 
-## Wiring it in
+## How it is wired (done; kept as a reference)
 
 1. Add `music/moves.js` to the build after `music.js` (`CITY_ORDER` in `build.py`; move the file to `src/city/`).
 2. In `music.js`, make the three changes `build_preview.py` makes to the engine (it is the reference; each is one line):
