@@ -9369,34 +9369,64 @@ const Life = (() => {
   const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _m3 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _c = new THREE.Color(), _v = V3(), _s = V3(), _e = new THREE.Euler();
   const Y = V3(0, 1, 0);
 
-  // ---------- people: six instanced meshes (torso+arms, two legs, bent legs, head, hair) ----------
-  // everyone near the camera is packed into the first slots each frame, so far people cost nothing
-  const PM = {};
+  // ---------- people: the model sheet's body parts (KIT.BODY), one instanced mesh per variant ----------
+  // Each variant packs the people near the camera that wear it into its own first slots, so a variant nobody nearby
+  // wears costs nothing. A part's `sh` is a shade of the instance colour; parts with a fixed `col` go in a second mesh.
+  const PM = {}, PV = [];
   function personMeshes(n) {
-    const merge = (parts) => mergeParts(parts.map(([g, m]) => [g, m, '#ffffff']));
-    const torso = merge([
-      [new THREE.CylinderGeometry(0.2, 0.25, 0.62, 8), T4(0, 1.12, 0)],
-      [new THREE.SphereGeometry(0.235, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.Matrix4().makeScale(1, 0.55, 0.8).setPosition(0, 1.42, 0)],
-    ]);
-    // an arm hangs from the shoulder (pivot at the origin); the hand is skin-ish at the end
-    const arm = merge([[new THREE.CylinderGeometry(0.065, 0.055, 0.56, 5), T4(0, -0.28, 0)], [new THREE.SphereGeometry(0.06, 5, 4), T4(0, -0.6, 0)]]);
-    // props in hand: a phone, a tour guide's flag on a pole
-    const phone = merge([[new THREE.BoxGeometry(0.08, 0.15, 0.02), T4(0, -0.64, 0.04)]]);
-    const head = merge([[new THREE.SphereGeometry(0.17, 10, 8), T4(0, 1.66, 0)], [new THREE.CylinderGeometry(0.07, 0.08, 0.14, 6), T4(0, 1.5, 0)]]);
-    const hair = merge([[new THREE.SphereGeometry(0.182, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.Matrix4().makeScale(1, 0.92, 1.05).setPosition(0, 1.67, -0.015)]]);
-    // a leg hangs from the hip (pivot at the origin)
-    const leg = merge([[new THREE.CylinderGeometry(0.085, 0.068, 0.8, 6), T4(0, -0.4, 0)], [new THREE.BoxGeometry(0.13, 0.08, 0.24), T4(0, -0.78, 0.05)]]);
+    const mat = () => toon('#ffffff', { noCache: true });
+    const mk = (g, cnt = n) => { const im = new THREE.InstancedMesh(g, mat(), cnt); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.count = 0; im.setColorAt(0, _c.set('#ffffff')); im.userData.n = 0; W.group.add(im); return im; };
+    const B = KIT.BODY;
+    // a list of primitives → { t: tinted mesh, f: fixed-colour mesh }
+    const variant = (list, cnt = n) => {
+      const tinted = list.filter(q => !q.col), fixed = list.filter(q => q.col), v = {};
+      const geo = (L, fix) => mergeParts(L.map(q => [Models.geo(q), Models.mat(q), fix ? q.col : '#' + _c.setRGB(q.sh ?? 1, q.sh ?? 1, q.sh ?? 1).getHexString()]));
+      if (tinted.length) v.t = mk(geo(tinted), cnt); if (fixed.length) v.f = mk(geo(fixed, true), cnt);
+      PV.push(v); return v;
+    };
+    const each = (o) => { const r = {}; for (const k in o) r[k] = variant(o[k]); return r; };
+    PM.torso = each(B.torso); PM.leg = { trousers: variant(B.leg.trousers, n * 2), bare: variant(B.leg.bare, n * 2) };
+    PM.arm = variant(B.arm.sleeve, n * 2); PM.hand = variant(B.hand, n * 2); PM.head = variant(B.head);
+    PM.hair = each(B.hair); PM.hat = each(B.hat); PM.acc = {}; for (const k in B.acc) PM.acc[k] = variant(B.acc[k].parts);
     // sitting: thighs forward, shins down (both legs)
+    const merge = (parts) => mergeParts(parts.map(([g, m]) => [g, m, '#ffffff']));
     const sit = merge([
       [new THREE.CylinderGeometry(0.09, 0.08, 0.44, 6), T4(-0.11, 0, 0.2, Math.PI / 2, 0, 0)], [new THREE.CylinderGeometry(0.09, 0.08, 0.44, 6), T4(0.11, 0, 0.2, Math.PI / 2, 0, 0)],
       [new THREE.CylinderGeometry(0.075, 0.065, 0.46, 6), T4(-0.11, -0.22, 0.43)], [new THREE.CylinderGeometry(0.075, 0.065, 0.46, 6), T4(0.11, -0.22, 0.43)],
       [new THREE.BoxGeometry(0.13, 0.08, 0.24), T4(-0.11, -0.43, 0.49)], [new THREE.BoxGeometry(0.13, 0.08, 0.24), T4(0.11, -0.43, 0.49)],
     ]);
-    const mk = (g, cnt = n) => { const im = new THREE.InstancedMesh(g, toon('#ffffff', { noCache: true }), cnt); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.count = 0; im.setColorAt(0, _c.set('#ffffff')); W.group.add(im); return im; };
-    PM.torso = mk(torso); PM.legL = mk(leg); PM.legR = mk(leg); PM.head = mk(head); PM.hair = mk(hair); PM.sit = mk(sit);
-    PM.armL = mk(arm); PM.armR = mk(arm); PM.prop = mk(phone);
+    PM.sit = { t: mk(sit) }; PV.push(PM.sit);
     const flag = mergeParts([[new THREE.CylinderGeometry(0.02, 0.02, 1.7, 4), T4(0, -0.2, 0), '#3a3550'], [new THREE.BoxGeometry(0.02, 0.32, 0.48), T4(0, 0.5, 0.25), '#ffffff']]);
-    PM.flag = mk(flag, 8);
+    PM.flag = { t: mk(flag, 8) }; PV.push(PM.flag);
+    PM.cap = n;
+  }
+  // one instance of a variant: matrix, and the colour of its tinted part
+  function put(v, m, col) {
+    if (v.t) { const k = v.t.userData.n++; if (k < v.t.instanceMatrix.count) { v.t.setMatrixAt(k, m); v.t.setColorAt(k, _c.setHex(col)); } }
+    if (v.f) { const k = v.f.userData.n++; if (k < v.f.instanceMatrix.count) v.f.setMatrixAt(k, m); }
+  }
+  // what people wear, by district (and by chance)
+  const HATC = ['#c4523a', '#2f5f8a', '#e8c84a', '#3e8f86', '#f2efe6', '#e8dcc0', '#1f1f28'];
+  const ACCC = ['#8a5a4a', '#2f8f9d', '#b8743a', '#1b1a24', '#e8d4a0', '#c4523a', '#5a6a4a', '#3a4a6a'];
+  function dress(p, style, r, kid) {
+    const ch = (q) => r() < q, any = (a) => a[Math.floor(r() * a.length)];
+    const warm = style === 'lake' || style === 'park' || style === 'market';
+    p.torso = !kid && ch(warm ? 0.22 : style === 'oldtown' ? 0.14 : 0.06) ? 'dress' : !kid && ch(style === 'oldtown' || style === 'business' || style === 'obs' ? 0.22 : 0.06) ? 'coat'
+      : ch(kid ? 0.5 : style === 'canals' || style === 'docks' ? 0.32 : 0.14) ? 'hoodie' : 'jacket';
+    p.leg = p.torso === 'dress' ? 'bare' : 'trousers';
+    p.hairV = p.torso === 'dress' ? any(['long', 'long', 'bob', 'bun']) : any(['short', 'short', 'short', 'long', 'bob', 'bun']);
+    p.hat = null;
+    if (ch(kid ? 0.3 : 0.24)) p.hat = style === 'docks' && ch(0.5) ? 'hardhat' : warm && p.torso === 'dress' ? 'sunhat' : kid || style === 'obs' || style === 'canals' ? any(['beanie', 'cap']) : any(['cap', 'cap', 'beanie', warm ? 'sunhat' : 'cap']);
+    p.hatC = _c.set(p.hat === 'hardhat' ? '#f2c14e' : any(HATC)).getHex();
+    const acc = [];
+    if (ch(kid ? 0.45 : style === 'obs' || style === 'park' ? 0.2 : 0.08)) acc.push('backpack');
+    else if (!kid && ch(style === 'business' ? 0.35 : 0.1)) acc.push('bag');
+    if (!kid && style === 'market' && ch(0.22)) acc.push('shopping');
+    if (!kid && style === 'oldtown' && ch(0.08) && !p.jog) acc.push('cane');
+    if (!kid && (style === 'oldtown' || style === 'obs') && p.torso !== 'dress' && ch(0.25)) acc.push('scarf');
+    if ((style === 'canals' || style === 'business') && !p.hat && ch(0.14)) acc.push('headphones');
+    if (!kid && style === 'docks' && p.torso === 'jacket' && ch(0.25)) acc.push('vest');
+    p.acc = acc; p.accC = acc.map(a => _c.set(a === 'vest' ? '#ff8a3a' : any(ACCC)).getHex());
   }
   function person(style, r, o = {}) {
     const pal = STYLE[style] || STYLE.business;
@@ -9404,9 +9434,10 @@ const Life = (() => {
     const p = {
       top: _c.set(pal[Math.floor(r() * pal.length)]).getHex(), pants: _c.set(PANTS[Math.floor(r() * PANTS.length)]).getHex(),
       skin: _c.set(SKIN[Math.floor(r() * SKIN.length)]).getHex(),
-      hair: _c.set(r() < 0.12 ? HATS[Math.floor(r() * HATS.length)] : HAIR[Math.floor(r() * HAIR.length)]).getHex(),
+      hair: _c.set(HAIR[Math.floor(r() * HAIR.length)]).getHex(),
       sc: kid ? 0.62 + r() * 0.1 : 0.9 + r() * 0.16, wide: 0.92 + r() * 0.2, t: r() * 9, x: 0, y: 0, z: 0, yaw: 0, ph: r() * 6, style,
     };
+    dress(p, style, r, kid); if (o.apron) { p.acc = ['apron']; p.accC = [0xf2efe6]; }
     all.push(p);
     return Object.assign(p, o);
   }
@@ -9446,31 +9477,30 @@ const Life = (() => {
     }
     return a;
   }
+  const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
   function emit(p, swing, bob, pose) {
-    const k = slot++;
+    slot++;
     _q.setFromAxisAngle(Y, p.yaw);
     _m.compose(_v.set(p.x, p.y + bob, p.z), _q, _s.set(p.sc * p.wide, p.sc, p.sc * p.wide));
-    PM.torso.setMatrixAt(k, _m); PM.head.setMatrixAt(k, _m); PM.hair.setMatrixAt(k, _m);
-    PM.torso.setColorAt(k, _c.setHex(p.top)); PM.head.setColorAt(k, _c.setHex(p.skin)); PM.hair.setColorAt(k, _c.setHex(p.hair));
-    PM.legL.setColorAt(k, _c.setHex(p.pants)); PM.legR.setColorAt(k, _c); PM.sit.setColorAt(k, _c);
-    if (pose === 'sit') {
-      _m2.makeTranslation(0, 0.8, 0.02); PM.sit.setMatrixAt(k, _m3.multiplyMatrices(_m, _m2));
-      _m2.makeScale(0, 0, 0); PM.legL.setMatrixAt(k, _m2); PM.legR.setMatrixAt(k, _m2);
-    } else {
+    put(PM.torso[p.torso], _m, p.top); put(PM.head, _m, p.skin); put(PM.hair[p.hairV], _m, p.hair);
+    if (p.hat) put(PM.hat[p.hat], _m, p.hatC);
+    const legC = p.leg === 'bare' ? p.skin : p.pants;
+    if (pose === 'sit') { _m2.makeTranslation(0, 0.8, 0.02); put(PM.sit, _m3.multiplyMatrices(_m, _m2), legC); }
+    else {
       const lift = pose === 'ground' ? -Math.PI / 2 : 0;
-      for (const [im, sx, sw] of [[PM.legL, -0.11, swing], [PM.legR, 0.11, -swing]]) {
-        _m2.makeRotationX(sw + lift).setPosition(sx, 0.82, 0); im.setMatrixAt(k, _m3.multiplyMatrices(_m, _m2));
-      }
-      _m2.makeScale(0, 0, 0); PM.sit.setMatrixAt(k, _m2);
+      for (const [sx, sw] of [[-0.1, swing], [0.1, -swing]]) { _m2.makeRotationX(sw + lift).setPosition(sx, 0.84, 0); put(PM.leg[p.leg], _m3.multiplyMatrices(_m, _m2), legC); }
     }
-    // arms from the shoulders
-    const a = arms(p, swing, pose);
-    PM.armL.setColorAt(k, _c.setHex(p.top)); PM.armR.setColorAt(k, _c);
-    _e.set(a.lx, 0, a.lz); _m2.makeRotationFromEuler(_e).setPosition(-0.27, 1.38, 0); PM.armL.setMatrixAt(k, _m3.multiplyMatrices(_m, _m2));
-    _e.set(a.rx, 0, a.rz); _m2.makeRotationFromEuler(_e).setPosition(0.27, 1.38, 0); _m3.multiplyMatrices(_m, _m2); PM.armR.setMatrixAt(k, _m3);
-    if (a.prop) { PM.prop.setMatrixAt(k, _m3); PM.prop.setColorAt(k, _c.set('#1b1a24')); } else { _m2.makeScale(0, 0, 0); PM.prop.setMatrixAt(k, _m2); }
-    if (p.flag && flagN < 8) { _m2.makeTranslation(0, -0.62, 0); PM.flag.setMatrixAt(flagN, _m3.multiply(_m2)); PM.flag.setColorAt(flagN++, _c.set(p.flag)); }
+    // arms from the shoulders (a dress has bare arms)
+    const a = arms(p, swing, pose), armC = p.torso === 'dress' ? p.skin : p.top;
+    _e.set(a.lx, 0, a.lz); _m2.makeRotationFromEuler(_e).setPosition(-0.27, 1.38, 0); const mL = _mL.multiplyMatrices(_m, _m2);
+    _e.set(a.rx, 0, a.rz); _m2.makeRotationFromEuler(_e).setPosition(0.27, 1.38, 0); const mR = _mR.multiplyMatrices(_m, _m2);
+    put(PM.arm, mL, armC); put(PM.arm, mR, armC); put(PM.hand, mL, p.skin); put(PM.hand, mR, p.skin);
+    const acc = p.acc || [];
+    for (let i = 0; i < acc.length; i++) { const at = KIT.BODY.acc[acc[i]].at; put(PM.acc[acc[i]], at === 'armL' ? mL : at === 'armR' ? mR : _m, p.accC[i]); }
+    if (a.prop) put(PM.acc.phone, mR, 0x1b1a24);
+    if (p.flag && flagN < 8) { _m2.makeTranslation(0, -0.62, 0); put(PM.flag, _m3.multiplyMatrices(mR, _m2), _c.set(p.flag).getHex()); flagN++; }
   }
+  const _mL = new THREE.Matrix4(), _mR = new THREE.Matrix4();
 
   function init(world) {
     W = world;
@@ -9723,7 +9753,7 @@ const Life = (() => {
     const fx = focus.x, fz = focus.z, pl = Game.player;
     // people: everyone within reach is animated and packed into the instanced meshes
     let crowd = 0; slot = 0; flagN = 0;
-    const R = Math.min(230, (Game.cellR || 360) * 0.64), cap = PM.torso.instanceMatrix.count;
+    const R = Math.min(230, (Game.cellR || 360) * 0.64), cap = PM.cap;
     for (const w of walkers) {
       w.s += w.sp * dt * w.dir; if (w.s > w.len) { w.s = w.len; w.dir = -1; } else if (w.s < 0) { w.s = 0; w.dir = 1; }
       if (Math.abs(w.x - fx) > R || Math.abs(w.z - fz) > R) { if (!w.y || Math.random() < 0.02) { pathPos(w.segs, w.s, _pp); w.x = _pp.x; w.z = _pp.z; w.y = w.y0 ?? walkY(w.x, w.z); } continue; }
@@ -9775,7 +9805,7 @@ const Life = (() => {
       emit(s, s.nearBusk && !s.sit && bi ? Math.sin(bi.phase * Math.PI * 2) * 0.15 : 0, bob, s.pose === 'sit' ? 'sit' : s.pose === 'ground' ? 'ground' : 'stand');
       if (ds < 12) crowd++;
     }
-    for (const k in PM) { const im = PM[k]; im.count = k === 'flag' ? flagN : slot; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+    for (const v of PV) for (const im of [v.t, v.f]) if (im) { im.count = Math.min(im.userData.n, im.instanceMatrix.count); im.userData.n = 0; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     L.crowdNear = U.damp(L.crowdNear, Math.min(1, crowd / 8), 2, dt);
     // dogs trot beside their people
     let nd = 0;
