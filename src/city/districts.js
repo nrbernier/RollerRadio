@@ -121,11 +121,30 @@ function districtKit(K, S, F) {
     if (o.far !== false) F.add(new THREE.ConeGeometry(2.0 * s, 6 * s, 5), new THREE.Matrix4().makeTranslation(x, y + 4.2 * s, z), col);
   };
   // street lamp (glows at night) — lamps also chime softly as you pass (an instrument)
+  // a piece of the model sheet (models/kit-street.js) into the cell batch: origin on the ground, front to +z, turned by yaw.
+  // sc scales it ([x, y, z] or one number). Parts tagged 'light' glow at night (the 'lamp' kind).
+  const _kp = new Map(), _km = new THREE.Matrix4(), _kb = new THREE.Matrix4(), _kv = V3(), _kq = new THREE.Quaternion(), _ks = V3(), _ky = V3(0, 1, 0);
+  H.kitPut = (parts, pal, x, y, z, yaw = 0, sc = 1, o = {}) => {
+    _kb.compose(_kv.set(x, y, z), _kq.setFromAxisAngle(_ky, yaw), Array.isArray(sc) ? _ks.fromArray(sc) : _ks.set(sc, sc, sc));
+    for (const p of parts) {
+      const g = Models.geo(p); let sh = _kp.get(g); if (!sh) _kp.set(g, sh = prepShape(g));
+      const light = p.tag === 'light', col = light ? (o.glow || pal[p.col] || p.col) : p.col[0] === '#' ? p.col : (pal[p.col] || '#ff00ff');
+      _km.multiplyMatrices(_kb, Models.mat(p));
+      B.addShape(sh, _km, col, light ? 'lamp' : 'plain', light || Math.min(...p.size) < 0.05 ? 0 : (o.outline ?? 0.025));
+    }
+  };
+  const FURN = {}; for (const [n, f] of KIT.FURNITURE) FURN[n] = f();
+  // the street lamp's banner takes the district's colour
+  const BANNER = { business: '#e4572e', park: '#3e8f56', market: '#e8b84a', canals: '#2f8f9d', oldtown: '#b8743a', docks: '#c4523a', lake: '#7fb7d8', obs: '#8a5a9e' };
   H.lamp = (x, z, o = {}) => {
     const y = o.y ?? terrainAt(x, z), h = o.h ?? 4.6, col = o.color || '#2e2b3a';
-    K.cyl(x, y - 0.2, z, 0.09, h + 0.2, col, { outline: 0.03, seg: 6 });
-    if (o.style === 'globe') K.sphere(x, y + h + 0.25, z, 0.38, '#fff1c8', { kind: 'lamp', outline: 0.04, seg: 8 });
-    else { B.box(x - 0.32, y + h - 0.1, z - 0.32, x + 0.32, y + h + 0.05, z + 0.32, col, 'plain', { outlineT: 0.02, edges: false }); B.box(x - 0.24, y + h - 0.5, z - 0.24, x + 0.24, y + h - 0.1, z + 0.24, o.glow || '#ffe2a6', 'lamp', { outlineT: 0.02, edges: false }); }
+    if (o.style === 'globe') { K.cyl(x, y - 0.2, z, 0.09, h + 0.2, col, { outline: 0.03, seg: 6 }); K.sphere(x, y + h + 0.25, z, 0.38, '#fff1c8', { kind: 'lamp', outline: 0.04, seg: 8 }); }
+    else {
+      // downtown and wherever the lamp is tall: a double street lamp with a banner; elsewhere an iron lantern on a bracket
+      const d = districtAt(x, z), key = d ? d.key : '', yaw = ((x * 0.37 + z * 0.61) % 4 | 0) * Math.PI / 2;
+      if (key === 'business' || h > 5.5) H.kitPut(FURN['Street lamp with banner'], Object.assign({}, KIT.STREET_PAL, { dark: col, banner: BANNER[key] || '#e4572e' }), x, y, z, yaw, h / 6.2, { glow: o.glow });
+      else H.kitPut(FURN['Old-town lantern'], Object.assign({}, KIT.STREET_PAL, { iron: col }), x, y, z, yaw, h / 3.4, { glow: o.glow });
+    }
     W.boxes.push({ x0: x - 0.14, y0: y - 1, z0: z - 0.14, x1: x + 0.14, y1: y + h, z1: z + 0.14, tag: 'lamp' });
     W.lamps.push([x, y + h, z]);
     H.pool(x, z, Math.min(9, 3 + h * 0.9), o.glow === '#ffb36a' ? '#ff9a4a' : '#ffc870', o.y);
@@ -147,8 +166,12 @@ function districtKit(K, S, F) {
     for (let i = 0; i < P.length; i += 3) { b.pos.push(P[i], P[i + 1], P[i + 2]); b.nor.push(0, 1, 0); b.col.push(cols[i], cols[i + 1], cols[i + 2]); b.uv.push(0, 0); }
   };
   H.bench = (x, z, alongX = true, o = {}) => {
-    const y = o.y ?? terrainAt(x, z) + 0.02;
-    K.bench(x, z, alongX, y, o.color || '#b8743a', o.rail ?? true);
+    const y = o.y ?? terrainAt(x, z) + 0.02, wood = new THREE.Color(o.color || '#b8743a');
+    // the model sheet's slatted bench, stretched to the game's 4 m; collision and the hidden grind rail as before
+    H.kitPut(FURN['Bench'], Object.assign({}, KIT.STREET_PAL, { wood: '#' + wood.getHexString(), wood2: '#' + wood.clone().multiplyScalar(1.15).getHexString() }), x, y, z, alongX ? ((x * 3 + z) % 2 < 1 ? 0 : Math.PI) : ((x + z * 3) % 2 < 1 ? Math.PI / 2 : -Math.PI / 2), [2.3, 1, 1]);
+    { const hw = 2, hd = 0.4, [x0, x1, z0, z1] = alongX ? [x - hw, x + hw, z - hd, z + hd] : [x - hd, x + hd, z - hw, z + hw];
+      W.boxes.push({ x0, y0: y + 0.38, z0, x1, y1: y + 0.5, z1 }); W.boxes.push({ x0, y0: y, z0, x1, y1: y + 0.38, z1, tag: 'benchleg' });
+      if (o.rail ?? true) { if (alongX) K.rail([[x0 + 0.1, y + 0.52, z], [x1 - 0.1, y + 0.52, z]], { hidden: true }); else K.rail([[x, y + 0.52, z0 + 0.1], [x, y + 0.52, z1 - 0.1]], { hidden: true }); } }
     W.benches.push({ x, y, z, alongX, view: o.view });
   };
   // a paved patch that follows the ground (sampled on the terrain grid so it sits flush)

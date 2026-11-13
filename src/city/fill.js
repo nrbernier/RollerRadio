@@ -82,7 +82,8 @@ function fillKit(H) {
     }
     if (!o.noGrind) K.rail(railPts, { hidden: true, round: 0.5 });
   };
-  H.bin = (x, z, col = '#3a4a3a') => { const y = terrainAt(x, z); H.sound(x, y, z, 1.4, 'bin'); put(CYL, x, y + 0.45, z, 0.28, 0.9, 0.28, col, 'plain', 0.03); put(CYL, x, y + 0.92, z, 0.31, 0.06, 0.31, '#2a2a32', 'plain', 0); };
+  const BIN = KIT.FURNITURE.find(f => f[0] === 'Litter bin')[1]();
+  H.bin = (x, z, col = '#3a4a3a') => { const y = terrainAt(x, z); H.sound(x, y, z, 1.4, 'bin'); H.kitPut(BIN, Object.assign({}, KIT.STREET_PAL, { green: col }), x, y, z, (x + z) % 6.28); };
   // a rack of bikes (hoops and simple bikes leaning in)
   H.bikes = (x, z, alongX, n, r) => {
     const y = terrainAt(x, z), ux = alongX ? 1 : 0, uz = alongX ? 0 : 1;
