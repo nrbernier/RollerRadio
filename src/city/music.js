@@ -14,10 +14,24 @@ const Sound = (() => {
   const S = { musicVol: 0.85, sfxVol: 0.8 };
   let rng = U.rng(9001);
 
+  // Phones only let sound start from a real gesture: pointerUP/touchend/click/keydown, never pointerdown on a touch screen
+  // (the game starts on pointerdown). iOS can also leave the context "interrupted" after a call or an app switch.
+  // So every gesture nudges it awake, and the first one plays the silent buffer iOS wants.
+  let wantSound = false, unlocked = false;
+  function wake() {
+    if (!ctx || !wantSound) return;
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (!unlocked) { unlocked = true; try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) {} }
+  }
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, wake, { capture: true, passive: true });
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    wantSound = true;
+    if (ctx) { wake(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    // iOS 17+: play like a video, not like a ringtone, so the silent switch does not mute the game
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     ctx = new AC({ latencyHint: 'interactive' });
+    ctx.onstatechange = () => { if (ctx.state === 'interrupted' && wantSound) setTimeout(wake, 300); };
     master = ctx.createGain(); master.gain.value = 0.8;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.2;
     const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
@@ -904,7 +918,7 @@ const Sound = (() => {
     comboL += (target - comboL) * (1 - Math.exp(-dt / (target > comboL ? 0.3 : 3)));
   }
   function setVolume(music, fx) { if (music != null) { S.musicVol = music; if (musicOut) musicOut.gain.setTargetAtTime(music, ctx.currentTime, 0.05); } if (fx != null) { S.sfxVol = fx; if (sfxOut) sfxOut.gain.setTargetAtTime(fx, ctx.currentTime, 0.05); } }
-  function suspend(on) { if (!ctx) return; if (on) ctx.suspend(); else ctx.resume(); }
+  function suspend(on) { if (!ctx) return; wantSound = !on; if (on) ctx.suspend(); else ctx.resume().catch(() => {}); }
   function debugTap() { if (!ctx) return null; const a = ctx.createAnalyser(); a.fftSize = 2048; master.connect(a); return a; }
   return { init, start, beat, judge, sfx, update, R, setPlace, knock, knocked, resume, quant, setVolume, suspend, debugTap, REC, H, clk,
     get ready() { return !!ctx; }, get place() { return dom.key; }, get modeName() { return H.modeName; }, get bpm() { return clk.bpm; }, get vol() { return S.musicVol; }, get ctx() { return ctx; } };

@@ -133,10 +133,15 @@ class CellBatch extends StaticBatch {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
       const ck = key.split('|')[1];
-      if (name === 'outline') { cellOf(ck).add(new THREE.Mesh(g, G.outlineMat)); continue; }
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+      if (name === 'outline') { b.pos = null; cellOf(ck).add(new THREE.Mesh(g, G.outlineMat)); continue; }
+      // normals and colours as bytes, not floats: 26 bytes a vertex instead of 44 (the look is the same)
+      const n = b.nor, cl = b.col, N8 = new Int8Array(n.length), C8 = new Uint8Array(cl.length);
+      for (let i = 0; i < n.length; i++) N8[i] = Math.round(Math.max(-1, Math.min(1, n[i])) * 127);
+      for (let i = 0; i < cl.length; i++) C8[i] = Math.round(Math.max(0, Math.min(1, cl[i])) * 255);
+      g.setAttribute('normal', new THREE.BufferAttribute(N8, 3, true));
+      g.setAttribute('color', new THREE.BufferAttribute(C8, 3, true));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      b.pos = b.nor = b.col = b.uv = null;
       const mesh = new THREE.Mesh(g, materials[name] || materials.plain);
       if (name === 'water' || name === 'glow' || name === 'lamp' || name === 'pool') mesh.renderOrder = 3;
       cellOf(ck).add(mesh);
@@ -145,10 +150,21 @@ class CellBatch extends StaticBatch {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(this.cellLines[key], 3));
       cellOf(key).add(new THREE.LineSegments(lg, G.lineMat));
     }
+    // the plain JS arrays the geometry was gathered in are twice the size of the meshes made from them: let them go
+    this.buckets = {}; this.cellLines = {}; this._lb = null; this._ln = null;
+    for (const g of cells.values()) g.traverse(o => { if (o.geometry) freeOnUpload(o.geometry); });
     return cells;
   }
 }
 
+// once a static mesh is on the GPU its arrays are only a second copy in memory (and phones run out of it): drop them.
+// The bounds are worked out first, for culling. Nothing raycasts against city meshes.
+function freeOnUpload(g) {
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  if (!g.boundingBox) g.computeBoundingBox();
+  for (const k in g.attributes) g.attributes[k].onUpload(function () { this.array = new this.array.constructor(0); });
+  if (g.index) g.index.onUpload(function () { this.array = new this.array.constructor(0); });
+}
 // far skyline: plain coloured boxes and blobs merged into a few tiles, no outlines, no textures
 const _nm3 = new THREE.Matrix3(), _sc = new THREE.Color(); let _tp = new Float32Array(0), _tn = new Float32Array(0);
 function prepShape(geo) { const g = geo.index ? geo.toNonIndexed() : geo; if (!g.attributes.normal) g.computeVertexNormals(); return { pos: g.attributes.position.array, nor: g.attributes.normal.array }; }
@@ -187,8 +203,9 @@ class FarBatch {
       g.setAttribute('position', new THREE.Float32BufferAttribute(T.pos, 3));
       g.setAttribute('normal', new THREE.Float32BufferAttribute(T.nor, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(T.col, 3));
-      group.add(new THREE.Mesh(g, mat));
+      group.add(new THREE.Mesh(g, mat)); freeOnUpload(g);
     }
+    this.tiles = {};
     return group;
   }
 }

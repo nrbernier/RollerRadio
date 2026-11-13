@@ -272,11 +272,11 @@ function makeKit(meta) {
     W.ramps.push({ x0, z0, x1, z1, axis, h0, h1, base: plank ? null : base });
   };
   K.cyl = (x, y0, z, r, h, color, o = {}) => {
-    const g = new THREE.CylinderGeometry(r, o.r2 ?? r, h, o.seg || 14);
+    const g = new THREE.CylinderGeometry(r, o.r2 ?? r, h, o.seg || (meta.lowPoly ? 8 : 14));
     B.add(g, new THREE.Matrix4().makeTranslation(x, y0 + h / 2, z), color, o.kind || 'plain', { outlineT: o.outline ?? 0.07, edges: false });
   };
   K.sphere = (x, y, z, r, color, o = {}) => {
-    const g = new THREE.SphereGeometry(r, o.seg || 12, o.seg ? Math.ceil(o.seg * 0.7) : 9);
+    const g = meta.lowPoly ? new THREE.SphereGeometry(r, Math.min(o.seg || 8, 10), Math.min(o.seg ? Math.ceil(o.seg * 0.7) : 6, 7)) : new THREE.SphereGeometry(r, o.seg || 12, o.seg ? Math.ceil(o.seg * 0.7) : 9);
     const m = new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion(), V3(o.sx || 1, o.sy || 1, o.sz || 1));
     B.add(g, m, color, o.kind || 'plain', { outlineT: o.outline ?? 0.1, edges: false });
   };

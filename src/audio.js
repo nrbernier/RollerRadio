@@ -16,7 +16,9 @@ const Sound = (() => {
   const midiF = m => 440 * Math.pow(2, (m - 69) / 12);
 
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return; }
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, () => { if (ctx && ctx.state !== 'running' && !Sound.held) ctx.resume().catch(() => {}); }, { capture: true, passive: true });
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC({ latencyHint: 'interactive' });
@@ -829,7 +831,7 @@ const Sound = (() => {
     if (music != null) { S.musicVol = music; if (musicOut) musicOut.gain.setTargetAtTime(music * ((S.song && S.song.gain) ?? 1), ctx.currentTime, 0.05); }
     if (sfxV != null) { S.sfxVol = sfxV; if (sfxOut) sfxOut.gain.setTargetAtTime(sfxV, ctx.currentTime, 0.05); }
   }
-  function suspend(on) { if (!ctx) return; if (on) ctx.suspend(); else ctx.resume(); }
+  function suspend(on) { if (!ctx) return; Sound.held = on; if (on) ctx.suspend(); else ctx.resume().catch(() => {}); }
 
   // debug: an analyser on the final mix (used by the loudness check)
   function debugTap() { if (!ctx) return null; const a = ctx.createAnalyser(); a.fftSize = 2048; S.lim.connect(a); return a; }

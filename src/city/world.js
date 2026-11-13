@@ -98,7 +98,7 @@ function buildCity() {
   const B = new CellBatch(), F = new FarBatch(), S = makeSlabs();
   const mats = cityMaterials();
   const K = makeKit({
-    name: 'Downtone', killY: -30, batch: B,
+    name: 'Downtone', killY: -30, batch: B, lowPoly: true,
     phys: { friction: 0.5, fastFriction: 0.55, overDecay: 0.6, slopeK: 0.45, drag: 0.0012, climb: 1.6 },
     buildBatch: (b, W) => {
       W.cells = b.buildCells(mats);
