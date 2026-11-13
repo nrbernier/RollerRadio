@@ -226,12 +226,11 @@ const Life = (() => {
     ]);
     dogIM = new THREE.InstancedMesh(dogG, toon('#ffffff', { noCache: true }), Math.max(1, dogs.length)); dogIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); dogIM.frustumCulled = false; dogIM.count = 0; dogIM.setColorAt(0, _c.set('#ffffff')); W.group.add(dogIM);
     // cars on the big roads: two lanes each way, U-turn at the ends
-    const carCols = ['#c4523a', '#2f5f8a', '#e8b84a', '#f2efe6', '#3e8f86', '#2a2838', '#8a5a9e', '#d9779a'];
     for (const [key, n2] of [['boulevard', 8], ['avenue', 8], ['hill', 3], ['oblique', 3]]) {
       const road = W.roads[key]; if (!road) continue;
       const P = road.pts; const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
       for (let i = 0; i < n2; i++) {
-        const g = carMesh(carCols[(i * 3 + key.length) % carCols.length]);
+        const g = carMesh(cars.length);
         cars.push({ g, segs, len, s: (i / n2) * len * 2, v: key === 'hill' ? 7 : 10 + r() * 3, lane: key === 'hill' ? 2.6 : 3.2, x: 0, z: 0, y: 0, fx: 0, fz: 1, vx: 0, vz: 0, slope: 0 });
       }
     }
@@ -322,20 +321,13 @@ const Life = (() => {
       flush() { for (const im of [A, Bm, O]) if (im) { im.count = k; im.instanceMatrix.needsUpdate = true; } },
     };
   }
-  let carKit, boatKit, sailKit;
-  function carMesh(c) {
-    if (!carKit) {
-      const parts = [
-        [new THREE.BoxGeometry(1.9, 0.75, 4.1), T4(0, 0.7, 0), null],
-        [new THREE.BoxGeometry(1.7, 0.65, 2.1), T4(0, 1.38, -0.2), null],
-        [new THREE.BoxGeometry(1.74, 0.45, 1.92), T4(0, 1.38, -0.2), '#2a3550'],
-        [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(-0.6, 0.78, 2.07), '#fff3c4'], [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(0.6, 0.78, 2.07), '#fff3c4'],
-        [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(-0.6, 0.78, -2.07), '#ff3a3a'], [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(0.6, 0.78, -2.07), '#ff3a3a'],
-      ];
-      for (const [sx, sz] of [[-0.95, 1.25], [0.95, 1.25], [-0.95, -1.25], [0.95, -1.25]]) parts.push([new THREE.CylinderGeometry(0.33, 0.33, 0.22, 8), T4(sx, 0.33, sz, 0, 0, Math.PI / 2), '#1b1a24']);
-      carKit = instKit(parts, 24, 0.05);
-    }
-    const o = carKit.add(c); o.kit = carKit; return o;
+  let boatKit, sailKit;
+  // traffic: the model sheet's vehicles (KIT.VEHICLES), one instanced kit per kind
+  const vehKits = {}, VEH = ['City car', 'City car', 'Saloon', 'Taxi', 'City car', 'Delivery van', 'Saloon', 'Market pickup'];
+  function carMesh(i) {
+    const v = KIT.VEHICLES.find(q => q.name === VEH[i % VEH.length]);
+    if (!vehKits[v.name]) vehKits[v.name] = instKit(Models.parts(v.build()), 24, 0.05);
+    const k = vehKits[v.name], o = k.add(v.paints[(i * 5 + (i >> 3)) % v.paints.length]); o.kit = k; o.box = v.box; return o;
   }
   function boatMesh(c) {
     if (!boatKit) {
@@ -496,12 +488,12 @@ const Life = (() => {
       c.y = y; c.vx = c.fx * c.v; c.vz = c.fz * c.v;
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;
-      carKit.write(c.g);
+      c.g.kit.write(c.g);
       // a friendly toot (in key) if you're on the road in front of it
       { const dx = pl.pos.x - c.x, dz = pl.pos.z - c.z, al = dx * c.fx + dz * c.fz, lat = Math.abs(dx * -c.fz + dz * c.fx);
         if (al > 2 && al < 14 && lat < 2.5 && Math.abs(pl.pos.y - c.y) < 2 && Game.t > (c.hornCD || 0)) { c.hornCD = Game.t + 10; Sound.sfx.touch('horn'); } }
     }
-    if (carKit) carKit.flush();
+    for (const k in vehKits) vehKits[k].flush();
     // the big wheel
     const fw = W.ferris;
     if (fw) {
@@ -593,7 +585,7 @@ const Life = (() => {
       if (!c.g.visible) continue;
       const dx = p.x - c.x, dz = p.z - c.z; if (Math.abs(dx) > 4 || Math.abs(dz) > 4) continue;
       const al = dx * c.fx + dz * c.fz, lat = dx * -c.fz + dz * c.fx;
-      if (Math.abs(al) < 2.4 && Math.abs(lat) < 1.3 && p.y < c.y + 1.6) return { vx: c.vx, vz: c.vz };
+      const bx = c.g.box; if (Math.abs(al) < bx[2] / 2 + 0.35 && Math.abs(lat) < bx[0] / 2 + 0.35 && p.y < c.y + bx[1]) return { vx: c.vx, vz: c.vz };
     }
     return null;
   }
@@ -607,5 +599,5 @@ const Life = (() => {
     for (const w of walkers) { if (Math.abs(w.x - x) > 12 || Math.abs(w.z - z) > 12) continue; if (Math.random() < 0.5) w.gest = { kind: w.sc < 0.8 ? 'point' : 'clap', t0: Game.t, until: Game.t + 1.4 }; n++; }
     return n;
   }
-  return Object.assign(L, { init, update, hits, walkers, standers, applaud });
+  return Object.assign(L, { init, update, hits, walkers, standers, applaud, cars });
 })();

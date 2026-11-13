@@ -2498,6 +2498,383 @@ function rayBox(o, d, b, maxT) {
 }
 
 // ============================================================
+//  MODEL KIT — house pieces, five houses, pedestrians.
+//  Pure data + small pure functions; no three.js, no game code.
+//  See models/README.md for the format and how to wire it in.
+//  Units: metres. y up. A house's origin is the middle of its
+//  footprint at ground level; its street front faces +z.
+// ============================================================
+const KIT = (() => {
+  const K = {}, PI = Math.PI;
+  // one primitive. s: box [w,h,d] | cyl [rTop,rBot,h] | cone [r,h] | sph [r] | dome [r] | ico [r] | prism [len,h,base]
+  // at: centre (prism, dome, cone base: see README). rot: [rx,ry,rz], applied Y then X then Z. col: a palette slot or '#hex'.
+  const P = (s, size, at, col, o) => Object.assign({ s, size, at, col }, o || {});
+  K.TRIS = (p) => p.s === 'box' ? 12 : p.s === 'cyl' ? 4 * (p.seg || 8) : p.s === 'cone' ? 2 * (p.seg || 6) : p.s === 'sph' ? 10 * (p.seg || 8) : p.s === 'dome' ? 7 * (p.seg || 8) : p.s === 'ico' ? 20 : 8;
+  K.count = (parts) => parts.reduce((n, p) => n + K.TRIS(p), 0);
+
+  // ---------- pieces (local frame: x along the wall, y up from the piece's own base line, z out of the wall) ----------
+  // a window. y = 0 is the bottom of the glass. o: { shutters, box (flowers), lintel, lite (far sides: frame + glass only) }
+  K.window = (w = 1.0, h = 1.45, o = {}) => {
+    const q = [P('box', [w + 0.26, h + 0.26, 0.08], [0, h / 2, 0.04], 'trim'), P('box', [w, h, 0.05], [0, h / 2, 0.085], 'glass')];
+    if (o.lite) { if (o.shutters) for (const s of [-1, 1]) q.push(P('box', [w / 2, h + 0.06, 0.05], [s * (w * 0.75 + 0.16), h / 2, 0.045], 'shutter')); return q; }
+    q.push(P('box', [0.06, h, 0.03], [0, h / 2, 0.115], 'trim'), P('box', [w, 0.06, 0.03], [0, h * 0.62, 0.115], 'trim'));
+    q.push(P('box', [w + 0.44, 0.09, 0.26], [0, -0.175, 0.13], 'stone'));
+    if (o.lintel) q.push(P('box', [w + 0.5, 0.2, 0.12], [0, h + 0.23, 0.06], 'stone'));
+    if (o.shutters) for (const s of [-1, 1]) { const x = s * (w * 0.75 + 0.16); q.push(P('box', [w / 2, h + 0.06, 0.05], [x, h / 2, 0.045], 'shutter'), P('box', [w / 2 - 0.14, h * 0.34, 0.02], [x, h * 0.72, 0.075], 'shutter2'), P('box', [w / 2 - 0.14, h * 0.34, 0.02], [x, h * 0.28, 0.075], 'shutter2')); }
+    if (o.box) { q.push(P('box', [w + 0.1, 0.2, 0.2], [0, -0.03, 0.3], 'wood')); for (const k of [-1, 0, 1]) q.push(P('ico', [0.14], [k * w * 0.33, 0.14, 0.3], k ? 'flower' : 'leaf', { scale: [1.2, 0.8, 1] })); }
+    return q;
+  };
+  // a door on a stone step. y = 0 is the ground. o: { fanlight, hood, arch }
+  K.door = (w = 1.1, h = 2.15, o = {}) => {
+    const st = 0.18, top = st + h + (o.fanlight ? 0.42 : 0), q = [P('box', [w + 0.7, st, 0.6], [0, st / 2, 0.3], 'stone', { tag: 'solid' })];
+    q.push(P('box', [w + 0.3, top - st + 0.15, 0.12], [0, (top + st + 0.15) / 2, 0.06], 'trim'), P('box', [w, h, 0.08], [0, st + h / 2, 0.1], 'door'));
+    for (const y of [0.3, 0.7]) q.push(P('box', [w * 0.62, h * 0.3, 0.03], [0, st + h * y, 0.15], 'door2'));
+    q.push(P('ico', [0.05], [w * 0.36, st + h * 0.48, 0.17], 'brass'));
+    if (o.fanlight) q.push(P('box', [w, 0.34, 0.05], [0, st + h + 0.23, 0.1], 'glass'), P('box', [0.05, 0.34, 0.03], [0, st + h + 0.23, 0.13], 'trim'));
+    if (o.arch) q.push(P('cyl', [w / 2 + 0.15, w / 2 + 0.15, 0.12], [0, st + h, 0.06], 'trim', { rot: [PI / 2, 0, 0], seg: 12 }), P('cyl', [w / 2, w / 2, 0.08], [0, st + h, 0.1], 'door', { rot: [PI / 2, 0, 0], seg: 12 }));
+    if (o.hood) { q.push(P('box', [w + 0.8, 0.07, 0.75], [0, top + 0.5, 0.36], 'roof', { rot: [0.32, 0, 0] })); for (const s of [-1, 1]) q.push(P('box', [0.08, 0.4, 0.08], [s * (w / 2 + 0.25), top + 0.28, 0.3], 'timber', { rot: [-0.7, 0, 0] })); }
+    return q;
+  };
+  // a shop front, ground floor. The awning is taut canvas (bounce); the fascia is where the sign goes
+  K.shop = (w = 5, o = {}) => {
+    const q = [P('box', [w, 0.6, 0.14], [0, 0.3, 0.07], 'accent'), P('box', [w - 0.3, 1.75, 0.05], [0, 1.5, 0.06], 'glass'), P('box', [w + 0.2, 0.5, 0.16], [0, 2.85, 0.08], 'accent', { sign: true })];
+    for (const s of [-1, 1]) q.push(P('box', [0.22, 3.1, 0.18], [s * (w / 2), 1.55, 0.09], 'trim'));
+    const n = Math.max(2, Math.round(w / 1.6)); for (let k = 1; k < n; k++) q.push(P('box', [0.06, 1.75, 0.04], [-w / 2 + k * w / n, 1.5, 0.1], 'trim'));
+    q.push(P('box', [0.95, 2.05, 0.06], [w * 0.28, 1.03, 0.1], 'door'), P('box', [0.7, 1.2, 0.03], [w * 0.28, 1.35, 0.14], 'glass'));
+    if (o.awning !== false) { q.push(P('box', [w - 0.1, 0.06, 1.55], [0, 2.42, 0.86], 'awning', { rot: [0.24, 0, 0], tag: 'bounce' }), P('box', [w - 0.1, 0.24, 0.04], [0, 2.14, 1.62], 'awning2')); for (let k = 0; k < 3; k++) q.push(P('box', [(w - 0.1) / 7, 0.065, 1.55], [(k - 1) * (w - 0.1) * 2 / 7, 2.422, 0.86], 'awning2', { rot: [0.24, 0, 0] })); }
+    return q;
+  };
+  // a balcony: floor (solid), a railing whose top bar is a grind
+  K.balcony = (w = 2.4) => {
+    const q = [P('box', [w, 0.1, 0.9], [0, -0.05, 0.45], 'stone', { tag: 'solid' })];
+    for (const s of [-1, 1]) q.push(P('box', [0.1, 0.34, 0.6], [s * (w / 2 - 0.2), -0.24, 0.3], 'stone', { rot: [0.5, 0, 0] }), P('box', [0.05, 0.05, 0.86], [s * (w / 2 - 0.03), 0.95, 0.44], 'iron'), P('box', [0.05, 0.95, 0.05], [s * (w / 2 - 0.03), 0.47, 0.86], 'iron'));
+    q.push(P('box', [w, 0.06, 0.06], [0, 0.97, 0.86], 'iron', { tag: 'grind' }), P('box', [w, 0.04, 0.04], [0, 0.14, 0.86], 'iron'));
+    const n = Math.round(w / 0.3); for (let k = 1; k < n; k++) q.push(P('box', [0.035, 0.82, 0.035], [-w / 2 + k * w / n, 0.55, 0.86], 'iron'));
+    return q;
+  };
+  // one bay of half-timbering, w × h: posts, rails, a brace
+  K.timber = (w = 2.3, h = 2.7, lean = 1) => [
+    P('box', [0.18, h, 0.07], [-w / 2 + 0.09, h / 2, 0.035], 'timber'), P('box', [0.18, h, 0.07], [w / 2 - 0.09, h / 2, 0.035], 'timber'),
+    P('box', [w, 0.18, 0.07], [0, 0.09, 0.035], 'timber'), P('box', [w, 0.18, 0.07], [0, h - 0.09, 0.035], 'timber'),
+    P('box', [0.14, Math.hypot(w * 0.42, h * 0.8), 0.06], [lean * w * 0.24, h / 2, 0.03], 'timber', { rot: [0, 0, lean * Math.atan2(w * 0.42, h * 0.8)] }),
+  ];
+  // a chimney with two pots. y = 0 is where it leaves the roof
+  K.chimney = (h = 1.7) => [P('box', [0.62, h, 0.62], [0, h / 2 - 0.4, 0], 'stone'), P('box', [0.8, 0.12, 0.8], [0, h - 0.34, 0], 'trim'), P('cyl', [0.1, 0.13, 0.32], [-0.15, h - 0.12, 0], 'pot', { seg: 6 }), P('cyl', [0.1, 0.13, 0.32], [0.15, h - 0.12, 0], 'pot', { seg: 6 })];
+  // a dormer window. y = 0 is its sill line on the roof; it faces +z
+  K.dormer = (w = 1.3) => {
+    const q = [P('box', [w, 1.0, 1.5], [0, 0.5, -0.5], 'wall'), P('prism', [1.9, 0.5, w + 0.36], [0, 1.0, -0.5], 'roof', { rot: [0, PI / 2, 0] })];
+    for (const p of K.window(w - 0.5, 0.72, { lite: true })) q.push(Object.assign({}, p, { at: [p.at[0], p.at[1] + 0.14, p.at[2] + 0.25] }));
+    return q;
+  };
+  // a gabled, tiled roof over a w × d box. y = 0 is the eave line. Ridge along x. Slabs (tag 'roof': skate on them), three courses of tiles a side, ridge cap
+  K.roof = (w, d, rise, o = {}) => {
+    const ov = 0.45, half = d / 2 + ov, a = Math.atan2(rise, d / 2), t = Math.tan(a), L = half / Math.cos(a), q = [P('prism', [w, rise, d], [0, 0, 0], o.gable || 'wall')];
+    for (const s of [-1, 1]) {
+      q.push(P('box', [w + 0.7, 0.16, L], [0, rise - half / 2 * t + 0.02, s * half / 2], 'roof', { rot: [s * a, 0, 0], tag: 'roof' }));
+      if (!o.lite) for (const f of [0.2, 0.5, 0.8]) q.push(P('box', [w + 0.74, 0.06, L * 0.17], [0, rise - half * f * t + 0.13, s * half * f], 'roof2', { rot: [s * a, 0, 0] }));
+      q.push(P('box', [w + 0.76, 0.2, 0.1], [0, rise - half * t + 0.02, s * (half + 0.02)], 'trim'));
+    }
+    q.push(P('box', [w + 0.8, 0.16, 0.36], [0, rise + 0.12, 0], 'roof3', { tag: 'grind' }));
+    return q;
+  };
+  // crow steps for a gable end of base d and height rise (stand it on the eave line, in the plane of the gable wall)
+  K.crowSteps = (d, rise, n = 4) => { const q = []; for (let k = 0; k < n; k++) q.push(P('box', [d * (1 - k / n) + 0.5, rise / n + (k === n - 1 ? 0.5 : 0.05), 0.36], [0, rise * (k + 0.5) / n + (k === n - 1 ? 0.22 : 0), 0], 'stone')); return q; };
+  // a wooden bay window with a lattice (market houses)
+  K.lattice = (w = 1.7) => { const q = [P('box', [w, 1.5, 0.6], [0, 0.75, 0.3], 'wood'), P('box', [w - 0.26, 1.05, 0.04], [0, 0.82, 0.61], 'lattice'), P('box', [w + 0.2, 0.08, 0.76], [0, 1.56, 0.36], 'timber', { rot: [0.12, 0, 0] })]; for (const s of [-1, 1]) q.push(P('box', [0.1, 0.5, 0.5], [s * (w / 2 - 0.2), -0.2, 0.22], 'timber', { rot: [0.75, 0, 0] })); for (let k = 1; k < 5; k++) q.push(P('box', [0.035, 1.05, 0.02], [-w / 2 + 0.13 + k * (w - 0.26) / 5, 0.82, 0.635], 'wood')); return q; };
+  // a pergola for a flat roof: four posts, a striped shade (bounce), a cushion
+  K.pergola = (w = 3.2, d = 2.6) => { const q = []; for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) q.push(P('cyl', [0.06, 0.06, 2.3], [a * w / 2, 1.15, b * d / 2], 'timber', { seg: 6 })); q.push(P('box', [w + 0.4, 0.07, d + 0.4], [0, 2.34, 0], 'awning', { tag: 'bounce' }), P('box', [(w + 0.4) / 5, 0.075, d + 0.4], [-(w + 0.4) / 5, 2.342, 0], 'awning2'), P('box', [(w + 0.4) / 5, 0.075, d + 0.4], [(w + 0.4) / 5, 2.342, 0], 'awning2'), P('box', [w * 0.7, 0.22, d * 0.45], [0, 0.11, 0], 'fabric')); return q; };
+  K.pot = (r = 0.24) => [P('cyl', [r, r * 0.75, r * 1.6], [0, r * 0.8, 0], 'pot', { seg: 7 }), P('ico', [r * 1.5], [0, r * 2.4, 0], 'leaf', { scale: [1, 0.9, 1] })];
+
+  // ---------- assembly ----------
+  // put a piece on one face of a w × d box: 'f' front (+z), 'b' back, 'r' right (+x), 'l' left. x along the face, y up, out = extra stand-off
+  const FACE = { f: 0, r: PI / 2, b: PI, l: -PI / 2 };
+  K.onFace = (parts, face, w, d, x, y, out = 0) => parts.map(p => {
+    const th = FACE[face], dist = (face === 'f' || face === 'b' ? d : w) / 2 + out, lx = p.at[0] + x, lz = p.at[2] + dist, c = Math.cos(th), s = Math.sin(th), r = p.rot || [0, 0, 0];
+    return Object.assign({}, p, { at: [lx * c + lz * s, p.at[1] + y, -lx * s + lz * c], rot: [r[0], r[1] + th, r[2]] });
+  });
+  const lift = (parts, x, y, z, ry = 0) => parts.map(p => { const c = Math.cos(ry), s = Math.sin(ry), r = p.rot || [0, 0, 0]; return Object.assign({}, p, { at: [p.at[0] * c + p.at[2] * s + x, p.at[1] + y, -p.at[0] * s + p.at[2] * c + z], rot: [r[0], r[1] + ry, r[2]] }); });
+  K.lift = lift;
+  const bays = (w, n) => Array.from({ length: n }, (_, i) => (i + 0.5 - n / 2) * w / n);
+
+  // a house from a spec. Returns { parts, size: [w, h, d], eave }.
+  // spec: { w, d, floors, kind: 'town' | 'timber' | 'stone' | 'shop' | 'market', bays, rise, lite }
+  // lite: the version for every house that is not close to the player — front only, plain windows, no tile courses
+  K.house = (S) => {
+    const { w, d, floors, kind } = S, lite = !!S.lite, gh = kind === 'shop' ? 3.3 : 3.0, fh = 2.85, H = gh + (floors - 1) * fh, n = S.bays || Math.max(2, Math.round(w / 2.6)), X = bays(w, n), q = [];
+    const jet = kind === 'timber' ? 0.4 : 0, add = (parts, face, x, y, out = 0) => q.push(...K.onFace(parts, face, w, d, x, y, out));
+    // walls
+    q.push(P('box', [w, kind === 'timber' ? gh : H, d], [0, (kind === 'timber' ? gh : H) / 2, 0], kind === 'timber' ? 'wall2' : 'wall', { tag: 'solid' }));
+    if (jet) q.push(P('box', [w + 0.1, H - gh, d + jet], [0, gh + (H - gh) / 2, jet / 2], 'wall', { tag: 'solid' }));
+    q.push(P('box', [w + 0.14, kind === 'market' ? 1.0 : 0.55, d + 0.14], [0, kind === 'market' ? 0.5 : 0.275, 0], kind === 'market' ? 'accent' : 'stone'));
+    if (kind !== 'timber') for (let f = 1; f < floors; f++) q.push(P('box', [w + 0.1, 0.12, d + 0.1], [0, gh + (f - 1) * fh - 0.06, 0], 'trim'));
+    // ground floor, front
+    const doorX = X[kind === 'shop' ? n - 1 : Math.floor(n / 2) - (n % 2 ? 0 : 1)];
+    if (kind === 'shop') { add(K.shop(w - 2.6), 'f', -1.0, 0); add(K.door(1.0, 2.1), 'f', w / 2 - 0.9, 0); }
+    else for (const x of X) { if (x === doorX) add(K.door(1.1, kind === 'market' ? 1.95 : 2.15, { fanlight: kind === 'town', hood: kind === 'timber', arch: kind === 'market' || kind === 'stone' }), 'f', x, 0); else add(K.window(kind === 'stone' ? 0.8 : 1.0, 1.35, { lite, shutters: kind === 'town' || kind === 'market', lintel: kind === 'stone', box: kind === 'town' }), 'f', x, 1.0); }
+    // upper floors, front; plain windows on the back, 'lite' ones on the sides
+    for (let f = 1; f < floors; f++) {
+      const y = gh + (f - 1) * fh;
+      if (kind === 'timber') for (const [i, x] of X.entries()) { add(K.timber(w / n, fh, i < n / 2 ? -1 : 1), 'f', x, y, jet); }
+      for (const [i, x] of X.entries()) {
+        if (kind === 'market' && f === 1 && i === Math.floor(n / 2)) { add(K.lattice(1.7), 'f', x, y + 0.75); continue; }
+        add(K.window(kind === 'stone' ? 0.8 : 1.0, kind === 'timber' ? 1.15 : 1.4, { lite, shutters: kind !== 'stone' && kind !== 'timber', lintel: kind === 'stone', box: (kind === 'town' || kind === 'shop') && f === 1 && i % 2 === 0 }), 'f', x, y + (kind === 'timber' ? 1.0 : 0.95), jet + (kind === 'timber' ? 0.06 : 0));
+      }
+      if (kind === 'shop' && f === 1 && !lite) add(K.balcony(w * 0.5), 'f', -w * 0.12, y + 0.6);
+    }
+    if (!lite) for (let f = 0; f < floors; f++) { const y = (f ? gh + (f - 1) * fh : 0) + 1.0; for (const x of X) add(K.window(0.9, 1.3, {}), 'b', x, y); for (const x of bays(d, Math.max(1, Math.round(d / 3.6)))) for (const fc of ['l', 'r']) add(K.window(0.9, 1.3, { lite: true }), fc, x, y); }
+    if (jet && !lite) for (let x = -w / 2 + 0.3; x <= w / 2 - 0.2; x += 0.9) q.push(P('box', [0.16, 0.2, jet + 0.1], [x, gh - 0.1, d / 2 + jet / 2], 'timber'));
+    // roof
+    let top = H;
+    if (kind === 'market') {
+      for (const [a, b, c, e] of [[w, 0.3, 0, d / 2 - 0.15], [w, 0.3, 0, -d / 2 + 0.15], [0.3, d - 0.6, w / 2 - 0.15, 0], [0.3, d - 0.6, -w / 2 + 0.15, 0]]) q.push(P('box', [a, 0.42, b], [c, H + 0.21, e], 'trim', { tag: 'grind' }));
+      q.push(...lift(K.pergola(), -w * 0.18, H, -d * 0.1), ...lift(K.pot(), w / 2 - 0.7, H, d / 2 - 0.7), ...lift(K.pot(0.2), w / 2 - 1.4, H, d / 2 - 0.65), P('dome', [1.25], [w * 0.26, H, -d * 0.2], 'plaster', { seg: 10 }), P('cyl', [0.04, 0.04, 0.6], [w * 0.26, H + 1.5, -d * 0.2], 'brass', { seg: 5 }));
+      top = H + 2.4;
+    } else {
+      const rise = S.rise || (kind === 'timber' ? 4.2 : 3.0), street = kind === 'stone';      // the stone house turns its gable to the street
+      const R = K.roof(street ? d + jet : w + (jet ? 0.1 : 0), street ? w : d + jet, rise, { lite });
+      q.push(...lift(R, 0, H, street ? 0 : jet / 2, street ? PI / 2 : 0));
+      if (street) for (const s of [-1, 1]) q.push(...lift(K.crowSteps(w, rise), 0, H, s * (d / 2 + 0.02)));
+      else {
+        const half = d / 2 + jet / 2, t = rise / half, dz = half * 0.52;
+        for (const x of kind === 'shop' ? [-w * 0.22, w * 0.22] : kind === 'town' ? [0] : []) q.push(...lift(K.dormer(), x, H + rise - dz * t - 0.25, jet / 2 + dz + 0.35));
+      }
+      q.push(...lift(K.chimney(), street ? w * 0.22 : w * 0.3, H + rise * 0.55, street ? -d * 0.2 : -d * 0.14));
+      top = H + rise + 1.2;
+    }
+    return { parts: q, size: [w, top, d + jet], eave: H };
+  };
+  // the five houses, each with the palette it was drawn in (slots → colours; a quarter's own colours can replace wall / roof / shutter)
+  const BASE = { trim: '#f4ecd8', stone: '#b9b0a0', glass: '#3f5468', timber: '#4a3628', wood: '#8a6a4a', iron: '#2a2838', brass: '#c9a24a', pot: '#b8643f', leaf: '#5a9a52', flower: '#e4572e', door2: '#3a2a22', wall2: '#cfc6b4', roof: '#a04a32', roof2: '#b85a3a', roof3: '#7a3a28', accent: '#2f5f4a', awning: '#c4523a', awning2: '#f6f1e7', shutter: '#3e6f5a', shutter2: '#335c4a', door: '#5a3a2a', plaster: '#f6f1e7', fabric: '#d9779a', lattice: '#5a4030' };
+  K.HOUSES = [
+    { name: 'Town house', where: 'Bell quarter, church quarter', spec: { w: 7.6, d: 8.5, floors: 2, kind: 'town', bays: 3 }, pal: { wall: '#f2d7c0', roof: '#b85a3a', roof2: '#c96b48', roof3: '#8f4028', shutter: '#3e6f5a', shutter2: '#335c4a', door: '#2f5f6a', door2: '#274f58' } },
+    { name: 'Timbered house', where: 'East quarter', spec: { w: 7.0, d: 8.0, floors: 3, kind: 'timber', bays: 3 }, pal: { wall: '#f4ecd8', wall2: '#cfc6b4', roof: '#8a5040', roof2: '#9c6250', roof3: '#6a3a2e', door: '#7a2f2f', door2: '#662626', trim: '#4a3628' } },
+    { name: 'Stone house', where: 'Upper town', spec: { w: 7.2, d: 9.0, floors: 2, kind: 'stone', bays: 3, rise: 4.0 }, pal: { wall: '#d8d4c8', stone: '#a8a498', trim: '#c8c4b8', roof: '#5a6272', roof2: '#6a7282', roof3: '#454c5a', door: '#3a3550', door2: '#2e2a40' } },
+    { name: 'Shop house', where: 'Round the squares', spec: { w: 8.6, d: 8.5, floors: 3, kind: 'shop', bays: 3 }, pal: { wall: '#e8c87a', roof: '#8a4a3a', roof2: '#9c5c4a', roof3: '#6a352a', shutter: '#7a2f3a', shutter2: '#662630', door: '#7a2f3a', door2: '#662630', accent: '#2f5f4a', awning: '#c4523a', awning2: '#f6f1e7' } },
+    { name: 'Market house', where: 'Market', spec: { w: 9.0, d: 9.0, floors: 2, kind: 'market', bays: 3 }, pal: { wall: '#f4ecd8', trim: '#f6f1e7', accent: '#2f6f9d', shutter: '#2f6f9d', shutter2: '#275d85', door: '#2f6f9d', door2: '#275d85', awning: '#e8b84a', awning2: '#f6f1e7', stone: '#d8cfbf' } },
+  ].map(h => Object.assign(h, { pal: Object.assign({}, BASE, h.pal), build: (lite) => K.house(Object.assign({}, h.spec, { lite })) }));
+  K.PIECES = [
+    ['Window, shutters and flowers', () => K.window(1.0, 1.45, { shutters: true, box: true }), 0], ['Window, stone lintel', () => K.window(0.8, 1.35, { lintel: true }), 2], ['Door with fanlight', () => K.door(1.1, 2.15, { fanlight: true }), 0],
+    ['Arched door', () => K.door(1.1, 1.95, { arch: true }), 4], ['Shop front with awning', () => K.shop(5), 3], ['Balcony', () => K.balcony(2.4), 3], ['Timber bay', () => K.timber(), 1],
+    ['Tiled roof, ridge and eaves', () => K.roof(7, 8, 3), 0], ['Dormer', () => K.dormer(), 0], ['Chimney', () => K.chimney(), 0], ['Lattice bay', () => K.lattice(), 4], ['Pergola', () => K.pergola(), 4],
+  ];
+
+  // ---------- pedestrians ----------
+  // The game draws people as instanced meshes, one per body part, one colour per instance. So a person here is a
+  // choice of part variants. In a part, `sh` (0..1) multiplies the instance colour (1 = the colour itself; lower = a
+  // darker shade of it); `col` instead fixes a colour (then give that instance white). Pivots: torso, head, hair, hats
+  // and body accessories sit in the body frame (origin at the feet); a leg hangs from the hip [±0.1, 0.84, 0]; an arm
+  // and what it holds hangs from the shoulder [±0.27, 1.38, 0]. Adult height 1.78; children are the same parts at 0.68.
+  const B = (s, size, at, sh = 1, o) => Object.assign({ s, size, at, sh }, o || {});
+  const SHOULD = B('sph', [0.24], [0, 1.42, 0], 1, { scale: [1, 0.5, 0.76] });
+  K.BODY = {
+    pivots: { legL: [-0.1, 0.84, 0], legR: [0.1, 0.84, 0], armL: [-0.27, 1.38, 0], armR: [0.27, 1.38, 0] },
+    torso: {   // instance colour: the top
+      jacket: [B('cyl', [0.2, 0.235, 0.6], [0, 1.14, 0]), SHOULD, B('cyl', [0.24, 0.245, 0.1], [0, 0.88, 0], 0.8), B('cyl', [0.1, 0.135, 0.08], [0, 1.49, 0], 0.72), B('box', [0.03, 0.5, 0.02], [0, 1.14, 0.222], 0.7)],
+      coat: [B('cyl', [0.2, 0.3, 1.0], [0, 0.95, 0]), SHOULD, B('cyl', [0.252, 0.262, 0.07], [0, 1.02, 0], 0.6), B('cyl', [0.12, 0.16, 0.1], [0, 1.49, 0], 0.75), B('box', [0.03, 0.9, 0.02], [0, 0.95, 0.27], 0.7, { rot: [-0.1, 0, 0] })],
+      dress: [B('cyl', [0.17, 0.195, 0.42], [0, 1.24, 0]), B('sph', [0.215], [0, 1.42, 0], 1, { scale: [1, 0.45, 0.72] }), B('cyl', [0.2, 0.43, 0.76], [0, 0.66, 0], 1, { seg: 10 }), B('cyl', [0.202, 0.207, 0.06], [0, 1.03, 0], 0.72)],
+      hoodie: [B('cyl', [0.22, 0.25, 0.62], [0, 1.13, 0]), SHOULD, B('sph', [0.16], [0, 1.5, -0.13], 0.9, { scale: [1.1, 0.8, 0.9] }), B('box', [0.26, 0.12, 0.04], [0, 1.0, 0.235], 0.8), B('cyl', [0.25, 0.255, 0.08], [0, 0.86, 0], 0.85)],
+    },
+    leg: {     // instance colour: trousers — or skin, for 'bare' (worn under a dress)
+      trousers: [B('sph', [0.11], [0, 0, 0]), B('cyl', [0.095, 0.075, 0.76], [0, -0.39, 0], 1, { seg: 6 }), B('box', [0.13, 0.09, 0.27], [0, -0.795, 0.05], 0.45)],
+      bare: [B('cyl', [0.068, 0.058, 0.78], [0, -0.39, 0], 1, { seg: 6 }), B('box', [0.12, 0.08, 0.25], [0, -0.8, 0.045], 0.35)],
+    },
+    arm: { sleeve: [B('cyl', [0.068, 0.056, 0.56], [0, -0.28, 0], 1, { seg: 5 }), B('cyl', [0.06, 0.06, 0.05], [0, -0.55, 0], 0.8, { seg: 5 })] },   // instance colour: the top
+    hand: [B('sph', [0.062], [0, -0.61, 0], 1, { seg: 5 })],                                                                                      // instance colour: skin (same matrix as its arm)
+    head: [B('sph', [0.18], [0, 1.68, 0], 1, { scale: [1, 1.06, 1] }), B('cyl', [0.07, 0.08, 0.14], [0, 1.5, 0], 0.92, { seg: 6 }), B('box', [0.045, 0.05, 0.05], [0, 1.655, 0.175], 0.9), B('box', [0.034, 0.05, 0.02], [-0.066, 1.71, 0.166], 0.14), B('box', [0.034, 0.05, 0.02], [0.066, 1.71, 0.166], 0.14)],
+    hair: {    // instance colour: hair
+      short: [B('dome', [0.19], [0, 1.69, -0.015], 1, { scale: [1, 0.95, 1.05] })],
+      long: [B('dome', [0.192], [0, 1.69, -0.015], 1, { scale: [1, 0.95, 1.05] }), B('box', [0.31, 0.42, 0.1], [0, 1.5, -0.15], 0.92)],
+      bun: [B('dome', [0.19], [0, 1.69, -0.015], 1, { scale: [1, 0.95, 1.05] }), B('sph', [0.09], [0, 1.87, -0.1], 0.9, { seg: 6 })],
+      bob: [B('dome', [0.195], [0, 1.69, -0.01], 1, { scale: [1, 0.95, 1.05] }), B('box', [0.06, 0.24, 0.26], [-0.175, 1.6, -0.03], 0.92), B('box', [0.06, 0.24, 0.26], [0.175, 1.6, -0.03], 0.92), B('box', [0.34, 0.24, 0.07], [0, 1.6, -0.16], 0.92)],
+    },
+    hat: {     // each its own instance colour
+      cap: [B('dome', [0.196], [0, 1.74, 0], 1, { scale: [1, 0.72, 1.02] }), B('box', [0.2, 0.03, 0.17], [0, 1.755, 0.2], 0.85)],
+      sunhat: [B('cyl', [0.34, 0.34, 0.03], [0, 1.79, 0], 1, { seg: 12 }), B('cyl', [0.17, 0.19, 0.13], [0, 1.86, 0], 1), B('cyl', [0.192, 0.194, 0.04], [0, 1.82, 0], 0.55)],
+      beanie: [B('dome', [0.2], [0, 1.72, 0], 1, { scale: [1, 1.08, 1.03] }), B('cyl', [0.203, 0.203, 0.06], [0, 1.74, 0], 0.8), B('sph', [0.055], [0, 1.95, 0], 1.0, { seg: 5 })],
+      hardhat: [B('dome', [0.206], [0, 1.73, 0], 1, { scale: [1, 0.9, 1.05] }), B('cyl', [0.235, 0.235, 0.03], [0, 1.745, 0.02], 0.9, { seg: 10 }), B('box', [0.05, 0.2, 0.36], [0, 1.83, 0], 0.85)],
+    },
+    acc: {     // accessories. at: 'body' or an arm. Parts with `col` keep that colour; the rest take the instance colour
+      backpack: { at: 'body', parts: [B('box', [0.3, 0.4, 0.16], [0, 1.2, -0.28]), B('box', [0.22, 0.16, 0.05], [0, 1.1, -0.37], 0.8), B('box', [0.05, 0.42, 0.03], [-0.12, 1.25, 0.2], 0.7), B('box', [0.05, 0.42, 0.03], [0.12, 1.25, 0.2], 0.7)] },
+      bag: { at: 'body', parts: [B('box', [0.1, 0.22, 0.28], [0.29, 0.86, 0.02]), B('box', [0.05, 0.86, 0.02], [0.02, 1.2, 0.225], 0.7, { rot: [0, 0, 0.62] }), B('box', [0.05, 0.86, 0.02], [0.02, 1.2, -0.2], 0.7, { rot: [0, 0, 0.62] })] },
+      apron: { at: 'body', parts: [B('box', [0.36, 0.62, 0.03], [0, 0.98, 0.245], 1, { rot: [-0.06, 0, 0] }), B('box', [0.22, 0.26, 0.03], [0, 1.36, 0.205]), B('cyl', [0.245, 0.25, 0.04], [0, 1.2, 0], 0.85)] },
+      scarf: { at: 'body', parts: [B('cyl', [0.135, 0.15, 0.1], [0, 1.51, 0]), B('box', [0.1, 0.32, 0.04], [0.08, 1.33, 0.2], 0.9)] },
+      headphones: { at: 'body', parts: [B('box', [0.34, 0.03, 0.05], [0, 1.89, 0]), B('box', [0.03, 0.2, 0.05], [-0.185, 1.8, 0]), B('box', [0.03, 0.2, 0.05], [0.185, 1.8, 0]), B('cyl', [0.065, 0.065, 0.05], [-0.2, 1.69, 0], 1, { rot: [0, 0, PI / 2], seg: 7 }), B('cyl', [0.065, 0.065, 0.05], [0.2, 1.69, 0], 1, { rot: [0, 0, PI / 2], seg: 7 })] },
+      vest: { at: 'body', parts: [B('cyl', [0.215, 0.248, 0.5], [0, 1.16, 0]), B('cyl', [0.232, 0.24, 0.06], [0, 1.08, 0], 1, { col: '#e9e4f5' }), B('cyl', [0.222, 0.23, 0.06], [0, 1.26, 0], 1, { col: '#e9e4f5' })] },
+      cane: { at: 'armR', parts: [B('cyl', [0.016, 0.016, 0.82], [0, -1.0, 0.07], 1, { seg: 5 }), B('box', [0.03, 0.03, 0.14], [0, -0.6, 0.03])] },
+      shopping: { at: 'armL', parts: [B('box', [0.13, 0.28, 0.24], [0, -0.78, 0.02], 1, { col: '#c9a878' }), B('cyl', [0.03, 0.03, 0.5], [0, -0.52, 0.06], 1, { col: '#d9a85a', rot: [0.3, 0, 0.1], seg: 5 }), B('ico', [0.07], [0, -0.6, -0.04], 1, { col: '#5a9a52' })] },
+      phone: { at: 'armR', parts: [B('box', [0.08, 0.15, 0.02], [0, -0.64, 0.05], 1, { col: '#1b1a24' })] },
+    },
+  };
+  // eight people: which variants, and the colours they were drawn in. `pose` is only for the preview
+  K.PEOPLE = [
+    { name: 'Commuter', where: 'Downtown', torso: 'jacket', leg: 'trousers', hair: 'short', acc: ['bag', 'phone'], c: { top: '#2f5f8a', legs: '#2a2f45', skin: '#d9a07a', hair: '#3a2a20', bag: '#8a5a4a' } },
+    { name: 'Stallholder', where: 'Market', torso: 'jacket', leg: 'trousers', hair: 'short', hat: 'cap', acc: ['apron'], c: { top: '#c4523a', legs: '#5a4a3a', skin: '#a8704a', hair: '#1f1a18', hat: '#e8b84a', apron: '#f2efe6' } },
+    { name: 'Grandmother', where: 'Old town', torso: 'coat', leg: 'trousers', hair: 'bun', acc: ['scarf', 'cane'], c: { top: '#7a4a6a', legs: '#3a3a42', skin: '#f0c8a0', hair: '#c9c4c0', scarf: '#e8d4a0', cane: '#5a3a24' } },
+    { name: 'Schoolchild', where: 'Everywhere', scale: 0.68, torso: 'hoodie', leg: 'trousers', hair: 'bob', hat: 'beanie', acc: ['backpack'], c: { top: '#e8c84a', legs: '#4a5a7a', skin: '#e8b890', hair: '#5a3a24', hat: '#e4572e', backpack: '#2f8f9d' } },
+    { name: 'Summer dress', where: 'Lake, park', torso: 'dress', leg: 'bare', hair: 'long', hat: 'sunhat', acc: ['shopping'], c: { top: '#4aa0c8', skin: '#c68c5a', hair: '#1f1a18', hat: '#e8dcc0' } },
+    { name: 'Visitor', where: 'Squares, observatory', torso: 'jacket', leg: 'trousers', hair: 'long', hat: 'cap', acc: ['backpack'], c: { top: '#6f8a5a', legs: '#c9c2b4', skin: '#f0c8a0', hair: '#8a5a30', hat: '#2f5f8a', backpack: '#b8743a' } },
+    { name: 'Builder', where: 'Building site, docks', torso: 'jacket', leg: 'trousers', hair: 'short', hat: 'hardhat', acc: ['vest'], c: { top: '#3a4a5a', legs: '#2f4a6a', skin: '#7a4a32', hair: '#1f1a18', hat: '#f2c14e', vest: '#ff8a3a' } },
+    { name: 'Listener', where: 'Canals, skatepark', torso: 'hoodie', leg: 'trousers', hair: 'bob', acc: ['headphones'], c: { top: '#8a5a9e', legs: '#1f1f28', skin: '#d9a07a', hair: '#7a2f1f', headphones: '#1b1a24' } },
+  ];
+  K.personTris = (p) => { const b = K.BODY, n = (L) => L.reduce((s, q) => s + K.TRIS(q), 0); return n(b.torso[p.torso]) + 2 * n(b.leg[p.leg]) + 2 * (n(b.arm.sleeve) + n(b.hand)) + n(b.head) + n(b.hair[p.hair]) + (p.hat ? n(b.hat[p.hat]) : 0) + (p.acc || []).reduce((s, a) => s + n(b.acc[a].parts), 0); };
+  return K;
+})();
+if (typeof module !== 'undefined') module.exports = KIT;
+
+// ============================================================
+//  MODEL KIT, part two — the skater, street furniture, vehicles.
+//  Same format as kit.js (see README.md), plus two shapes:
+//  cap [r, len] (a capsule, len = the straight part) and
+//  torus [R, r] (ring radius, tube radius; lies in the x–y plane).
+// ============================================================
+(() => {
+  const K = KIT, PI = Math.PI;
+  const P = (s, size, at, col, o) => Object.assign({ s, size, at, col }, o || {});
+  const base = K.TRIS; K.TRIS = (p) => p.s === 'cap' ? 112 : p.s === 'torus' ? 10 * (p.seg || 12) : base(p);
+  const lift = K.lift;
+
+  // ---------- the skater ----------
+  // Parts per joint of the game's Rig (src/characters.js), in that joint's own frame, for scale 1. Joint pivots, as the
+  // Rig has them: hips at the hip line; torso = hips + [0, .04, 0]; head = torso + [0, .78, 0]; arm = torso + [±.31, .5, 0];
+  // fore = arm + [0, -.31, 0]; leg = hips + [±.12, -.05, 0]; shin = leg + [0, -.42, 0]; skate = shin + [0, -.40, 0].
+  // Left and right use the same lists; a part with `side: true` has its x mirrored on the other side.
+  // The face stays the game's own (a drawn texture on the front of the skull); the antenna tip is `antTip`.
+  K.SKATER = {
+    pivots: { torso: [0, 0.04, 0], head: [0, 0.78, 0], arm: [0.31, 0.5, 0], fore: [0, -0.31, 0], leg: [0.12, -0.05, 0], shin: [0, -0.42, 0], skate: [0, -0.40, 0] },
+    hips: [P('sph', [0.2], [0, 0, 0], 'pants'), P('cyl', [0.232, 0.24, 0.13], [0, 0.15, 0], 'shirt', { scale: [1.05, 1, 0.84], seg: 12 }), P('cyl', [0.218, 0.218, 0.06], [0, 0.07, 0], 'ink', { scale: [1.04, 1, 0.9], seg: 12 }), P('box', [0.08, 0.07, 0.03], [0, 0.07, 0.195], 'accent')],
+    torso: [
+      P('cap', [0.24, 0.26], [0, 0.3, 0], 'jacket', { scale: [1.08, 1, 0.82] }),
+      P('cyl', [0.262, 0.268, 0.08], [0, 0.13, 0], 'accent', { scale: [1.08, 1, 0.82], seg: 12 }),           // the cropped jacket's hem
+      P('box', [0.03, 0.4, 0.02], [0, 0.33, 0.2], 'ink'), P('box', [0.13, 0.1, 0.02], [-0.12, 0.38, 0.19], 'accent'),   // zip, chest badge
+      P('sph', [0.19], [0, 0.58, -0.15], 'jacket2', { scale: [1.15, 0.7, 0.9] }),                             // hood, down
+      P('torus', [0.17, 0.06], [0, 0.58, 0], 'accent', { rot: [PI / 2, 0, 0], seg: 14 }),                    // collar
+      P('cyl', [0.07, 0.08, 0.14], [0, 0.66, 0], 'skin', { seg: 8 }),
+      // the radio on the back: speaker, dials, antenna
+      P('box', [0.4, 0.44, 0.2], [0, 0.34, -0.28], 'radio'), P('box', [0.42, 0.06, 0.22], [0, 0.55, -0.28], 'ink'),
+      P('cyl', [0.115, 0.115, 0.03], [-0.07, 0.3, -0.385], 'ink', { rot: [PI / 2, 0, 0], seg: 10 }), P('cyl', [0.07, 0.07, 0.035], [-0.07, 0.3, -0.39], 'radio2', { rot: [PI / 2, 0, 0], seg: 10 }),
+      P('cyl', [0.03, 0.03, 0.04], [0.1, 0.42, -0.385], 'accent', { rot: [PI / 2, 0, 0], seg: 6 }), P('cyl', [0.03, 0.03, 0.04], [0.1, 0.32, -0.385], 'accent', { rot: [PI / 2, 0, 0], seg: 6 }), P('box', [0.1, 0.035, 0.02], [0.1, 0.22, -0.385], 'radio2'),
+      P('cyl', [0.012, 0.012, 0.6], [0.14, 0.82, -0.3], 'ink', { rot: [0, 0, -0.25], seg: 5 }), P('sph', [0.04], [0.21, 1.1, -0.3], 'glow', { id: 'antTip', seg: 6 }),
+      P('box', [0.05, 0.4, 0.03], [-0.14, 0.36, 0.195], 'ink', { rot: [0.1, 0, 0] }), P('box', [0.05, 0.4, 0.03], [0.14, 0.36, 0.195], 'ink', { rot: [0.1, 0, 0] }),
+    ],
+    head: [
+      P('sph', [0.21], [0, 0, 0], 'skin', { scale: [1, 1.05, 0.98], seg: 14, id: 'skull' }),
+      P('dome', [0.222], [0, 0.03, -0.01], 'hair', { scale: [1.02, 1, 1.06], seg: 12 }), P('box', [0.3, 0.085, 0.1], [0.03, 0.13, 0.175], 'hair', { rot: [0, 0, 0.16] }),
+      P('cone', [0.085, 0.2], [0.06, 0.24, 0.06], 'hair', { rot: [0.5, 0, -0.35] }), P('cone', [0.08, 0.2], [-0.06, 0.25, -0.02], 'hair', { rot: [-0.2, 0, 0.3] }), P('cone', [0.09, 0.22], [0, 0.14, -0.21], 'hair', { rot: [-1.9, 0, 0] }),
+      // headphones
+      P('torus', [0.218, 0.028], [0, 0.01, -0.01], 'ink', { seg: 14 }), P('cyl', [0.085, 0.085, 0.07], [-0.222, -0.01, -0.01], 'accent', { rot: [0, 0, PI / 2], seg: 10 }), P('cyl', [0.085, 0.085, 0.07], [0.222, -0.01, -0.01], 'accent', { rot: [0, 0, PI / 2], seg: 10 }),
+    ],
+    arm: [P('cap', [0.078, 0.2], [0, -0.15, 0], 'jacket'), P('sph', [0.1], [0, -0.02, 0], 'accent', { scale: [1, 0.7, 1], seg: 8 })],
+    fore: [P('cap', [0.066, 0.18], [0, -0.13, 0], 'sleeve'), P('cyl', [0.076, 0.072, 0.09], [0, -0.235, 0], 'ink', { seg: 8 }), P('box', [0.07, 0.1, 0.03], [0, -0.245, 0.062], 'accent'), P('sph', [0.075], [0, -0.3, 0], 'glove', { seg: 8 })],
+    leg: [P('cap', [0.105, 0.32], [0, -0.21, 0], 'pants'), P('box', [0.07, 0.15, 0.13], [0.105, -0.27, 0], 'pants2', { side: true })],
+    shin: [P('cyl', [0.095, 0.128, 0.37], [0, -0.2, 0], 'pants', { seg: 10 }), P('sph', [0.088], [0, -0.02, 0.07], 'ink', { scale: [1, 1.1, 0.6], seg: 8 }), P('box', [0.1, 0.06, 0.03], [0, -0.02, 0.125], 'accent')],
+    skate: [
+      P('box', [0.17, 0.2, 0.32], [0, -0.05, 0.04], 'boot'), P('box', [0.176, 0.11, 0.1], [0, -0.095, 0.155], 'boot2'), P('cyl', [0.1, 0.11, 0.1], [0, 0.04, 0], 'boot2', { seg: 10 }),
+      P('box', [0.182, 0.035, 0.2], [0, 0.005, 0.03], 'accent'), P('box', [0.182, 0.035, 0.22], [0, -0.07, 0.05], 'accent'),
+      P('box', [0.05, 0.06, 0.37], [0, -0.165, 0.04], 'frame'), P('box', [0.07, 0.06, 0.06], [0, -0.17, -0.165], 'ink'),
+      ...[0, 1, 2, 3].map(i => P('cyl', [0.05, 0.05, 0.04], [0, -0.195, -0.105 + i * 0.097], 'wheels', { rot: [0, 0, PI / 2], seg: 10 })),
+    ],
+    looks: [
+      { name: 'Signal', note: 'The game\'s present colours', c: { jacket: '#3f8f7a', jacket2: '#357a68', sleeve: '#3f8f7a', accent: '#f2c14e', shirt: '#f6f1e7', pants: '#2a2f45', pants2: '#353b55', boot: '#e9e4f5', boot2: '#c9c4d8', frame: '#3a3550', wheels: '#e4572e', radio: '#e4572e', radio2: '#f2c14e', hair: '#1f1a18', skin: '#d9a07a', glove: '#1d1a26', ink: '#1d1a26', glow: '#ff5ab0' } },
+      { name: 'Ember', note: 'Red jacket, cream trim', c: { jacket: '#e4572e', jacket2: '#c4452a', sleeve: '#f6f1e7', accent: '#f6f1e7', shirt: '#1d1a26', pants: '#3a3550', pants2: '#474262', boot: '#1d1a26', boot2: '#3a3550', frame: '#c9c4d8', wheels: '#f2c14e', radio: '#2f8f9d', radio2: '#f6f1e7', hair: '#7a2f1f', skin: '#f0c8a0', glove: '#f6f1e7', ink: '#1d1a26', glow: '#7fd3ff' } },
+      { name: 'Night bus', note: 'Violet, ice blue, pink wheels', c: { jacket: '#8a5a9e', jacket2: '#734a85', sleeve: '#1f1f28', accent: '#7fd3ff', shirt: '#f6f1e7', pants: '#1f1f28', pants2: '#2c2c38', boot: '#f6f1e7', boot2: '#7fd3ff', frame: '#1d1a26', wheels: '#ff5a8a', radio: '#f2c14e', radio2: '#1d1a26', hair: '#e8e2d4', skin: '#7a4a32', glove: '#7fd3ff', ink: '#1d1a26', glow: '#ff5a8a' } },
+    ],
+  };
+  K.skaterTris = () => { const S = K.SKATER, n = (L) => L.reduce((s, q) => s + K.TRIS(q), 0); return n(S.hips) + n(S.torso) + n(S.head) + 2 * (n(S.arm) + n(S.fore) + n(S.leg) + n(S.shin) + n(S.skate)); };
+
+  // ---------- street furniture ----------
+  // Static pieces: origin on the ground, front to +z. Tags as for houses, plus 'light' (it glows at night, hang a pool of light under it).
+  const SP = K.STREET_PAL = { iron: '#2a2838', wood: '#8a6a4a', wood2: '#a07a4a', stone: '#b9b0a0', glass: '#9fc4d8', lamp: '#ffe2a6', red: '#c4302b', green: '#2f5f4a', yellow: '#f2c14e', cream: '#f4ecd8', blue: '#2f6f9d', dark: '#1b1a24', leaf: '#5a9a52', leaf2: '#6fb25e', tyre: '#1b1a24', steel: '#c9d2da', soil: '#5a4030', banner: '#e4572e', amber: '#f2a03a', go: '#4ac06a' };
+  const F = {};
+  F.bench = () => { const q = [P('box', [1.7, 0.06, 0.46], [0, 0.44, 0], 'wood', { tag: 'solid' })];
+    for (const z of [-0.15, 0, 0.15]) q.push(P('box', [1.72, 0.035, 0.12], [0, 0.475, z], 'wood2'));
+    for (const [y, tg] of [[0.66, 0], [0.8, 0], [0.94, 1]]) q.push(P('box', [1.72, 0.11, 0.035], [0, y, -0.25 - (y - 0.6) * 0.16], 'wood2', Object.assign({ rot: [-0.16, 0, 0] }, tg ? { tag: 'grind' } : {})));
+    for (const s of [-1, 1]) q.push(P('box', [0.06, 0.44, 0.06], [s * 0.76, 0.22, 0.18], 'iron'), P('box', [0.06, 1.0, 0.06], [s * 0.76, 0.5, -0.24], 'iron', { rot: [-0.14, 0, 0] }), P('box', [0.06, 0.05, 0.5], [s * 0.76, 0.66, 0], 'iron'), P('box', [0.06, 0.05, 0.46], [s * 0.76, 0.1, -0.02], 'iron'));
+    return q; };
+  F.lantern = () => [P('cyl', [0.15, 0.2, 0.34], [0, 0.17, 0], 'iron'), P('cyl', [0.055, 0.08, 3.1], [0, 1.85, 0], 'iron', { seg: 6 }), P('cyl', [0.1, 0.1, 0.07], [0, 0.9, 0], 'iron', { seg: 6 }),
+    P('box', [0.05, 0.05, 0.75], [0, 3.36, 0.34], 'iron'), P('box', [0.04, 0.5, 0.04], [0, 3.14, 0.2], 'iron', { rot: [0.9, 0, 0] }), P('box', [0.03, 0.2, 0.03], [0, 3.26, 0.68], 'iron'),
+    P('box', [0.26, 0.36, 0.26], [0, 2.98, 0.68], 'lamp', { tag: 'light' }), ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => P('box', [0.035, 0.4, 0.035], [a * 0.135, 2.98, 0.68 + b * 0.135], 'iron')),
+    P('box', [0.34, 0.04, 0.34], [0, 2.79, 0.68], 'iron'), P('cone', [0.27, 0.2], [0, 3.26, 0.68], 'iron', { seg: 4, rot: [0, PI / 4, 0] })];
+  F.streetlamp = () => [P('cyl', [0.16, 0.2, 0.5], [0, 0.25, 0], 'dark'), P('cyl', [0.065, 0.11, 6.2], [0, 3.1, 0], 'dark', { seg: 6 }),
+    ...[-1, 1].flatMap(s => [P('box', [1.3, 0.07, 0.1], [s * 0.66, 6.1, 0], 'dark', { rot: [0, 0, s * 0.1] }), P('box', [0.55, 0.08, 0.26], [s * 1.2, 6.14, 0], 'dark'), P('box', [0.48, 0.03, 0.2], [s * 1.2, 6.09, 0], 'lamp', { tag: 'light' })]),
+    P('box', [0.04, 0.04, 0.7], [0, 4.5, 0.36], 'dark'), P('box', [0.03, 1.5, 0.62], [0, 3.72, 0.38], 'banner', { sign: true }), P('box', [0.04, 0.04, 0.7], [0, 2.95, 0.36], 'dark')];
+  F.bin = () => [P('cyl', [0.27, 0.23, 0.78], [0, 0.45, 0], 'green', { seg: 10, tag: 'solid' }), P('cyl', [0.29, 0.29, 0.07], [0, 0.86, 0], 'dark', { seg: 10 }), P('cyl', [0.272, 0.262, 0.1], [0, 0.6, 0], 'cream', { seg: 10 }), P('cyl', [0.2, 0.2, 0.02], [0, 0.9, 0], 'dark', { seg: 10 }), P('cyl', [0.2, 0.22, 0.06], [0, 0.03, 0], 'dark', { seg: 10 })];
+  F.bollards = () => { const q = []; for (const x of [-1, 1]) q.push(P('cyl', [0.085, 0.11, 0.8], [x, 0.4, 0], 'iron', { tag: 'solid' }), P('sph', [0.1], [x, 0.85, 0], 'iron', { seg: 6 }), P('cyl', [0.1, 0.1, 0.05], [x, 0.66, 0], 'cream', { seg: 8 }));
+    for (const [x, y, a] of [[-0.62, 0.6, 0.38], [0, 0.52, 0], [0.62, 0.6, -0.38]]) q.push(P('box', [0.68, 0.035, 0.035], [x, y, 0], 'iron', { rot: [0, 0, -a] })); return q; };
+  F.postbox = () => [P('cyl', [0.06, 0.08, 0.95], [0, 0.475, 0], 'dark', { seg: 6 }), P('box', [0.52, 0.7, 0.36], [0, 1.3, 0], 'yellow', { tag: 'solid' }), P('box', [0.56, 0.06, 0.4], [0, 1.67, 0], 'dark'), P('box', [0.34, 0.04, 0.02], [0, 1.47, 0.185], 'dark'), P('box', [0.3, 0.22, 0.015], [0, 1.2, 0.185], 'cream'), P('box', [0.1, 0.06, 0.02], [0, 1.02, 0.185], 'dark')];
+  // a finger post: one board per district, each in that district's colour (point them with rot y)
+  F.fingerpost = () => [P('cyl', [0.05, 0.065, 3.1], [0, 1.55, 0], 'dark', { seg: 6 }), P('sph', [0.09], [0, 3.16, 0], 'yellow', { seg: 6 }), P('cyl', [0.14, 0.18, 0.2], [0, 0.1, 0], 'dark'),
+    ...[['red', 2.9, 0.3], ['blue', 2.66, 2.2], ['green', 2.42, -1.3], ['yellow', 2.18, 3.6]].flatMap(([c, y, a]) => [P('box', [0.95, 0.19, 0.03], [Math.cos(a) * 0.5, y, -Math.sin(a) * 0.5], c, { rot: [0, a, 0], sign: true }), P('box', [0.16, 0.14, 0.035], [Math.cos(a) * 1.02, y, -Math.sin(a) * 1.02], c, { rot: [0, a, PI / 4] })])];
+  F.kiosk = () => { const q = [P('box', [2.2, 2.3, 1.7], [0, 1.15, 0], 'green', { tag: 'solid' }), P('box', [1.7, 0.95, 0.06], [0, 1.55, 0.83], 'dark'), P('box', [1.9, 0.08, 0.4], [0, 1.05, 0.95], 'wood2'), P('box', [2.3, 0.4, 1.8], [0, 2.5, 0], 'cream', { sign: true }), P('box', [2.7, 0.1, 2.2], [0, 2.75, 0], 'green'), P('cone', [1.2, 0.7], [0, 3.15, 0], 'green', { seg: 6 }), P('sph', [0.12], [0, 3.55, 0], 'yellow', { seg: 6 }),
+      P('box', [2.0, 0.05, 1.0], [0, 2.2, 1.3], 'red', { rot: [0.3, 0, 0], tag: 'bounce' }), P('box', [0.5, 0.055, 1.0], [-0.5, 2.202, 1.3], 'cream', { rot: [0.3, 0, 0] }), P('box', [0.5, 0.055, 1.0], [0.5, 2.202, 1.3], 'cream', { rot: [0.3, 0, 0] })];
+    ['red', 'yellow', 'blue', 'cream', 'amber'].forEach((c, i) => q.push(P('box', [0.26, 0.36, 0.04], [-0.7 + i * 0.35, 0.72, 0.87], c, { rot: [-0.15, 0, 0] }))); return q; };
+  F.shelter = () => { const q = [P('box', [4.2, 0.1, 1.9], [0, 2.55, 0.1], 'dark', { rot: [0.05, 0, 0], tag: 'solid' }), P('box', [4.0, 1.7, 0.04], [0, 1.5, -0.7], 'glass'), P('box', [0.04, 1.7, 1.2], [-1.98, 1.5, -0.1], 'glass'), P('box', [1.0, 1.4, 0.05], [1.4, 1.5, -0.66], 'cream', { sign: true }), P('box', [3.0, 0.06, 0.4], [-0.3, 0.5, -0.45], 'wood2', { tag: 'solid' })];
+    for (const [x, z] of [[-2, -0.72], [2, -0.72], [-2, 0.6], [2, 0.6]]) q.push(P('box', [0.08, 2.5, 0.08], [x, 1.25, z], 'dark'));
+    for (const x of [-1.6, 1.0]) q.push(P('box', [0.06, 0.5, 0.06], [x, 0.25, -0.45], 'dark'));
+    q.push(P('cyl', [0.04, 0.05, 2.8], [2.6, 1.4, 0.7], 'dark', { seg: 6 }), P('cyl', [0.3, 0.3, 0.05], [2.6, 2.75, 0.7], 'yellow', { rot: [PI / 2, 0, 0], seg: 10, sign: true }), P('box', [0.34, 0.46, 0.04], [2.6, 1.7, 0.7], 'cream')); return q; };
+  F.cafe = () => { const q = [P('cyl', [0.42, 0.42, 0.035], [0, 0.74, 0], 'cream', { seg: 10, tag: 'solid' }), P('cyl', [0.035, 0.035, 0.72], [0, 0.37, 0], 'iron', { seg: 5 }), P('cyl', [0.24, 0.26, 0.03], [0, 0.015, 0], 'iron', { seg: 8 }),
+      P('cyl', [0.025, 0.025, 2.5], [0, 1.25, 0], 'wood', { seg: 5 }), P('cone', [1.35, 0.5], [0, 2.5, 0], 'red', { seg: 8, tag: 'bounce' }), P('cyl', [1.36, 1.36, 0.14], [0, 2.2, 0], 'cream', { seg: 8 }), P('sph', [0.05], [0, 2.78, 0], 'wood', { seg: 5 })];
+    for (const a of [0.5, 3.4]) { const c = [P('box', [0.4, 0.04, 0.4], [0, 0.45, 0], 'blue'), P('box', [0.4, 0.34, 0.035], [0, 0.72, -0.19], 'blue', { rot: [-0.12, 0, 0] })]; for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) c.push(P('box', [0.03, z < 0 ? 0.9 : 0.45, 0.03], [x * 0.18, z < 0 ? 0.45 : 0.225, z * 0.18], 'iron')); q.push(...lift(c, Math.sin(a) * 0.75, 0, Math.cos(a) * 0.75, a + PI)); }
+    return q; };
+  F.bikes = () => { const q = []; for (const x of [-0.7, 0, 0.7]) q.push(P('box', [0.05, 0.8, 0.05], [x, 0.4, -0.3], 'steel'), P('box', [0.05, 0.8, 0.05], [x, 0.4, 0.3], 'steel'), P('box', [0.05, 0.05, 0.65], [x, 0.8, 0], 'steel', { tag: 'grind' }));
+    const b = [P('torus', [0.33, 0.025], [0, 0.36, 0.52], 'tyre', { rot: [0, PI / 2, 0] }), P('torus', [0.33, 0.025], [0, 0.36, -0.52], 'tyre', { rot: [0, PI / 2, 0] }),
+      P('box', [0.035, 0.035, 0.62], [0, 0.72, 0.04], 'red'), P('box', [0.035, 0.6, 0.035], [0, 0.56, 0.3], 'red', { rot: [0.5, 0, 0] }), P('box', [0.035, 0.56, 0.035], [0, 0.58, -0.2], 'red', { rot: [-0.25, 0, 0] }), P('box', [0.03, 0.03, 0.42], [0, 0.36, -0.32], 'red'), P('box', [0.03, 0.5, 0.03], [0, 0.6, 0.5], 'steel', { rot: [-0.3, 0, 0] }),
+      P('box', [0.46, 0.03, 0.03], [0, 0.98, 0.4], 'dark'), P('box', [0.1, 0.05, 0.24], [0, 0.9, -0.28], 'dark'), P('box', [0.03, 0.2, 0.03], [0, 0.8, -0.27], 'steel')];
+    q.push(...lift(b, 0.36, 0, 0, 0.12).map(p => Object.assign(p, { rot: [p.rot[0], p.rot[1], (p.rot[2] || 0) + 0.12] }))); return q; };
+  F.hydrant = () => [P('cyl', [0.17, 0.19, 0.08], [0, 0.04, 0], 'red', { seg: 8 }), P('cyl', [0.12, 0.13, 0.58], [0, 0.37, 0], 'red', { seg: 8, tag: 'solid' }), P('cyl', [0.15, 0.15, 0.06], [0, 0.6, 0], 'red', { seg: 8 }), P('dome', [0.13], [0, 0.63, 0], 'red', { seg: 8 }), P('cyl', [0.04, 0.04, 0.06], [0, 0.79, 0], 'steel', { seg: 5 }),
+    P('cyl', [0.06, 0.06, 0.4], [0, 0.42, 0], 'red', { rot: [0, 0, PI / 2], seg: 6 }), P('cyl', [0.07, 0.07, 0.1], [0, 0.42, 0.13], 'steel', { rot: [PI / 2, 0, 0], seg: 6 })];
+  F.trafficlight = () => { const q = [P('cyl', [0.13, 0.16, 0.4], [0, 0.2, 0], 'dark'), P('cyl', [0.06, 0.07, 3.3], [0, 1.65, 0], 'dark', { seg: 6 }), P('box', [0.32, 0.9, 0.26], [0, 3.1, 0.12], 'dark'), P('box', [0.26, 0.4, 0.2], [0, 2.1, 0.12], 'dark'), P('box', [0.16, 0.16, 0.02], [0, 2.18, 0.225], 'red'), P('box', [0.16, 0.16, 0.02], [0, 2.0, 0.225], 'go', { tag: 'light' })];
+    ['red', 'amber', 'go'].forEach((c, i) => q.push(P('cyl', [0.1, 0.1, 0.03], [0, 3.38 - i * 0.28, 0.255], c, { rot: [PI / 2, 0, 0], seg: 8, tag: 'light' }), P('box', [0.24, 0.03, 0.14], [0, 3.49 - i * 0.28, 0.3], 'dark'))); return q; };
+  F.planter = () => { const q = [P('box', [1.4, 0.6, 1.4], [0, 0.3, 0], 'wood', { tag: 'solid' }), P('box', [1.24, 0.04, 1.24], [0, 0.6, 0], 'soil'), P('cyl', [0.1, 0.14, 2.3], [0, 1.75, 0], 'wood', { seg: 6 }), P('ico', [1.0], [0, 3.2, 0], 'leaf', { scale: [1.1, 0.9, 1.1] }), P('ico', [0.7], [0.5, 2.8, 0.3], 'leaf2'), P('ico', [0.65], [-0.45, 3.0, -0.35], 'leaf2'), P('ico', [0.55], [-0.1, 3.9, 0.1], 'leaf2')];
+    for (const [a, b, c, e] of [[1.5, 0.12, 0, 0.7], [1.5, 0.12, 0, -0.7], [0.12, 1.5, 0.7, 0], [0.12, 1.5, -0.7, 0]]) q.push(P('box', [a, 0.09, b], [c, 0.64, e], 'wood2', { tag: 'grind' })); return q; };
+  K.FURNITURE = [['Bench', F.bench, 'Slatted wood on iron; the top of the back grinds'], ['Old-town lantern', F.lantern, 'Old town, canals'], ['Street lamp with banner', F.streetlamp, 'Downtown; the banner takes the district\'s colour'], ['Finger post', F.fingerpost, 'One board per district, at crossroads'],
+    ['Kiosk', F.kiosk, 'Squares, station forecourts'], ['Tram shelter', F.shelter, 'Roof is solid; its edge could grind'], ['Café table', F.cafe, 'The parasol bounces'], ['Bike rack', F.bikes, 'Hoops grind'],
+    ['Tree in a planter', F.planter, 'The rim grinds'], ['Litter bin', F.bin, ''], ['Bollards and chain', F.bollards, ''], ['Post box', F.postbox, ''], ['Hydrant', F.hydrant, ''], ['Traffic light', F.trafficlight, 'Downtown crossings']];
+
+  // ---------- vehicles ----------
+  // Rigid, instanced (instKit in src/city/life.js): parts whose col is 'paint' take the vehicle's own colour, the rest are fixed.
+  // Origin on the road under the middle; the nose points to +z. `box` is the body for collision: [w, h, l].
+  const wheels = (hw, zs, r = 0.33) => zs.flatMap(z => [-1, 1].flatMap(s => [P('cyl', [r, r, 0.24], [s * hw, r, z], '#1b1a24', { rot: [0, 0, PI / 2], seg: 10 }), P('cyl', [r * 0.5, r * 0.5, 0.25], [s * hw, r, z], '#c9c2b4', { rot: [0, 0, PI / 2], seg: 6 })]));
+  const lights = (hw, y, zf, zb) => [-1, 1].flatMap(s => [P('box', [0.36, 0.17, 0.06], [s * hw, y, zf], '#fff3c4', { tag: 'light' }), P('box', [0.34, 0.15, 0.06], [s * hw, y, zb], '#ff3a3a')]);
+  const GL = '#2a3550', BUMP = '#3a3a42';
+  const V = {};
+  V.city = () => [P('box', [1.72, 0.6, 3.5], [0, 0.66, 0], 'paint'), P('box', [1.66, 0.16, 0.95], [0, 1.0, 1.2], 'paint', { rot: [0.13, 0, 0] }), P('box', [1.6, 0.6, 1.9], [0, 1.28, -0.4], 'paint'), P('box', [1.64, 0.4, 1.72], [0, 1.3, -0.4], GL),
+    P('box', [1.46, 0.52, 0.06], [0, 1.27, 0.62], GL, { rot: [-0.5, 0, 0] }), P('box', [1.5, 0.06, 1.6], [0, 1.6, -0.45], 'paint'), P('box', [1.78, 0.2, 0.16], [0, 0.44, 1.74], BUMP), P('box', [1.78, 0.2, 0.16], [0, 0.44, -1.74], BUMP),
+    P('box', [0.5, 0.12, 0.03], [0, 0.6, 1.83], '#f6f1e7'), P('box', [0.12, 0.09, 0.16], [-0.92, 1.12, 0.5], 'paint'), P('box', [0.12, 0.09, 0.16], [0.92, 1.12, 0.5], 'paint'), ...lights(0.58, 0.78, 1.75, -1.75), ...wheels(0.82, [1.12, -1.12], 0.31)];
+  V.saloon = (taxi) => [P('box', [1.84, 0.58, 4.4], [0, 0.68, 0], 'paint'), P('box', [1.66, 0.56, 2.1], [0, 1.25, -0.25], 'paint'), P('box', [1.7, 0.38, 1.9], [0, 1.27, -0.25], GL), P('box', [1.5, 0.56, 0.06], [0, 1.22, 0.9], GL, { rot: [-0.62, 0, 0] }), P('box', [1.5, 0.52, 0.06], [0, 1.22, -1.38], GL, { rot: [0.7, 0, 0] }),
+    P('box', [1.56, 0.06, 1.7], [0, 1.55, -0.25], 'paint'), P('box', [1.9, 0.2, 0.16], [0, 0.46, 2.2], BUMP), P('box', [1.9, 0.2, 0.16], [0, 0.46, -2.2], BUMP), P('box', [1.86, 0.07, 4.2], [0, 0.6, 0], BUMP), P('box', [0.9, 0.2, 0.05], [0, 0.72, 2.21], BUMP),
+    P('box', [0.5, 0.12, 0.03], [0, 0.58, 2.29], '#f6f1e7'), P('box', [0.12, 0.09, 0.16], [-0.98, 1.1, 0.75], 'paint'), P('box', [0.12, 0.09, 0.16], [0.98, 1.1, 0.75], 'paint'), ...lights(0.64, 0.8, 2.2, -2.2), ...wheels(0.88, [1.4, -1.4]),
+    ...(taxi ? [P('box', [0.56, 0.17, 0.22], [0, 1.67, -0.1], '#fff3c4', { tag: 'light', sign: true }), P('box', [1.86, 0.14, 2.0], [0, 0.82, -0.1], '#1b1a24')] : [])];
+  V.van = () => [P('box', [2.0, 1.75, 3.3], [0, 1.3, -0.75], 'paint'), P('box', [2.0, 0.85, 1.5], [0, 0.86, 1.6], 'paint'), P('box', [1.9, 0.75, 1.0], [0, 1.6, 1.25], 'paint'), P('box', [1.94, 0.5, 0.8], [0, 1.66, 1.3], GL), P('box', [1.76, 0.7, 0.06], [0, 1.6, 1.84], GL, { rot: [-0.42, 0, 0] }),
+    P('box', [2.04, 0.5, 2.6], [0, 1.5, -0.8], '#f6f1e7', { sign: true }), P('box', [2.02, 0.04, 3.2], [0, 0.62, -0.75], BUMP), P('box', [2.06, 0.22, 0.16], [0, 0.46, 2.36], BUMP), P('box', [2.06, 0.22, 0.16], [0, 0.46, -2.42], BUMP), P('box', [0.04, 1.5, 0.04], [1.01, 1.3, -0.05], BUMP), P('box', [0.04, 1.5, 0.04], [-1.01, 1.3, -0.05], BUMP),
+    P('box', [1.6, 0.06, 2.6], [0, 2.24, -0.8], BUMP), P('box', [0.14, 0.1, 0.18], [-1.08, 1.5, 1.7], BUMP), P('box', [0.14, 0.1, 0.18], [1.08, 1.5, 1.7], BUMP), ...lights(0.7, 0.86, 2.36, -2.42), ...wheels(0.94, [1.5, -1.6], 0.36)];
+  V.pickup = () => { const q = [P('box', [1.92, 0.6, 4.9], [0, 0.78, 0], 'paint'), P('box', [1.8, 0.7, 1.7], [0, 1.42, 0.55], 'paint'), P('box', [1.84, 0.46, 1.5], [0, 1.46, 0.55], GL), P('box', [1.6, 0.6, 0.06], [0, 1.4, 1.5], GL, { rot: [-0.45, 0, 0] }), P('box', [1.7, 0.06, 1.4], [0, 1.8, 0.5], 'paint'),
+      P('box', [0.1, 0.4, 2.1], [-0.91, 1.26, -1.35], 'paint'), P('box', [0.1, 0.4, 2.1], [0.91, 1.26, -1.35], 'paint'), P('box', [1.92, 0.4, 0.1], [0, 1.26, -2.4], 'paint'), P('box', [1.72, 0.04, 2.0], [0, 1.1, -1.35], BUMP),
+      P('box', [1.98, 0.22, 0.18], [0, 0.52, 2.46], BUMP), P('box', [1.98, 0.22, 0.18], [0, 0.52, -2.46], BUMP), P('box', [0.14, 0.1, 0.18], [-1.04, 1.3, 1.25], 'paint'), P('box', [0.14, 0.1, 0.18], [1.04, 1.3, 1.25], 'paint'), ...lights(0.68, 0.9, 2.45, -2.45), ...wheels(0.92, [1.55, -1.55], 0.38)];
+    // crates of fruit in the back: this one is the market's
+    [['#e85a3a', -0.45, -0.8], ['#f2b23a', 0.45, -0.8], ['#7ac04a', -0.45, -1.7], ['#c83a6a', 0.45, -1.7]].forEach(([c, x, z]) => q.push(P('box', [0.75, 0.4, 0.75], [x, 1.32, z], '#a07a4a'), P('box', [0.62, 0.1, 0.62], [x, 1.55, z], c)));
+    return q; };
+  V.bus = () => { const q = [P('box', [2.5, 1.1, 10], [0, 0.95, 0], 'paint'), P('box', [2.5, 1.5, 10], [0, 2.25, 0], '#f4ecd8'), P('box', [2.54, 0.85, 9.3], [0, 2.15, -0.15], GL), P('box', [2.3, 1.0, 0.06], [0, 2.15, 5.0], GL), P('box', [2.52, 0.14, 10.02], [0, 1.52, 0], 'paint'),
+      P('box', [1.7, 0.34, 0.08], [0, 2.82, 5.0], '#1b1a24', { sign: true }), P('box', [1.5, 0.22, 0.04], [0, 2.82, 5.04], '#f2c14e'), P('box', [2.4, 0.16, 9.6], [0, 3.06, 0], '#e8e2d4'), P('box', [1.4, 0.24, 2.2], [0, 3.2, -2.5], '#c9c2b4'),
+      P('box', [2.56, 0.24, 0.2], [0, 0.5, 5.0], BUMP), P('box', [2.56, 0.24, 0.2], [0, 0.5, -5.0], BUMP), P('box', [0.16, 0.24, 0.1], [-1.4, 2.5, 4.9], BUMP), P('box', [0.16, 0.24, 0.1], [1.4, 2.5, 4.9], BUMP), ...lights(0.9, 0.9, 5.0, -5.0), ...wheels(1.16, [3.3, -3.0], 0.48)];
+    for (const z of [3.6, -1.2]) q.push(P('box', [0.05, 2.1, 1.2], [1.27, 1.55, z], '#3a3a42'), P('box', [0.06, 1.3, 0.5], [1.275, 1.8, z - 0.28], GL), P('box', [0.06, 1.3, 0.5], [1.275, 1.8, z + 0.28], GL));
+    for (let z = -4; z <= 4.1; z += 1.6) for (const s of [-1, 1]) q.push(P('box', [0.03, 0.85, 0.08], [s * 1.275, 2.15, z], '#f4ecd8'));
+    return q; };
+  V.scooter = () => [P('torus', [0.22, 0.07], [0, 0.29, 0.62], '#1b1a24', { rot: [0, PI / 2, 0], seg: 8 }), P('torus', [0.22, 0.07], [0, 0.29, -0.55], '#1b1a24', { rot: [0, PI / 2, 0], seg: 8 }),
+    P('box', [0.38, 0.5, 0.75], [0, 0.6, -0.5], 'paint'), P('box', [0.34, 0.1, 0.6], [0, 0.92, -0.45], '#3a2a22'), P('box', [0.3, 0.06, 0.5], [0, 0.34, 0.08], 'paint'), P('box', [0.42, 0.75, 0.08], [0, 0.72, 0.42], 'paint', { rot: [-0.25, 0, 0] }),
+    P('box', [0.2, 0.12, 0.36], [0, 0.52, 0.64], 'paint'), P('cyl', [0.035, 0.035, 0.4], [0, 1.15, 0.33], '#c9d2da', { rot: [-0.25, 0, 0], seg: 5 }), P('box', [0.6, 0.05, 0.05], [0, 1.32, 0.3], '#1b1a24'), P('cyl', [0.09, 0.09, 0.06], [0, 1.2, 0.4], '#fff3c4', { rot: [PI / 2, 0, 0], seg: 8, tag: 'light' }),
+    P('box', [0.1, 0.07, 0.04], [0, 0.72, -0.9], '#ff3a3a'), P('box', [0.04, 0.3, 0.04], [-0.14, 0.15, 0.0], '#c9d2da', { rot: [0, 0, 0.4] })];
+  K.VEHICLES = [
+    { name: 'City car', build: V.city, box: [1.72, 1.6, 3.5], paints: ['#e4572e', '#7fb7d8', '#f2efe6', '#6fb38a'], note: 'The everyday car, a little shorter than today\'s' },
+    { name: 'Saloon', build: () => V.saloon(false), box: [1.84, 1.55, 4.4], paints: ['#3a4a6a', '#8a8f9a', '#7a2f3a', '#1f2433'], note: 'Downtown' },
+    { name: 'Taxi', build: () => V.saloon(true), box: [1.84, 1.7, 4.4], paints: ['#f2c14e'], note: 'The saloon with a roof light and a dark band' },
+    { name: 'Delivery van', build: V.van, box: [2.0, 2.25, 4.8], paints: ['#2f6f9d', '#f2efe6', '#3e8f56', '#c4523a'], note: 'The white panel takes a shop\'s name' },
+    { name: 'Market pickup', build: V.pickup, box: [1.92, 1.85, 4.9], paints: ['#3e8f86', '#c4523a', '#e8b84a'], note: 'Crates of fruit in the back' },
+    { name: 'Bus', build: V.bus, box: [2.5, 3.3, 10], paints: ['#e4572e', '#2f8f9d'], note: 'Two-tone; the board over the windscreen shows the route' },
+    { name: 'Scooter', build: V.scooter, box: [0.6, 1.35, 1.8], paints: ['#7fb7d8', '#e4572e', '#f2efe6', '#6fb38a'], note: 'Parked on the old town\'s lanes; no rider' },
+  ];
+})();
+
+// ============================================================
 //  CITY PLAN — the approved map, in metres
 //  x runs east, z runs south (towards the lake). North is uphill.
 //  Map units from the sketch convert at 6 m per unit.
@@ -8903,6 +9280,37 @@ const Sky = (() => {
 })();
 
 // ============================================================
+//  The model sheets (models/kit.js, models/kit-street.js) turned into game geometry.
+//  A primitive { s, size, at, rot, scale, col, seg } becomes [geometry, matrix, colour].
+// ============================================================
+const Models = (() => {
+  const geoCache = new Map();
+  function prism(len, h, base) {
+    const g = new THREE.BufferGeometry(), x = len / 2, z = base / 2, v = [[-x, 0, -z], [-x, 0, z], [-x, h, 0], [x, 0, -z], [x, 0, z], [x, h, 0]], f = [0, 1, 2, 3, 5, 4, 1, 4, 5, 1, 5, 2, 3, 0, 2, 3, 2, 5, 0, 3, 4, 0, 4, 1];
+    g.setAttribute('position', new THREE.Float32BufferAttribute(f.flatMap(i => v[i]), 3)); g.computeVertexNormals(); return g;
+  }
+  // one geometry per shape and size (many parts repeat)
+  function geo(p) {
+    const s = p.size, sg = p.seg, key = p.s + s.join(',') + '/' + (sg || '');
+    let g = geoCache.get(key); if (g) return g;
+    g = p.s === 'box' ? new THREE.BoxGeometry(s[0], s[1], s[2]) : p.s === 'cyl' ? new THREE.CylinderGeometry(s[0], s[1], s[2], sg || 8) : p.s === 'cone' ? new THREE.ConeGeometry(s[0], s[1], sg || 6)
+      : p.s === 'sph' ? new THREE.SphereGeometry(s[0], sg || 8, 6) : p.s === 'dome' ? new THREE.SphereGeometry(s[0], sg || 8, 4, 0, Math.PI * 2, 0, Math.PI / 2) : p.s === 'ico' ? new THREE.IcosahedronGeometry(s[0], 0)
+      : p.s === 'cap' ? new THREE.CapsuleGeometry(s[0], s[1], 3, 8) : p.s === 'torus' ? new THREE.TorusGeometry(s[0], s[1], 5, sg || 12) : prism(s[0], s[1], s[2]);
+    geoCache.set(key, g); return g;
+  }
+  const _e = new THREE.Euler(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+  function mat(p, mirror) {
+    const r = p.rot || [0, 0, 0]; _e.set(r[0], mirror ? -r[1] : r[1], mirror ? -r[2] : r[2], 'YXZ');
+    return new THREE.Matrix4().compose(_v.set(mirror ? -p.at[0] : p.at[0], p.at[1], p.at[2]), _q.setFromEuler(_e), p.scale ? _s.fromArray(p.scale) : _s.set(1, 1, 1));
+  }
+  // parts → [geometry, matrix, colour]; colour: a palette slot, '#hex', or null for 'paint' (tinted per instance)
+  function parts(list, pal = {}, o = {}) {
+    return list.map(p => [geo(p), o.pre ? o.pre.clone().multiply(mat(p, o.mirror && p.side)) : mat(p, o.mirror && p.side), p.col === 'paint' ? null : p.col[0] === '#' ? p.col : (pal[p.col] || '#ff00ff')]);
+  }
+  return { geo, mat, parts };
+})();
+
+// ============================================================
 //  LIFE — people, cars, boats, birds
 // ============================================================
 const Life = (() => {
@@ -9130,12 +9538,11 @@ const Life = (() => {
     ]);
     dogIM = new THREE.InstancedMesh(dogG, toon('#ffffff', { noCache: true }), Math.max(1, dogs.length)); dogIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); dogIM.frustumCulled = false; dogIM.count = 0; dogIM.setColorAt(0, _c.set('#ffffff')); W.group.add(dogIM);
     // cars on the big roads: two lanes each way, U-turn at the ends
-    const carCols = ['#c4523a', '#2f5f8a', '#e8b84a', '#f2efe6', '#3e8f86', '#2a2838', '#8a5a9e', '#d9779a'];
     for (const [key, n2] of [['boulevard', 8], ['avenue', 8], ['hill', 3], ['oblique', 3]]) {
       const road = W.roads[key]; if (!road) continue;
       const P = road.pts; const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
       for (let i = 0; i < n2; i++) {
-        const g = carMesh(carCols[(i * 3 + key.length) % carCols.length]);
+        const g = carMesh(cars.length);
         cars.push({ g, segs, len, s: (i / n2) * len * 2, v: key === 'hill' ? 7 : 10 + r() * 3, lane: key === 'hill' ? 2.6 : 3.2, x: 0, z: 0, y: 0, fx: 0, fz: 1, vx: 0, vz: 0, slope: 0 });
       }
     }
@@ -9226,20 +9633,13 @@ const Life = (() => {
       flush() { for (const im of [A, Bm, O]) if (im) { im.count = k; im.instanceMatrix.needsUpdate = true; } },
     };
   }
-  let carKit, boatKit, sailKit;
-  function carMesh(c) {
-    if (!carKit) {
-      const parts = [
-        [new THREE.BoxGeometry(1.9, 0.75, 4.1), T4(0, 0.7, 0), null],
-        [new THREE.BoxGeometry(1.7, 0.65, 2.1), T4(0, 1.38, -0.2), null],
-        [new THREE.BoxGeometry(1.74, 0.45, 1.92), T4(0, 1.38, -0.2), '#2a3550'],
-        [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(-0.6, 0.78, 2.07), '#fff3c4'], [new THREE.BoxGeometry(0.4, 0.2, 0.08), T4(0.6, 0.78, 2.07), '#fff3c4'],
-        [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(-0.6, 0.78, -2.07), '#ff3a3a'], [new THREE.BoxGeometry(0.4, 0.18, 0.08), T4(0.6, 0.78, -2.07), '#ff3a3a'],
-      ];
-      for (const [sx, sz] of [[-0.95, 1.25], [0.95, 1.25], [-0.95, -1.25], [0.95, -1.25]]) parts.push([new THREE.CylinderGeometry(0.33, 0.33, 0.22, 8), T4(sx, 0.33, sz, 0, 0, Math.PI / 2), '#1b1a24']);
-      carKit = instKit(parts, 24, 0.05);
-    }
-    const o = carKit.add(c); o.kit = carKit; return o;
+  let boatKit, sailKit;
+  // traffic: the model sheet's vehicles (KIT.VEHICLES), one instanced kit per kind
+  const vehKits = {}, VEH = ['City car', 'City car', 'Saloon', 'Taxi', 'City car', 'Delivery van', 'Saloon', 'Market pickup'];
+  function carMesh(i) {
+    const v = KIT.VEHICLES.find(q => q.name === VEH[i % VEH.length]);
+    if (!vehKits[v.name]) vehKits[v.name] = instKit(Models.parts(v.build()), 24, 0.05);
+    const k = vehKits[v.name], o = k.add(v.paints[(i * 5 + (i >> 3)) % v.paints.length]); o.kit = k; o.box = v.box; return o;
   }
   function boatMesh(c) {
     if (!boatKit) {
@@ -9400,12 +9800,12 @@ const Life = (() => {
       c.y = y; c.vx = c.fx * c.v; c.vz = c.fz * c.v;
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;
-      carKit.write(c.g);
+      c.g.kit.write(c.g);
       // a friendly toot (in key) if you're on the road in front of it
       { const dx = pl.pos.x - c.x, dz = pl.pos.z - c.z, al = dx * c.fx + dz * c.fz, lat = Math.abs(dx * -c.fz + dz * c.fx);
         if (al > 2 && al < 14 && lat < 2.5 && Math.abs(pl.pos.y - c.y) < 2 && Game.t > (c.hornCD || 0)) { c.hornCD = Game.t + 10; Sound.sfx.touch('horn'); } }
     }
-    if (carKit) carKit.flush();
+    for (const k in vehKits) vehKits[k].flush();
     // the big wheel
     const fw = W.ferris;
     if (fw) {
@@ -9497,7 +9897,7 @@ const Life = (() => {
       if (!c.g.visible) continue;
       const dx = p.x - c.x, dz = p.z - c.z; if (Math.abs(dx) > 4 || Math.abs(dz) > 4) continue;
       const al = dx * c.fx + dz * c.fz, lat = dx * -c.fz + dz * c.fx;
-      if (Math.abs(al) < 2.4 && Math.abs(lat) < 1.3 && p.y < c.y + 1.6) return { vx: c.vx, vz: c.vz };
+      const bx = c.g.box; if (Math.abs(al) < bx[2] / 2 + 0.35 && Math.abs(lat) < bx[0] / 2 + 0.35 && p.y < c.y + bx[1]) return { vx: c.vx, vz: c.vz };
     }
     return null;
   }
@@ -9511,7 +9911,7 @@ const Life = (() => {
     for (const w of walkers) { if (Math.abs(w.x - x) > 12 || Math.abs(w.z - z) > 12) continue; if (Math.random() < 0.5) w.gest = { kind: w.sc < 0.8 ? 'point' : 'clap', t0: Game.t, until: Game.t + 1.4 }; n++; }
     return n;
   }
-  return Object.assign(L, { init, update, hits, walkers, standers, applaud });
+  return Object.assign(L, { init, update, hits, walkers, standers, applaud, cars });
 })();
 
 // ============================================================
