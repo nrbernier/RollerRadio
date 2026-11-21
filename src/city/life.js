@@ -242,7 +242,7 @@ const Life = (() => {
       for (let k = 0; k < 10; k++) walkers.push(person(pick(r, ['lake', 'market', 'park']), r, { segs, len, s: s0 - 1.6 - k * 0.7 - r() * 0.5, dir: 1, sp: 0.9, off: (r() - 0.5) * 2.6, dodge: 0, phone: r() < 0.3 }));
     }
     // tai chi at dawn in the park clearing
-    for (let k = 0; k < 8; k++) { const x = -770 + (k % 4) * 2.6, z = -104 + Math.floor(k / 4) * 2.8; const s = person('park', r, { x, z, y: terrainAt(x, z), yaw0: 0.2, gest: { kind: 'taichi', t0: -1, until: 1e9 }, when: () => Sky.phase > 0.2 && Sky.phase < 0.42 }); s.yaw = s.yaw0; standers.push(s); }
+    for (let k = 0; k < 8; k++) { const x = -604 + (k % 4) * 2.6, z = -300 + Math.floor(k / 4) * 2.8; const s = person('park', r, { x, z, y: terrainAt(x, z), yaw0: 0.2, gest: { kind: 'taichi', t0: -1, until: 1e9 }, when: () => Sky.phase > 0.2 && Sky.phase < 0.42 }); s.yaw = s.yaw0; standers.push(s); }
     // a man whose hat blew off, chasing it down the promenade
     if (W.hatChase) actors.push(Object.assign(person('lake', r, { sp: 0 }), { script: hatScript, x: W.hatChase.x0 - 2 }));
     // a dog that chases the old-town square's pigeons now and then
@@ -516,7 +516,7 @@ const Life = (() => {
       pathPos(c.segs, s, _pp);
       const d = back ? -1 : 1, lx = -_pp.fz * d * c.lane, lz = _pp.fx * d * c.lane;
       c.x = _pp.x + lx; c.z = _pp.z + lz; c.fx = _pp.fx * d; c.fz = _pp.fz * d;
-      const y = terrainAt(c.x, c.z), y2 = terrainAt(c.x + c.fx * 2, c.z + c.fz * 2);
+      const y = walkY(c.x, c.z), y2 = walkY(c.x + c.fx * 2, c.z + c.fz * 2);       // (over a bridge: on its deck)
       c.y = y; c.vx = c.fx * c.v; c.vz = c.fz * c.v;
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;

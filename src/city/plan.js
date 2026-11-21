@@ -127,10 +127,10 @@ const PLAN = {
     // along the lake from the lido to the docks road
     promenade: { width: 10, ctrl: [[-470, 522], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
     docks: { width: 12, ctrl: [[560, 0], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
-    ring: { width: 10, loop: true, ctrl: circlePts(300, -440, 132, 12, 0.06).map(([x, z]) => [x, -440 + (z + 440) * 0.78]) },   // the old town's ring street, round its hill
-    oldSouth: { width: 9, ctrl: [[300, -337], [250, -318], [215, -260], [200, -184]] },           // from the ring down to downtown's ring street
+    ring: { width: 10, loop: true, ctrl: circlePts(300, -440, 137, 12, 0.06).map(([x, z]) => [x, -440 + (z + 440) * 0.78]) },   // the old town's ring street, round its hill
+    oldSouth: { width: 9, ctrl: [[300, -333], [250, -318], [215, -260], [200, -184]] },           // from the ring down to downtown's ring street
     oldWest: { width: 9, ctrl: [[172, -400], [130, -320], [100, -268], [66, -230]] },             // from the ring down to the main street (a T just above downtown)
-    oldNorth: { width: 9, ctrl: [[300, -543], [210, -580], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
+    oldNorth: { width: 9, ctrl: [[300, -547], [210, -580], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
   },
   // metro: a loop round downtown. West: Forest (downtown meets the forest); the north-west corner cut on a
   // diagonal through the vineyards (Vineyards); then dead straight east into the old town's hill, with Old Town

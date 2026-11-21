@@ -3021,10 +3021,10 @@ const PLAN = {
     // along the lake from the lido to the docks road
     promenade: { width: 10, ctrl: [[-470, 522], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
     docks: { width: 12, ctrl: [[560, 0], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
-    ring: { width: 10, loop: true, ctrl: circlePts(300, -440, 132, 12, 0.06).map(([x, z]) => [x, -440 + (z + 440) * 0.78]) },   // the old town's ring street, round its hill
-    oldSouth: { width: 9, ctrl: [[300, -337], [250, -318], [215, -260], [200, -184]] },           // from the ring down to downtown's ring street
+    ring: { width: 10, loop: true, ctrl: circlePts(300, -440, 137, 12, 0.06).map(([x, z]) => [x, -440 + (z + 440) * 0.78]) },   // the old town's ring street, round its hill
+    oldSouth: { width: 9, ctrl: [[300, -333], [250, -318], [215, -260], [200, -184]] },           // from the ring down to downtown's ring street
     oldWest: { width: 9, ctrl: [[172, -400], [130, -320], [100, -268], [66, -230]] },             // from the ring down to the main street (a T just above downtown)
-    oldNorth: { width: 9, ctrl: [[300, -543], [210, -580], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
+    oldNorth: { width: 9, ctrl: [[300, -547], [210, -580], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
   },
   // metro: a loop round downtown. West: Forest (downtown meets the forest); the north-west corner cut on a
   // diagonal through the vineyards (Vineyards); then dead straight east into the old town's hill, with Old Town
@@ -3433,7 +3433,7 @@ function cragShape(x, z, nat) {
 const SITE = [-227, -101, -129, -1];                 // the building site: one downtown block
 const TOWER = { x: 70, z: -429, block: [21, -479, 119, -379] };
 const OLD_PADS = [                                   // the old town's open places on its hill: [x, z, half-size, kind]
-  [382, -508, 20, 'church'], [252, -514, 16, 'play'], [364, -372, 15, 'well'], [482, -470, 17, 'court'],
+  [424, -642, 20, 'church'], [252, -514, 16, 'play'], [364, -372, 15, 'well'], [482, -470, 17, 'court'],
   [150, -486, 15, 'garden'], [520, -558, 15, 'boules'], [430, -604, 16, 'fountain'], [530, -330, 15, 'play'], [120, -566, 15, 'garden'],
 ]
 const placeRects = () => [SITE, TOWER.block];
@@ -6183,9 +6183,17 @@ function buildRoads(K, S, F) {
   for (const [key, road] of Object.entries(PLAN.roads)) {
     const pts = road.path.pts, width = road.width;
     // sidewalks first (wider, paler), then the asphalt on top
-    groundRibbon(B, pts, width + 7, '#c8c1b4', 'walk', 0.07);
-    const P = groundRibbon(B, pts, width, '#5a5868', 'road', 0.1);
-    roadDashes(B, P);
+    // (where a street crosses the sunken street it's carried by that street's bridge: no ribbon down in the cut)
+    const inCut = (x, z) => Math.abs(x - VALLEY.x) < VALLEY.rimHalf + 0.5 && z > VALLEY.z0 && z < VALLEY.z3;
+    const runs = []; let run = [];
+    for (const p of pts) { if (inCut(p[0], p[1])) { if (run.length > 1) runs.push(run); run = []; } else run.push(p); }
+    if (run.length > 1) runs.push(run);
+    const P = [];
+    for (const rp of runs) {
+      groundRibbon(B, rp, width + 7, '#c8c1b4', 'walk', 0.07);
+      const Pr = groundRibbon(B, rp, width, '#5a5868', 'road', 0.1);
+      roadDashes(B, Pr); P.push(...Pr);
+    }
     W.roads[key] = { pts, width, P };
   }
 }
@@ -6471,6 +6479,7 @@ function buildDistricts(K, S, F) {
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   // the compact city: each old district's builders run in their own frame, moved as a block (xform.js)
   xfInstall(H);
+  for (const rd of Object.values(PLAN.roads)) H.line(rd.path.pts, rd.width / 2 + 3.5);      // the streets (with their sidewalks): nothing is built on them
   H.reserve([LIDO.x0 - 2, LIDO.z0 - 2, LIDO.x1 + 18, LIDO.z1 + 2]);       // the lido (built after the lakeshore)
   { const P = PLAN_REAL.pond, m = P.r + 8; H.reserve([P.x - m, P.z - m, P.x + m, P.z + m]); }      // the pond and its banks: nothing else goes there
   const X = (g, ...f) => { xfRun(H, g, ...f); lap(g); };
@@ -9982,6 +9991,15 @@ function xfRun(H, g, ...fns) {
       if (v.length <= from) continue;
       const fresh = v.splice(from);
       for (const e of fresh) xfShift(e, dx, dz, seen);
+      if (k === 'npcs') {        // people: paths cut to what's kept (their longest stretch), standers that are kept
+        const ok = (p) => keep([p[0], p[1]]), longest = (P) => { let best = [], run = []; for (const p of P) { if (ok(p)) run.push(p); else { if (run.length > best.length) best = run; run = []; } } return run.length > best.length ? run : best; };
+        for (const e of fresh) {
+          if (e.paths) { e.paths = e.paths.map(longest).filter(P => P.length > 1); if (e.paths.length) v.push(e); }
+          else if (e.pts) { e.pts = e.pts.filter(ok); if (e.pts.length) v.push(e); }
+          else v.push(e);
+        }
+        continue;
+      }
       v.push(...(XF_TRIM.has(k) ? fresh.filter(keep) : fresh));
     } else if (v && typeof v === 'object' && (!before.has(k) || b !== v)) xfShift(v, dx, dz, seen);
   }
@@ -10420,7 +10438,7 @@ const Life = (() => {
       for (let k = 0; k < 10; k++) walkers.push(person(pick(r, ['lake', 'market', 'park']), r, { segs, len, s: s0 - 1.6 - k * 0.7 - r() * 0.5, dir: 1, sp: 0.9, off: (r() - 0.5) * 2.6, dodge: 0, phone: r() < 0.3 }));
     }
     // tai chi at dawn in the park clearing
-    for (let k = 0; k < 8; k++) { const x = -770 + (k % 4) * 2.6, z = -104 + Math.floor(k / 4) * 2.8; const s = person('park', r, { x, z, y: terrainAt(x, z), yaw0: 0.2, gest: { kind: 'taichi', t0: -1, until: 1e9 }, when: () => Sky.phase > 0.2 && Sky.phase < 0.42 }); s.yaw = s.yaw0; standers.push(s); }
+    for (let k = 0; k < 8; k++) { const x = -604 + (k % 4) * 2.6, z = -300 + Math.floor(k / 4) * 2.8; const s = person('park', r, { x, z, y: terrainAt(x, z), yaw0: 0.2, gest: { kind: 'taichi', t0: -1, until: 1e9 }, when: () => Sky.phase > 0.2 && Sky.phase < 0.42 }); s.yaw = s.yaw0; standers.push(s); }
     // a man whose hat blew off, chasing it down the promenade
     if (W.hatChase) actors.push(Object.assign(person('lake', r, { sp: 0 }), { script: hatScript, x: W.hatChase.x0 - 2 }));
     // a dog that chases the old-town square's pigeons now and then
@@ -10694,7 +10712,7 @@ const Life = (() => {
       pathPos(c.segs, s, _pp);
       const d = back ? -1 : 1, lx = -_pp.fz * d * c.lane, lz = _pp.fx * d * c.lane;
       c.x = _pp.x + lx; c.z = _pp.z + lz; c.fx = _pp.fx * d; c.fz = _pp.fz * d;
-      const y = terrainAt(c.x, c.z), y2 = terrainAt(c.x + c.fx * 2, c.z + c.fz * 2);
+      const y = walkY(c.x, c.z), y2 = walkY(c.x + c.fx * 2, c.z + c.fz * 2);       // (over a bridge: on its deck)
       c.y = y; c.vx = c.fx * c.v; c.vz = c.fz * c.v;
       c.g.position.set(c.x, y, c.z); c.g.rotation.set(0, 0, 0); c.g.rotation.order = 'YXZ'; c.g.rotation.y = Math.atan2(c.fx, c.fz); c.g.rotation.x = -Math.atan2(y2 - y, 2);
       c.g.visible = Math.abs(c.x - fx) < 600 && Math.abs(c.z - fz) < 600;

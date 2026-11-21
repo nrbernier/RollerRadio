@@ -76,6 +76,15 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   the viaduct (houses under the market's side of the line, the market hall's corner).
 - The tunnel mouths on the old town's hill: look at them from the lanes (portal blocks, the cut in the slope).
 
+### Checks (tools/geom.py, after the fixes below)
+- Walkers through walls: 116 → 3; cars through walls: 24 → 2 (downtown loop at z 218, x −150/−183: something
+  stands on the street by the building site); people standing in walls: 235 → 26 (mostly canal quarter quays).
+  Rails: 92 flagged, 19 running under things: go through them.
+- Fixed on the way: walker and stander paths of moved districts are now cut to their district (some ran off
+  the map's west edge); the cross street's ribbon no longer dives into the sunken street (the bridge carries
+  it, and cars follow bridge decks); every street is reserved before the districts are built (a house and the
+  church's square stood on the old town's ring street); the church's square moved north-east of the ring.
+
 ### Lido (new)
 - The lido's deck is a terrace 2 m above the lawn behind it (it must clear the ground at its back): the brick
   retaining wall faces the cable car's station; a few steps or a lawn bank on that side would soften it.

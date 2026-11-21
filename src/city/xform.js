@@ -235,6 +235,15 @@ function xfRun(H, g, ...fns) {
       if (v.length <= from) continue;
       const fresh = v.splice(from);
       for (const e of fresh) xfShift(e, dx, dz, seen);
+      if (k === 'npcs') {        // people: paths cut to what's kept (their longest stretch), standers that are kept
+        const ok = (p) => keep([p[0], p[1]]), longest = (P) => { let best = [], run = []; for (const p of P) { if (ok(p)) run.push(p); else { if (run.length > best.length) best = run; run = []; } } return run.length > best.length ? run : best; };
+        for (const e of fresh) {
+          if (e.paths) { e.paths = e.paths.map(longest).filter(P => P.length > 1); if (e.paths.length) v.push(e); }
+          else if (e.pts) { e.pts = e.pts.filter(ok); if (e.pts.length) v.push(e); }
+          else v.push(e);
+        }
+        continue;
+      }
       v.push(...(XF_TRIM.has(k) ? fresh.filter(keep) : fresh));
     } else if (v && typeof v === 'object' && (!before.has(k) || b !== v)) xfShift(v, dx, dz, seen);
   }

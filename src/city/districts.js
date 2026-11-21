@@ -251,6 +251,7 @@ function buildDistricts(K, S, F) {
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   // the compact city: each old district's builders run in their own frame, moved as a block (xform.js)
   xfInstall(H);
+  for (const rd of Object.values(PLAN.roads)) H.line(rd.path.pts, rd.width / 2 + 3.5);      // the streets (with their sidewalks): nothing is built on them
   H.reserve([LIDO.x0 - 2, LIDO.z0 - 2, LIDO.x1 + 18, LIDO.z1 + 2]);       // the lido (built after the lakeshore)
   { const P = PLAN_REAL.pond, m = P.r + 8; H.reserve([P.x - m, P.z - m, P.x + m, P.z + m]); }      // the pond and its banks: nothing else goes there
   const X = (g, ...f) => { xfRun(H, g, ...f); lap(g); };

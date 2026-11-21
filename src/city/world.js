@@ -292,9 +292,17 @@ function buildRoads(K, S, F) {
   for (const [key, road] of Object.entries(PLAN.roads)) {
     const pts = road.path.pts, width = road.width;
     // sidewalks first (wider, paler), then the asphalt on top
-    groundRibbon(B, pts, width + 7, '#c8c1b4', 'walk', 0.07);
-    const P = groundRibbon(B, pts, width, '#5a5868', 'road', 0.1);
-    roadDashes(B, P);
+    // (where a street crosses the sunken street it's carried by that street's bridge: no ribbon down in the cut)
+    const inCut = (x, z) => Math.abs(x - VALLEY.x) < VALLEY.rimHalf + 0.5 && z > VALLEY.z0 && z < VALLEY.z3;
+    const runs = []; let run = [];
+    for (const p of pts) { if (inCut(p[0], p[1])) { if (run.length > 1) runs.push(run); run = []; } else run.push(p); }
+    if (run.length > 1) runs.push(run);
+    const P = [];
+    for (const rp of runs) {
+      groundRibbon(B, rp, width + 7, '#c8c1b4', 'walk', 0.07);
+      const Pr = groundRibbon(B, rp, width, '#5a5868', 'road', 0.1);
+      roadDashes(B, Pr); P.push(...Pr);
+    }
     W.roads[key] = { pts, width, P };
   }
 }

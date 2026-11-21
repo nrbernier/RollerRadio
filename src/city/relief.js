@@ -50,7 +50,7 @@ function cragShape(x, z, nat) {
 const SITE = [-227, -101, -129, -1];                 // the building site: one downtown block
 const TOWER = { x: 70, z: -429, block: [21, -479, 119, -379] };
 const OLD_PADS = [                                   // the old town's open places on its hill: [x, z, half-size, kind]
-  [382, -508, 20, 'church'], [252, -514, 16, 'play'], [364, -372, 15, 'well'], [482, -470, 17, 'court'],
+  [424, -642, 20, 'church'], [252, -514, 16, 'play'], [364, -372, 15, 'well'], [482, -470, 17, 'court'],
   [150, -486, 15, 'garden'], [520, -558, 15, 'boules'], [430, -604, 16, 'fountain'], [530, -330, 15, 'play'], [120, -566, 15, 'garden'],
 ]
 const placeRects = () => [SITE, TOWER.block];
