@@ -134,33 +134,33 @@ const PLAN = {
   },
   // metro: a loop round downtown. West: Forest (downtown meets the forest); the north-west corner cut on a
   // diagonal through the vineyards (Vineyards); then dead straight east into the old town's hill, with Old Town
-  // station underground in it; out of the hill the line bends south down the market's west edge (Market),
+  // station underground in it; out of the hill the line bends south-west down the market's west edge (Market),
   // and back west along downtown's south side (Canal). Every station stands on a straight stretch, clear of
   // the streets; streets cross between stations (the line goes over them, or under them in the hill).
   // The polygon's corners are rounded with radius r (clockwise from the south-west).
-  metroLoop: { pts: [[-300, 252], [-300, -236], [-120, -446], [300, -412], [300, 252]], r: [80, 70, 70, 90, 80] },
+  metroLoop: { pts: [[-300, 252], [-300, -236], [-120, -446], [380, -405], [300, 252]], r: [80, 70, 70, 90, 80] },
   stations: [
     { key: 'forest',    name: 'Forest',    at: [-300, -20] },
     { key: 'vineyards', name: 'Vineyards', at: [-210, -338] },
-    { key: 'hilltop',   name: 'Old Town',  at: [232, -418], under: true },      // (its four stairways come up inside the ring street)
-    { key: 'market',    name: 'Market',    at: [300, 110] },
+    { key: 'hilltop',   name: 'Old Town',  at: [232, -417], under: true },      // (its four stairways come up inside the ring street)
+    { key: 'market',    name: 'Market',    at: [317, 110] },
     { key: 'canal',     name: 'Canal',     at: [-20, 252] },
   ],
   // hidden spots: local changes to the music, nothing to collect
   spots: [
     { key: 'glasshouse', at: [-436, -584] },
-    { key: 'belltower',  at: [266, -168] },
+    { key: 'belltower',  at: [349, -452] },
     { key: 'rooftop',    at: [136, 150] },
     { key: 'cellar',     at: [522, 170] },
     { key: 'arch',       at: [90, 400] },       // where the main street crosses the canal (set exactly below)
     { key: 'watertower', at: [262, 322] },
-    { key: 'lighthouse', at: [560, 626] },
+    { key: 'lighthouse', at: [-360, 688] },
   ],
   // landmarks, where districts meet (placed by their builders; these are their anchors)
   places: {
     summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [150, -109],
     site: [-154, 173], central: [-20, 252], recordShop: [522, 170], ferris: [-247, 493], lido: [-480, 505],
-    waterTower: [262, 322], lighthouse: [560, 626],
+    waterTower: [262, 322], lighthouse: [-360, 688],
   },
   vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
   pond: { x: -416, z: 124, r: 95 },          // (the old forest's pond, moved with the forest)

@@ -372,7 +372,7 @@ function fillLakeshore(H) {
   // a sea wall along the beach side of the promenade: one long ledge to grind (gaps at the pier and marina)
   const prom = []; for (let x = R[0] + 4; x <= R[2] + 160; x += 12) prom.push([x, shoreZ(x) - 34 + 5.4]);
   const parts = []; let cur = [];
-  for (const p of prom) { if (Math.abs(p[0] + 480) < 9 || Math.abs(p[0]) < 8 || p[0] > 296) { if (cur.length > 1) parts.push(cur); cur = []; } else cur.push(p); }
+  for (const p of prom) { if (Math.abs(p[0] + 360) < 9 || Math.abs(p[0]) < 8 || p[0] > 296) { if (cur.length > 1) parts.push(cur); cur = []; } else cur.push(p); }
   if (cur.length > 1) parts.push(cur);
   for (const p of parts) H.ledge(p, { h: 0.55, w: 0.7, color: '#cbbfa6', top: '#e0d6c0' });
   // paths across the lawn, with lamps and benches
@@ -410,7 +410,7 @@ function fillLakeshore(H) {
     const gx = R[0] + 40 + r() * (R[2] - R[0] - 80), gz = R[1] + 30 + r() * 230, n = 6 + Math.floor(r() * 9), col = pick(r, ['#5f8f45', '#4f7f42', '#6f9a50', '#7aa04a', '#3f7a45']);
     for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * 16, x = gx + Math.cos(a) * d, z = gz + Math.sin(a) * d; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 1)) { H.tree(x, z, { s: 0.9 + r() * 0.7, h: 3.6 + r() * 1.6, color: col, color2: '#7aa055' }); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   }
-  buildFerris(H, -250, 1105);
+  buildFerris(H, -250, shoreZ(-250) - 72);     // (just behind the promenade)
   // a playground, an ice-cream kiosk, picnics and groups across the lawn
   H.playground(-150, 920, r, 'lake');
   H.kiosk(-380, 930, Math.PI, '#f2c14e', r, 'lake'); H.kiosk(120, 940, Math.PI, '#d9779a', r, 'lake');
@@ -424,12 +424,12 @@ function fillLakeshore(H) {
   for (let i = 0; i < 24; i++) { const x = R[0] + 40 + r() * (R[2] - R[0] - 80), z = R[1] + 30 + r() * 260; if (H.clearOf(x - 3, z - 3, x + 3, z + 3, 1)) { H.flowerBed(x, z, 2.4, r); H.reserve([x - 3, z - 3, x + 3, z + 3]); } }
   // on the beach: sunbathers, a volleyball net, people paddling
   const sun = [];
-  for (let i = 0; i < 50; i++) { const x = R[0] + 40 + r() * (R[2] - R[0] - 80), z = shoreZ(x) - 8 - r() * 18; if (Math.abs(x + 480) < 10 || (x > -210 && x < 160)) continue; sun.push([x, z, r() * 6, terrainAt(x, z), r() < 0.6 ? 'ground' : undefined]); }
+  for (let i = 0; i < 50; i++) { const x = R[0] + 40 + r() * (R[2] - R[0] - 80), z = shoreZ(x) - 8 - r() * 18; if (Math.abs(x + 360) < 10 || (x > -210 && x < 160)) continue; sun.push([x, z, r() * 6, terrainAt(x, z), r() < 0.6 ? 'ground' : undefined]); }
   H.standers(sun, 'lake');
   for (const vx of [-880, -330]) { const vz = shoreZ(vx) - 16, y = terrainAt(vx, vz); for (const s of [-1, 1]) H.put(H.SH.CYL, vx, y + 1.2, vz + s * 4.5, 0.06, 2.4, 0.06, '#f2efe6', 'plain', 0.02); H.put(H.SH.BOX, vx, y + 2.1, vz, 0.04, 0.8, 9, '#f2efe6', 'plain', 0.02); H.standers([[vx - 4, vz - 2, Math.PI / 2], [vx - 4, vz + 2, Math.PI / 2], [vx + 4, vz, -Math.PI / 2], [vx + 4, vz + 3, -Math.PI / 2]], 'lake'); }
   H.walkers(paths, 60, 'lake');
   H.walkers([prom.map(p => [p[0], p[1] - 8])], 40, 'lake');
-  (W.gullSpots = W.gullSpots || []).push([-480, 1500, 5, 2.7], [-300, shoreZ(-300) + 2, 6, 2.1]);
+  (W.gullSpots = W.gullSpots || []).push([-360, shoreZ(-360) + 100, 5, 2.7], [-300, shoreZ(-300) + 2, 6, 2.1]);
 }
 
 // between the park and the avenue: a skatepark, ball courts, allotments
@@ -559,10 +559,11 @@ function fillMarketPeople(H) {
 function fillOldTown(H) {
   const { K, W, B } = H, r = U.rng(1707);
   // people chatting on the lanes and squares of the old town
-  for (let i = 0; i < 40; i++) { const x = 470 + r() * 550, z = -1420 + r() * 1030; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
+  const OR = PLAN.byKey.oldtown.rect;
+  for (let i = 0; i < 40; i++) { const x = U.lerp(OR[0], OR[2], r()), z = U.lerp(OR[1], OR[3], r()); if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   // flower beds and benches in the old town's gaps
   for (let i = 0; i < 300; i++) {
-    const x = 470 + r() * 550, z = -1420 + r() * 1030;
+    const x = U.lerp(OR[0], OR[2], r()), z = U.lerp(OR[1], OR[3], r());
     if (!H.clearOf(x - 2.5, z - 2.5, x + 2.5, z + 2.5, 0.5)) continue;
     const t = r();
     if (t < 0.4) H.flowerBed(x, z, 1.8, r); else if (t < 0.6) H.bench(x, z, r() < 0.5, { color: '#7a5a3a' }); else if (t < 0.8) H.tree(x, z, { s: 0.8, color: pick(r, ['#6f9a50', '#8aa04a', '#5f8f45']) }); else H.picnic(x, z, 'oldtown', r);

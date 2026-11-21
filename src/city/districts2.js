@@ -219,7 +219,7 @@ function buildLakeshore(H) {
   H.walkers([prom], 50, 'lake');
   H.busker('pan', prom[20][0] + 7, prom[20][1] - 5, 0);
   // the pier and the lighthouse
-  const px = -480, pz0 = shoreZ(px) - 12, pz1 = 1585, py = 2.7;
+  const px = -360, pz0 = shoreZ(px) - 12, pz1 = Math.round(shoreZ(px) + 110), py = 2.7;      // (a pier of about 120 m)
   S.add(px, terrainAt(px, pz0) + 0.05, pz0, px, py, pz0 + 14, 2.6);
   S.add(px, py, pz0 + 14, px, py, pz1 - 8, 2.6);
   for (let z = pz0; z < pz1 - 8; z += 4) {

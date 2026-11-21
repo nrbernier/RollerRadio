@@ -136,7 +136,7 @@ function planMetro() {
         // (west of the line a street runs close by: those exits pass under it in a corridor first)
         const pre = nx < -0.5 ? 15 : 0;
         const x0 = e.x + nx * (STN.hw + pre), z0 = e.z + nz * (STN.hw + pre), y0 = st.y + 1.2;
-        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 30); }
+        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 38); }
         const L = 3 + run + 3, x1 = x0 + nx * L, z1 = z0 + nz * L, w = 2.4, gTop = terrainAt(x1, z1);
         // the well opens a few metres out from the hall (the first steps run under a slab)
         const o0x = x0 + nx * 7, o0z = z0 + nz * 7;

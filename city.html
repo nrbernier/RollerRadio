@@ -3028,33 +3028,33 @@ const PLAN = {
   },
   // metro: a loop round downtown. West: Forest (downtown meets the forest); the north-west corner cut on a
   // diagonal through the vineyards (Vineyards); then dead straight east into the old town's hill, with Old Town
-  // station underground in it; out of the hill the line bends south down the market's west edge (Market),
+  // station underground in it; out of the hill the line bends south-west down the market's west edge (Market),
   // and back west along downtown's south side (Canal). Every station stands on a straight stretch, clear of
   // the streets; streets cross between stations (the line goes over them, or under them in the hill).
   // The polygon's corners are rounded with radius r (clockwise from the south-west).
-  metroLoop: { pts: [[-300, 252], [-300, -236], [-120, -446], [300, -412], [300, 252]], r: [80, 70, 70, 90, 80] },
+  metroLoop: { pts: [[-300, 252], [-300, -236], [-120, -446], [380, -405], [300, 252]], r: [80, 70, 70, 90, 80] },
   stations: [
     { key: 'forest',    name: 'Forest',    at: [-300, -20] },
     { key: 'vineyards', name: 'Vineyards', at: [-210, -338] },
-    { key: 'hilltop',   name: 'Old Town',  at: [232, -418], under: true },      // (its four stairways come up inside the ring street)
-    { key: 'market',    name: 'Market',    at: [300, 110] },
+    { key: 'hilltop',   name: 'Old Town',  at: [232, -417], under: true },      // (its four stairways come up inside the ring street)
+    { key: 'market',    name: 'Market',    at: [317, 110] },
     { key: 'canal',     name: 'Canal',     at: [-20, 252] },
   ],
   // hidden spots: local changes to the music, nothing to collect
   spots: [
     { key: 'glasshouse', at: [-436, -584] },
-    { key: 'belltower',  at: [266, -168] },
+    { key: 'belltower',  at: [349, -452] },
     { key: 'rooftop',    at: [136, 150] },
     { key: 'cellar',     at: [522, 170] },
     { key: 'arch',       at: [90, 400] },       // where the main street crosses the canal (set exactly below)
     { key: 'watertower', at: [262, 322] },
-    { key: 'lighthouse', at: [560, 626] },
+    { key: 'lighthouse', at: [-360, 688] },
   ],
   // landmarks, where districts meet (placed by their builders; these are their anchors)
   places: {
     summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [150, -109],
     site: [-154, 173], central: [-20, 252], recordShop: [522, 170], ferris: [-247, 493], lido: [-480, 505],
-    waterTower: [262, 322], lighthouse: [560, 626],
+    waterTower: [262, 322], lighthouse: [-360, 688],
   },
   vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
   pond: { x: -416, z: 124, r: 95 },          // (the old forest's pond, moved with the forest)
@@ -3431,10 +3431,10 @@ function cragShape(x, z, nat) {
 // level pads
 const SITE = [-227, -101, -129, -1];                 // the building site: one downtown block
 const TOWER = { x: 70, z: -429, block: [21, -479, 119, -379] };
-const OLD_PADS = [                                   // the old town's open places: [x, z, half-size, kind]
-  [770, -1010, 20, 'church'], [822, -1150, 16, 'play'], [900, -545, 15, 'well'], [948, -770, 17, 'court'],
-  [566, -730, 15, 'garden'], [985, -1170, 15, 'boules'], [585, -1010, 16, 'fountain'], [870, -1320, 15, 'play'], [545, -1270, 15, 'garden'],
-];
+const OLD_PADS = [                                   // the old town's open places on its hill: [x, z, half-size, kind]
+  [382, -508, 20, 'church'], [252, -514, 16, 'play'], [364, -372, 15, 'well'], [482, -470, 17, 'court'],
+  [150, -486, 15, 'garden'], [520, -558, 15, 'boules'], [430, -604, 16, 'fountain'], [530, -330, 15, 'play'], [120, -566, 15, 'garden'],
+]
 const placeRects = () => [SITE, TOWER.block];
 const inPlace = (x0, z0, x1, z1) => placeRects().some(r => x1 > r[0] && x0 < r[2] && z1 > r[1] && z0 < r[3]);
 
@@ -5324,7 +5324,7 @@ function planMetro() {
         // (west of the line a street runs close by: those exits pass under it in a corridor first)
         const pre = nx < -0.5 ? 15 : 0;
         const x0 = e.x + nx * (STN.hw + pre), z0 = e.z + nz * (STN.hw + pre), y0 = st.y + 1.2;
-        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 30); }
+        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 38); }
         const L = 3 + run + 3, x1 = x0 + nx * L, z1 = z0 + nz * L, w = 2.4, gTop = terrainAt(x1, z1);
         // the well opens a few metres out from the hall (the first steps run under a slab)
         const o0x = x0 + nx * 7, o0z = z0 + nz * 7;
@@ -7222,7 +7222,7 @@ function buildLakeshore(H) {
   H.walkers([prom], 50, 'lake');
   H.busker('pan', prom[20][0] + 7, prom[20][1] - 5, 0);
   // the pier and the lighthouse
-  const px = -480, pz0 = shoreZ(px) - 12, pz1 = 1585, py = 2.7;
+  const px = -360, pz0 = shoreZ(px) - 12, pz1 = Math.round(shoreZ(px) + 110), py = 2.7;      // (a pier of about 120 m)
   S.add(px, terrainAt(px, pz0) + 0.05, pz0, px, py, pz0 + 14, 2.6);
   S.add(px, py, pz0 + 14, px, py, pz1 - 8, 2.6);
   for (let z = pz0; z < pz1 - 8; z += 4) {
@@ -7282,11 +7282,11 @@ function buildLakeshore(H) {
 const SHADES = ['#c4523a', '#e8b84a', '#3e8f86', '#d9779a', '#4a6aa0', '#f2efe6', '#8a5a9e', '#6aa04a', '#e4572e', '#2f8f9d'];
 // the old town's five quarters: each has its own colours and its own mix of houses, so you can tell where you are
 const OLD_Q = [
-  { key: 'bell', at: [660, -570], walls: ['#f2d7c0', '#e8c8a0', '#f4ecd8', '#e8b8a8', '#f0e0a0'], roofs: ['#b85a3a', '#a04a32', '#b8643f'], trim: '#6a5a4a', types: ['gable', 'gable', 'timber', 'terrace', 'gable', 'stepped'] },
-  { key: 'church', at: [770, -1010], walls: ['#e8c87a', '#f0d890', '#e0b060', '#f4e4b0', '#d9a860'], roofs: ['#8a4a3a', '#7a4030', '#9a5a44'], trim: '#6a4a2a', types: ['gable', 'steep', 'stepped', 'gable', 'terrace', 'steep'] },
-  { key: 'upper', at: [850, -1290], walls: ['#d8d4c8', '#c8c4b8', '#e4e0d4', '#b8b4a8', '#cfc8b8'], roofs: ['#5a6272', '#6a6a7a', '#4a5260'], trim: '#4a4a52', types: ['stone', 'steep', 'tower', 'stone', 'gable', 'steep'] },
-  { key: 'east', at: [960, -760], walls: ['#c8d8e0', '#d9e0c8', '#c8dcd0', '#b8d0d8', '#e0e8d8'], roofs: ['#9a5a44', '#8a5040', '#a86a4a'], trim: '#4a5a5a', types: ['gable', 'timber', 'timber', 'terrace', 'gable', 'tower'] },
-  { key: 'west', at: [545, -1000], walls: ['#f0c8c0', '#f4dcd4', '#e8b0a8', '#f6e8e0', '#e0c0d0'], roofs: ['#c8703f', '#b85a3a', '#d08050'], trim: '#7a4a4a', types: ['gable', 'terrace', 'stepped', 'gable', 'timber', 'terrace'] },
+  { key: 'bell', at: [335, -446], walls: ['#f2d7c0', '#e8c8a0', '#f4ecd8', '#e8b8a8', '#f0e0a0'], roofs: ['#b85a3a', '#a04a32', '#b8643f'], trim: '#6a5a4a', types: ['gable', 'gable', 'timber', 'terrace', 'gable', 'stepped'] },
+  { key: 'church', at: [430, -540], walls: ['#e8c87a', '#f0d890', '#e0b060', '#f4e4b0', '#d9a860'], roofs: ['#8a4a3a', '#7a4030', '#9a5a44'], trim: '#6a4a2a', types: ['gable', 'steep', 'stepped', 'gable', 'terrace', 'steep'] },
+  { key: 'upper', at: [190, -560], walls: ['#d8d4c8', '#c8c4b8', '#e4e0d4', '#b8b4a8', '#cfc8b8'], roofs: ['#5a6272', '#6a6a7a', '#4a5260'], trim: '#4a4a52', types: ['stone', 'steep', 'tower', 'stone', 'gable', 'steep'] },
+  { key: 'east', at: [500, -380], walls: ['#c8d8e0', '#d9e0c8', '#c8dcd0', '#b8d0d8', '#e0e8d8'], roofs: ['#9a5a44', '#8a5040', '#a86a4a'], trim: '#4a5a5a', types: ['gable', 'timber', 'timber', 'terrace', 'gable', 'tower'] },
+  { key: 'west', at: [140, -440], walls: ['#f0c8c0', '#f4dcd4', '#e8b0a8', '#f6e8e0', '#e0c0d0'], roofs: ['#c8703f', '#b85a3a', '#d08050'], trim: '#7a4a4a', types: ['gable', 'terrace', 'stepped', 'gable', 'timber', 'terrace'] },
 ];
 const oldQ = (x, z) => OLD_Q.reduce((b, q) => Math.hypot(q.at[0] - x, q.at[1] - z) < Math.hypot(b.at[0] - x, b.at[1] - z) ? q : b);
 const shuffled = (r, a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
@@ -7569,16 +7569,16 @@ function roofWays(H, list, r, o = {}) {
 // ============================================================
 function buildOldTown(H) {
   const { K, W, B, F, S } = H, r = U.rng(404), put = H.put;
-  const lanes = [
-    [[560, -380], [600, -470], [660, -560], [700, -640], [640, -720], [720, -800], [800, -880], [760, -980], [840, -1080], [800, -1180], [880, -1280], [860, -1400]],
-    [[470, -600], [560, -620], [660, -560], [780, -540], [900, -520], [1010, -560]],
-    [[480, -1010], [600, -1040], [760, -980], [920, -1000], [1020, -940]],
-    [[700, -640], [820, -700], [960, -740], [1020, -820]],
-    [[800, -1180], [680, -1240], [560, -1300], [470, -1260]],
-    [[880, -1280], [980, -1200], [1020, -1100]],
-    [[640, -720], [560, -760], [480, -800]],
-    [[840, -1080], [960, -1100], [1010, -1160]],
-  ];
+  // the compact city's old town: a round quarter on its hill. Lanes climb from the ring street to the square at
+  // the top (and a small lane circles the square); outside the ring, lanes run down to the quarter's edge.
+  // (the square sits a little east of the ring's centre, clear of the station's stairways)
+  const RC = [300, -440], C0 = [335, -446], ring = (a) => [RC[0] + Math.cos(a) * 132, RC[1] + Math.sin(a) * 103];
+  const inner = (a, f) => [C0[0] + Math.cos(a) * 132 * f, C0[1] + Math.sin(a) * 103 * f];
+  const lanes = [];
+  for (const a of [-Math.PI / 2, 0, Math.PI / 2, Math.PI, -Math.PI / 4, Math.PI * 3 / 4, -Math.PI * 3 / 4]) { const p = ring(a), q = inner(a, 0.36); lanes.push([p, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], q]); }
+  { const L = []; for (let k = 0; k <= 16; k++) L.push(inner(k / 16 * Math.PI * 2, 0.36)); lanes.push(L); }
+  lanes.push([ring(-Math.PI / 4), [470, -580], [520, -600]], [ring(0), [520, -430], [570, -420]], [ring(Math.PI / 4), [470, -300], [520, -280]],
+    [ring(-Math.PI * 3 / 4), [140, -560], [90, -580]], [ring(Math.PI), [110, -430], [60, -410]], [ring(Math.PI * 3 / 4), [170, -330], [150, -300]]);
   const R = PLAN.byKey.oldtown.rect;
   // the open places: each is reserved, and joined to the nearest lane by a side lane
   const links = [];
@@ -7588,7 +7588,7 @@ function buildOldTown(H) {
     for (const L of lanes) for (let i = 0; i < L.length - 1; i++) { const [ax, az] = L[i], dx = L[i + 1][0] - ax, dz = L[i + 1][1] - az, u = U.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1), qx = ax + dx * u, qz = az + dz * u, dd = Math.hypot(qx - x, qz - z); if (dd < bd) { bd = dd; bq = [qx, qz]; } }
     if (bd > hf * 0.7) { const k = (bd - hf * 0.7) / bd; links.push([[bq[0], bq[1]], [bq[0] + (x - bq[0]) * k, bq[1] + (z - bq[1]) * k]]); p.link = bq; }
   }
-  const sq = [660, -570];
+  const sq = C0;              // the square at the top of the hill
   // the square
   const sqR = [sq[0] - 26, sq[1] - 24, sq[0] + 26, sq[1] + 24];
   H.patch(sqR, '#c9b79a', 'walk', 0.07); H.reserve(sqR);
@@ -7671,6 +7671,12 @@ function buildOldTown(H) {
     if (H.clearOf(x - 2, z - 2, x + 2, z + 2, 1)) { H.tree(x, z, { s: 0.7 + r() * 0.4, color: pick(r, ['#5f8f4a', '#6f9a4a', '#4f7f45']), color2: '#7aa055' }); H.reserve([x - 2, z - 2, x + 2, z + 2]); }
   }
   H.walkers(lanes, 50, 'oldtown');
+  // bits of the old town wall along its edge, a walk on top to grind (broken wherever a street or lane goes through)
+  { const S = PLAN.byKey.oldtown.shape, P = S.poly, n = P.length, inset = 7;
+    const pts = P.map((p, i) => { const a = P[(i - 1 + n) % n], b = P[(i + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); return [p[0] - dz / l * inset, p[1] + dx / l * inset]; });
+    let run = []; const flush = () => { if (run.length > 3) H.ledge(run, { h: 2.4, w: 1.4, color: '#b9ae98', kind: 'brick', top: '#cfc4ac' }); run = []; };
+    for (let i = 0; i <= n; i++) { const p = pts[i % n]; if ((i % 23) < 15 && H.clearOf(p[0] - 2, p[1] - 2, p[0] + 2, p[1] + 2, 0.5)) run.push(p); else flush(); }
+    flush(); }
 }
 
 // a courtyard block: four wings under one eave line, a gateway through one of them
@@ -8440,7 +8446,7 @@ function fillLakeshore(H) {
   // a sea wall along the beach side of the promenade: one long ledge to grind (gaps at the pier and marina)
   const prom = []; for (let x = R[0] + 4; x <= R[2] + 160; x += 12) prom.push([x, shoreZ(x) - 34 + 5.4]);
   const parts = []; let cur = [];
-  for (const p of prom) { if (Math.abs(p[0] + 480) < 9 || Math.abs(p[0]) < 8 || p[0] > 296) { if (cur.length > 1) parts.push(cur); cur = []; } else cur.push(p); }
+  for (const p of prom) { if (Math.abs(p[0] + 360) < 9 || Math.abs(p[0]) < 8 || p[0] > 296) { if (cur.length > 1) parts.push(cur); cur = []; } else cur.push(p); }
   if (cur.length > 1) parts.push(cur);
   for (const p of parts) H.ledge(p, { h: 0.55, w: 0.7, color: '#cbbfa6', top: '#e0d6c0' });
   // paths across the lawn, with lamps and benches
@@ -8478,7 +8484,7 @@ function fillLakeshore(H) {
     const gx = R[0] + 40 + r() * (R[2] - R[0] - 80), gz = R[1] + 30 + r() * 230, n = 6 + Math.floor(r() * 9), col = pick(r, ['#5f8f45', '#4f7f42', '#6f9a50', '#7aa04a', '#3f7a45']);
     for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * 16, x = gx + Math.cos(a) * d, z = gz + Math.sin(a) * d; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 1)) { H.tree(x, z, { s: 0.9 + r() * 0.7, h: 3.6 + r() * 1.6, color: col, color2: '#7aa055' }); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   }
-  buildFerris(H, -250, 1105);
+  buildFerris(H, -250, shoreZ(-250) - 72);     // (just behind the promenade)
   // a playground, an ice-cream kiosk, picnics and groups across the lawn
   H.playground(-150, 920, r, 'lake');
   H.kiosk(-380, 930, Math.PI, '#f2c14e', r, 'lake'); H.kiosk(120, 940, Math.PI, '#d9779a', r, 'lake');
@@ -8492,12 +8498,12 @@ function fillLakeshore(H) {
   for (let i = 0; i < 24; i++) { const x = R[0] + 40 + r() * (R[2] - R[0] - 80), z = R[1] + 30 + r() * 260; if (H.clearOf(x - 3, z - 3, x + 3, z + 3, 1)) { H.flowerBed(x, z, 2.4, r); H.reserve([x - 3, z - 3, x + 3, z + 3]); } }
   // on the beach: sunbathers, a volleyball net, people paddling
   const sun = [];
-  for (let i = 0; i < 50; i++) { const x = R[0] + 40 + r() * (R[2] - R[0] - 80), z = shoreZ(x) - 8 - r() * 18; if (Math.abs(x + 480) < 10 || (x > -210 && x < 160)) continue; sun.push([x, z, r() * 6, terrainAt(x, z), r() < 0.6 ? 'ground' : undefined]); }
+  for (let i = 0; i < 50; i++) { const x = R[0] + 40 + r() * (R[2] - R[0] - 80), z = shoreZ(x) - 8 - r() * 18; if (Math.abs(x + 360) < 10 || (x > -210 && x < 160)) continue; sun.push([x, z, r() * 6, terrainAt(x, z), r() < 0.6 ? 'ground' : undefined]); }
   H.standers(sun, 'lake');
   for (const vx of [-880, -330]) { const vz = shoreZ(vx) - 16, y = terrainAt(vx, vz); for (const s of [-1, 1]) H.put(H.SH.CYL, vx, y + 1.2, vz + s * 4.5, 0.06, 2.4, 0.06, '#f2efe6', 'plain', 0.02); H.put(H.SH.BOX, vx, y + 2.1, vz, 0.04, 0.8, 9, '#f2efe6', 'plain', 0.02); H.standers([[vx - 4, vz - 2, Math.PI / 2], [vx - 4, vz + 2, Math.PI / 2], [vx + 4, vz, -Math.PI / 2], [vx + 4, vz + 3, -Math.PI / 2]], 'lake'); }
   H.walkers(paths, 60, 'lake');
   H.walkers([prom.map(p => [p[0], p[1] - 8])], 40, 'lake');
-  (W.gullSpots = W.gullSpots || []).push([-480, 1500, 5, 2.7], [-300, shoreZ(-300) + 2, 6, 2.1]);
+  (W.gullSpots = W.gullSpots || []).push([-360, shoreZ(-360) + 100, 5, 2.7], [-300, shoreZ(-300) + 2, 6, 2.1]);
 }
 
 // between the park and the avenue: a skatepark, ball courts, allotments
@@ -8627,10 +8633,11 @@ function fillMarketPeople(H) {
 function fillOldTown(H) {
   const { K, W, B } = H, r = U.rng(1707);
   // people chatting on the lanes and squares of the old town
-  for (let i = 0; i < 40; i++) { const x = 470 + r() * 550, z = -1420 + r() * 1030; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
+  const OR = PLAN.byKey.oldtown.rect;
+  for (let i = 0; i < 40; i++) { const x = U.lerp(OR[0], OR[2], r()), z = U.lerp(OR[1], OR[3], r()); if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   // flower beds and benches in the old town's gaps
   for (let i = 0; i < 300; i++) {
-    const x = 470 + r() * 550, z = -1420 + r() * 1030;
+    const x = U.lerp(OR[0], OR[2], r()), z = U.lerp(OR[1], OR[3], r());
     if (!H.clearOf(x - 2.5, z - 2.5, x + 2.5, z + 2.5, 0.5)) continue;
     const t = r();
     if (t < 0.4) H.flowerBed(x, z, 1.8, r); else if (t < 0.6) H.bench(x, z, r() < 0.5, { color: '#7a5a3a' }); else if (t < 0.8) H.tree(x, z, { s: 0.8, color: pick(r, ['#6f9a50', '#8aa04a', '#5f8f45']) }); else H.picnic(x, z, 'oldtown', r);
@@ -9371,7 +9378,7 @@ const XF_GROUPS = {
   // key: [dx, dz], keep: district outline to trim to (null: none), margin: metres allowed past it
   park:     { d: [464, 304],   keep: 'park', margin: 12 },          // the pond lands where the pond is
   obs:      { d: [-152, 616],  keep: 'obs', margin: 60 },            // the observatory on the summit, its terrace looking down the main street
-  oldtown:  { d: [-408, 408],  keep: 'oldtown', margin: 12 },        // the bell tower's square at the south edge (phase 4 relays the old town)
+  oldtown:  { d: [0, 0],       keep: 'oldtown', margin: -2, real: true },   // laid out anew on its hill (real coordinates, the real plan)
   market:   { d: [-344, 96],   keep: 'market', margin: 30 },        // the hall just south of the cross street
   cellar:   { d: [-368, -8],   keep: null },                         // the record shop, in the market's south corner
   business: { d: [-56, 504],   keep: 'business', margin: -4 },       // (inside its ring street)       // the sunken street down the middle
@@ -9564,12 +9571,15 @@ function xfRun(H, g, ...fns) {
   districtAt = (x, z) => R.districtAt(x + dx, z + dz);
   districtWeights = (x, z, out, soft) => R.districtWeights(x + dx, z + dz, out, soft);
   inHole = (x, z) => R.inHole(x + dx, z + dz);
+  const real = !!G.real;
   const saved = { districts: PLAN.districts, byKey: PLAN.byKey, stations: PLAN.stations, spots: PLAN.spots, canal: PLAN.canal, pond: PLAN.pond, docksQuayZ: PLAN.docksQuayZ, boulevardX: PLAN.boulevardX, avenueZ: PLAN.avenueZ };
+  if (!real) {
   PLAN.districts = PLAN0.districts; PLAN.byKey = PLAN0.byKey; PLAN.canal = PLAN0.canal;
   PLAN.docksQuayZ = PLAN0.docksQuayZ; PLAN.boulevardX = PLAN0.boulevardX; PLAN.avenueZ = PLAN0.avenueZ;
   PLAN.stations = OLD_STATIONS.map(key => { const s = saved.stations.find(t => t.key === key) || saved.stations.find(t => t.key === STATION_ALIAS[key]); return { key, name: s ? s.name : key, at: s ? [s.at[0] - dx, s.at[1] - dz] : [1e6, 1e6] }; });
   PLAN.spots = saved.spots.map(s => ({ key: s.key, at: [s.at[0] - dx, s.at[1] - dz] }));
   PLAN.pond = Object.assign({}, saved.pond, { x: saved.pond.x - dx, z: saved.pond.z - dz });
+  } else canalEndZ = R.canalEndZ;
   xfFrame(g);
   Object.assign(XF, { g, dx, dz, keep: G.keep, margin: G.margin || 0 });
   try { for (const f of fns) f(H); }

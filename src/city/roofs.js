@@ -8,11 +8,11 @@
 const SHADES = ['#c4523a', '#e8b84a', '#3e8f86', '#d9779a', '#4a6aa0', '#f2efe6', '#8a5a9e', '#6aa04a', '#e4572e', '#2f8f9d'];
 // the old town's five quarters: each has its own colours and its own mix of houses, so you can tell where you are
 const OLD_Q = [
-  { key: 'bell', at: [660, -570], walls: ['#f2d7c0', '#e8c8a0', '#f4ecd8', '#e8b8a8', '#f0e0a0'], roofs: ['#b85a3a', '#a04a32', '#b8643f'], trim: '#6a5a4a', types: ['gable', 'gable', 'timber', 'terrace', 'gable', 'stepped'] },
-  { key: 'church', at: [770, -1010], walls: ['#e8c87a', '#f0d890', '#e0b060', '#f4e4b0', '#d9a860'], roofs: ['#8a4a3a', '#7a4030', '#9a5a44'], trim: '#6a4a2a', types: ['gable', 'steep', 'stepped', 'gable', 'terrace', 'steep'] },
-  { key: 'upper', at: [850, -1290], walls: ['#d8d4c8', '#c8c4b8', '#e4e0d4', '#b8b4a8', '#cfc8b8'], roofs: ['#5a6272', '#6a6a7a', '#4a5260'], trim: '#4a4a52', types: ['stone', 'steep', 'tower', 'stone', 'gable', 'steep'] },
-  { key: 'east', at: [960, -760], walls: ['#c8d8e0', '#d9e0c8', '#c8dcd0', '#b8d0d8', '#e0e8d8'], roofs: ['#9a5a44', '#8a5040', '#a86a4a'], trim: '#4a5a5a', types: ['gable', 'timber', 'timber', 'terrace', 'gable', 'tower'] },
-  { key: 'west', at: [545, -1000], walls: ['#f0c8c0', '#f4dcd4', '#e8b0a8', '#f6e8e0', '#e0c0d0'], roofs: ['#c8703f', '#b85a3a', '#d08050'], trim: '#7a4a4a', types: ['gable', 'terrace', 'stepped', 'gable', 'timber', 'terrace'] },
+  { key: 'bell', at: [335, -446], walls: ['#f2d7c0', '#e8c8a0', '#f4ecd8', '#e8b8a8', '#f0e0a0'], roofs: ['#b85a3a', '#a04a32', '#b8643f'], trim: '#6a5a4a', types: ['gable', 'gable', 'timber', 'terrace', 'gable', 'stepped'] },
+  { key: 'church', at: [430, -540], walls: ['#e8c87a', '#f0d890', '#e0b060', '#f4e4b0', '#d9a860'], roofs: ['#8a4a3a', '#7a4030', '#9a5a44'], trim: '#6a4a2a', types: ['gable', 'steep', 'stepped', 'gable', 'terrace', 'steep'] },
+  { key: 'upper', at: [190, -560], walls: ['#d8d4c8', '#c8c4b8', '#e4e0d4', '#b8b4a8', '#cfc8b8'], roofs: ['#5a6272', '#6a6a7a', '#4a5260'], trim: '#4a4a52', types: ['stone', 'steep', 'tower', 'stone', 'gable', 'steep'] },
+  { key: 'east', at: [500, -380], walls: ['#c8d8e0', '#d9e0c8', '#c8dcd0', '#b8d0d8', '#e0e8d8'], roofs: ['#9a5a44', '#8a5040', '#a86a4a'], trim: '#4a5a5a', types: ['gable', 'timber', 'timber', 'terrace', 'gable', 'tower'] },
+  { key: 'west', at: [140, -440], walls: ['#f0c8c0', '#f4dcd4', '#e8b0a8', '#f6e8e0', '#e0c0d0'], roofs: ['#c8703f', '#b85a3a', '#d08050'], trim: '#7a4a4a', types: ['gable', 'terrace', 'stepped', 'gable', 'timber', 'terrace'] },
 ];
 const oldQ = (x, z) => OLD_Q.reduce((b, q) => Math.hypot(q.at[0] - x, q.at[1] - z) < Math.hypot(b.at[0] - x, b.at[1] - z) ? q : b);
 const shuffled = (r, a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };

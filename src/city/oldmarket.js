@@ -5,16 +5,16 @@
 // ============================================================
 function buildOldTown(H) {
   const { K, W, B, F, S } = H, r = U.rng(404), put = H.put;
-  const lanes = [
-    [[560, -380], [600, -470], [660, -560], [700, -640], [640, -720], [720, -800], [800, -880], [760, -980], [840, -1080], [800, -1180], [880, -1280], [860, -1400]],
-    [[470, -600], [560, -620], [660, -560], [780, -540], [900, -520], [1010, -560]],
-    [[480, -1010], [600, -1040], [760, -980], [920, -1000], [1020, -940]],
-    [[700, -640], [820, -700], [960, -740], [1020, -820]],
-    [[800, -1180], [680, -1240], [560, -1300], [470, -1260]],
-    [[880, -1280], [980, -1200], [1020, -1100]],
-    [[640, -720], [560, -760], [480, -800]],
-    [[840, -1080], [960, -1100], [1010, -1160]],
-  ];
+  // the compact city's old town: a round quarter on its hill. Lanes climb from the ring street to the square at
+  // the top (and a small lane circles the square); outside the ring, lanes run down to the quarter's edge.
+  // (the square sits a little east of the ring's centre, clear of the station's stairways)
+  const RC = [300, -440], C0 = [335, -446], ring = (a) => [RC[0] + Math.cos(a) * 132, RC[1] + Math.sin(a) * 103];
+  const inner = (a, f) => [C0[0] + Math.cos(a) * 132 * f, C0[1] + Math.sin(a) * 103 * f];
+  const lanes = [];
+  for (const a of [-Math.PI / 2, 0, Math.PI / 2, Math.PI, -Math.PI / 4, Math.PI * 3 / 4, -Math.PI * 3 / 4]) { const p = ring(a), q = inner(a, 0.36); lanes.push([p, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], q]); }
+  { const L = []; for (let k = 0; k <= 16; k++) L.push(inner(k / 16 * Math.PI * 2, 0.36)); lanes.push(L); }
+  lanes.push([ring(-Math.PI / 4), [470, -580], [520, -600]], [ring(0), [520, -430], [570, -420]], [ring(Math.PI / 4), [470, -300], [520, -280]],
+    [ring(-Math.PI * 3 / 4), [140, -560], [90, -580]], [ring(Math.PI), [110, -430], [60, -410]], [ring(Math.PI * 3 / 4), [170, -330], [150, -300]]);
   const R = PLAN.byKey.oldtown.rect;
   // the open places: each is reserved, and joined to the nearest lane by a side lane
   const links = [];
@@ -24,7 +24,7 @@ function buildOldTown(H) {
     for (const L of lanes) for (let i = 0; i < L.length - 1; i++) { const [ax, az] = L[i], dx = L[i + 1][0] - ax, dz = L[i + 1][1] - az, u = U.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1), qx = ax + dx * u, qz = az + dz * u, dd = Math.hypot(qx - x, qz - z); if (dd < bd) { bd = dd; bq = [qx, qz]; } }
     if (bd > hf * 0.7) { const k = (bd - hf * 0.7) / bd; links.push([[bq[0], bq[1]], [bq[0] + (x - bq[0]) * k, bq[1] + (z - bq[1]) * k]]); p.link = bq; }
   }
-  const sq = [660, -570];
+  const sq = C0;              // the square at the top of the hill
   // the square
   const sqR = [sq[0] - 26, sq[1] - 24, sq[0] + 26, sq[1] + 24];
   H.patch(sqR, '#c9b79a', 'walk', 0.07); H.reserve(sqR);
@@ -107,6 +107,12 @@ function buildOldTown(H) {
     if (H.clearOf(x - 2, z - 2, x + 2, z + 2, 1)) { H.tree(x, z, { s: 0.7 + r() * 0.4, color: pick(r, ['#5f8f4a', '#6f9a4a', '#4f7f45']), color2: '#7aa055' }); H.reserve([x - 2, z - 2, x + 2, z + 2]); }
   }
   H.walkers(lanes, 50, 'oldtown');
+  // bits of the old town wall along its edge, a walk on top to grind (broken wherever a street or lane goes through)
+  { const S = PLAN.byKey.oldtown.shape, P = S.poly, n = P.length, inset = 7;
+    const pts = P.map((p, i) => { const a = P[(i - 1 + n) % n], b = P[(i + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); return [p[0] - dz / l * inset, p[1] + dx / l * inset]; });
+    let run = []; const flush = () => { if (run.length > 3) H.ledge(run, { h: 2.4, w: 1.4, color: '#b9ae98', kind: 'brick', top: '#cfc4ac' }); run = []; };
+    for (let i = 0; i <= n; i++) { const p = pts[i % n]; if ((i % 23) < 15 && H.clearOf(p[0] - 2, p[1] - 2, p[0] + 2, p[1] + 2, 0.5)) run.push(p); else flush(); }
+    flush(); }
 }
 
 // a courtyard block: four wings under one eave line, a gateway through one of them

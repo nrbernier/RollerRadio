@@ -10,7 +10,7 @@ const XF_GROUPS = {
   // key: [dx, dz], keep: district outline to trim to (null: none), margin: metres allowed past it
   park:     { d: [464, 304],   keep: 'park', margin: 12 },          // the pond lands where the pond is
   obs:      { d: [-152, 616],  keep: 'obs', margin: 60 },            // the observatory on the summit, its terrace looking down the main street
-  oldtown:  { d: [-408, 408],  keep: 'oldtown', margin: 12 },        // the bell tower's square at the south edge (phase 4 relays the old town)
+  oldtown:  { d: [0, 0],       keep: 'oldtown', margin: -2, real: true },   // laid out anew on its hill (real coordinates, the real plan)
   market:   { d: [-344, 96],   keep: 'market', margin: 30 },        // the hall just south of the cross street
   cellar:   { d: [-368, -8],   keep: null },                         // the record shop, in the market's south corner
   business: { d: [-56, 504],   keep: 'business', margin: -4 },       // (inside its ring street)       // the sunken street down the middle
@@ -203,12 +203,15 @@ function xfRun(H, g, ...fns) {
   districtAt = (x, z) => R.districtAt(x + dx, z + dz);
   districtWeights = (x, z, out, soft) => R.districtWeights(x + dx, z + dz, out, soft);
   inHole = (x, z) => R.inHole(x + dx, z + dz);
+  const real = !!G.real;
   const saved = { districts: PLAN.districts, byKey: PLAN.byKey, stations: PLAN.stations, spots: PLAN.spots, canal: PLAN.canal, pond: PLAN.pond, docksQuayZ: PLAN.docksQuayZ, boulevardX: PLAN.boulevardX, avenueZ: PLAN.avenueZ };
+  if (!real) {
   PLAN.districts = PLAN0.districts; PLAN.byKey = PLAN0.byKey; PLAN.canal = PLAN0.canal;
   PLAN.docksQuayZ = PLAN0.docksQuayZ; PLAN.boulevardX = PLAN0.boulevardX; PLAN.avenueZ = PLAN0.avenueZ;
   PLAN.stations = OLD_STATIONS.map(key => { const s = saved.stations.find(t => t.key === key) || saved.stations.find(t => t.key === STATION_ALIAS[key]); return { key, name: s ? s.name : key, at: s ? [s.at[0] - dx, s.at[1] - dz] : [1e6, 1e6] }; });
   PLAN.spots = saved.spots.map(s => ({ key: s.key, at: [s.at[0] - dx, s.at[1] - dz] }));
   PLAN.pond = Object.assign({}, saved.pond, { x: saved.pond.x - dx, z: saved.pond.z - dz });
+  } else canalEndZ = R.canalEndZ;
   xfFrame(g);
   Object.assign(XF, { g, dx, dz, keep: G.keep, margin: G.margin || 0 });
   try { for (const f of fns) f(H); }
