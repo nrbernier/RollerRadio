@@ -36,7 +36,7 @@ function buildCanals(H) {
   for (const c of crossings) bridgeAt(c.s, c.width + 4, c.key === 'main' ? 2.8 : 1.6, c.key === 'main' ? { color: '#a89a82', wall: '#8a7a64' } : {});
   // footbridges between them, about every 160 m
   const taken = crossings.map(c => c.s);
-  for (let s = 90; s < C.path.len - 60; s += 150 + r() * 40) if (!taken.some(t => Math.abs(t - s) < 70)) { bridgeAt(s, 7, 1.6); taken.push(s); }
+  for (let s = 90; s < C.path.len - 90; s += 150 + r() * 40) if (!taken.some(t => Math.abs(t - s) < 70)) { bridgeAt(s, 7, 1.6); taken.push(s); }
   // the echo under the stone bridge: a low ledge along the south wall
   const main = crossings.find(c => c.key === 'main');
   if (main) {
@@ -74,6 +74,7 @@ function buildCanals(H) {
   // bollards, trees and lamps along the quays
   for (let s = 12; s < C.path.len - 8; s += 14) for (const sd of [-1, 1]) {
     const [x, z] = off(s, sd * (C.half + 1.6));
+    if (z > shoreZ(x) - 6) continue;
     if (!H.clearOf(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 0)) continue;
     const y = terrainAt(x, z); K.cyl(x, y - 0.2, z, 0.28, 0.9, '#2a2a32', { outline: 0.03, seg: 8, r2: 0.34 }); W.boxes.push({ x0: x - 0.3, y0: y - 1, z0: z - 0.3, x1: x + 0.3, y1: y + 0.7, z1: z + 0.3, tag: 'bollard' });
     H.sound(x, y, z, 1.5, 'bollard');

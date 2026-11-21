@@ -19,7 +19,7 @@ function buildHeights() {
   }
 }
 // cells the terrain mesh leaves out along the canal (any part of them may be in the channel)
-function canalCell(cx, cz) { return pathDist(PLAN_REAL.canal.path, cx, cz, 32).d < PLAN_REAL.canal.half + TER.cell * 0.72; }
+function canalCell(cx, cz) { return cz < shoreZ(cx) + 2 && pathDist(PLAN_REAL.canal.path, cx, cz, 32).d < PLAN_REAL.canal.half + TER.cell * 0.72; }
 // lower the ground along a corridor (centreline points [x, y, z]) to floorY(t) + off
 function carveCorridor(pts, half, off = -0.6) {
   const { nx, nz, x0, z0, cell, H } = TER;

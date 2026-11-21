@@ -267,7 +267,6 @@ function buildDistricts(K, S, F) {
   X('obs', buildObservatory, fillObservatory);
   X('site', buildSite); X('tower', buildTower);
   X('vine', h => vineyards(h, U.rng(2027)));
-  X('mouth', h => canalMouth(h, U.rng(2028)));
   X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
   fillRoutes(H); lap('routes');
   return H;

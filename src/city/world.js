@@ -173,8 +173,10 @@ function buildCanal(K, S, F) {
     B.add(new THREE.BoxGeometry(thick, y1 - y0, L + 0.35), m, col, kind, { outlineT: ol, edges: false });
   };
   // walls + coping, in 8 m pieces (every second sample), each side
+  const dry = (k) => P[k][1] < shoreZ(P[k][0]) - 1;      // (the canal's walls and quays stop at the shore)
   for (let i = 0; i < n - 1; i += 2) {
     const j = Math.min(n - 1, i + 2);
+    if (!dry(i) || !dry(j)) continue;
     for (const sd of [-1, 1]) {
       const o = C.half + 0.5, ax = P[i][0] + N[i][0] * o * sd, az = P[i][1] + N[i][1] * o * sd, bx = P[j][0] + N[j][0] * o * sd, bz = P[j][1] + N[j][1] * o * sd;
       obox(ax, az, bx, bz, 0, 1, C.bedY, C.quayY - 0.05, wall, 'brick', 0);
@@ -186,6 +188,7 @@ function buildCanal(K, S, F) {
   const strip = (o0, o1, y0, y1, col, kind, mesh) => {
     const pos = [], uv = [];
     for (let i = 0; i < n - 1; i++) for (const sd of (o0 === -o1 ? [1] : [-1, 1])) {
+      if (!dry(i + 1)) continue;
       const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? y0 : y1), z]; };
       const a = q(i, o0), b = q(i, o1), c = q(i + 1, o0), d = q(i + 1, o1);
       // faces up whichever side we're on
@@ -215,11 +218,6 @@ function buildCanal(K, S, F) {
     B.box(x - 0.2, top, cz - C.half - 16.3, x + 0.4, top + 0.6, cz + C.half + 16.3, '#d9cfb8', 'plain', { outlineT: 0.05 });
     for (const sd of [-1, 1]) { K.cyl(x + 1.2, C.quayY, cz + sd * (C.half + 5), 0.1, 3.2, '#2a2838', { outline: 0.03, seg: 6 }); B.box(x + 0.9, C.quayY + 3.2, cz + sd * (C.half + 5) - 0.3, x + 1.5, C.quayY + 3.7, cz + sd * (C.half + 5) + 0.3, '#ffe9b0', 'lamp', { outlineT: 0, edges: false }); }
   }
-  // the basin's end: a wall across, and a lock gate in it (the lake beyond)
-  { const e = P[n - 1], d = N[n - 1], ax = e[0] + d[0] * (C.half + 1), az = e[1] + d[1] * (C.half + 1), bx = e[0] - d[0] * (C.half + 1), bz = e[1] - d[1] * (C.half + 1);
-    const fx = -d[1], fz = d[0];      // along the canal, onwards
-    obox(ax + fx * 0.5, az + fz * 0.5, bx + fx * 0.5, bz + fz * 0.5, 0, 1, C.bedY, C.quayY - 0.05, wall, 'brick', 0);
-    obox(ax - fx * 2.7, az - fz * 2.7, bx - fx * 2.7, bz - fz * 2.7, 0, 0.6, C.bedY, C.quayY - 0.6, '#7a5a3a', 'wood', 0.05); }
   W.canalWaterMat = wm;
   W.canal = C;
 }

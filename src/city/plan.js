@@ -111,8 +111,8 @@ const PLAN = {
   shore: { z: 548, tilt: -0.06, bayX: 80, bayR: 70, bayDepth: 16 },
   docksQuayZ: 502, docksX: [222, 660],
   // the canal: comes out of a tunnel under a knoll at the west edge, winds east under the main street,
-  // turns south and ends in a basin behind the promenade (a lock gate, the lake beyond)
-  canal: { ctrl: [[-662, 300], [-560, 318], [-430, 344], [-300, 298], [-160, 322], [-20, 352], [76, 386], [102, 446], [84, 0]], half: 11, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
+  // turns south east of it and runs straight out into the lake (its water is the lake's)
+  canal: { ctrl: [[-662, 300], [-560, 318], [-430, 344], [-300, 298], [-160, 322], [-20, 352], [90, 372], [168, 402], [202, 448], [212, 0]], half: 11, waterY: 0, bedY: -2.2, quayY: 4.6 },
   // streets that join the districts (each district lays its own small streets)
   // the streets that join the districts (each district lays its own small streets between them).
   // The main street comes down from the summit through the vineyards, runs straight down downtown on
@@ -121,7 +121,7 @@ const PLAN = {
   roads: {
     // the ring round downtown: its grid streets end on it
     downtown: { width: 14, loop: true, ctrl: [[-236, -184], [0, -198], [196, -182], [214, -20], [208, 178], [0, 212], [-206, 202], [-246, 0]] },
-    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -194], [76, -60], [76, 80], [76, 212], [80, 300], [76, 360], [74, 430], [70, 500]] },
+    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -194], [76, -60], [76, 80], [76, 212], [80, 300], [76, 360], [72, 420], [64, 474]] },      // (ends on the promenade)
     // from Forest station's forecourt, through downtown, past the market to the docks road
     cross: { width: 14, ctrl: [[-284, 12], [-246, 12], [-60, 12], [180, 12], [330, 10], [470, 4], [560, 0]] },
     // along the lake from the lido to the docks road
@@ -149,7 +149,7 @@ const PLAN = {
   // hidden spots: local changes to the music, nothing to collect
   spots: [
     { key: 'glasshouse', at: [-436, -584] },
-    { key: 'belltower',  at: [349, -452] },
+    { key: 'belltower',  at: [344, -450] },
     { key: 'rooftop',    at: [136, 150] },
     { key: 'cellar',     at: [522, 170] },
     { key: 'arch',       at: [90, 400] },       // where the main street crosses the canal (set exactly below)
@@ -174,7 +174,7 @@ PLAN.vineyardShape = makeShape(PLAN.vineyards, 6);
 for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.loop);
 
 // the canal path ends a little behind the shore: the basin
-{ const C = PLAN.canal, e = C.ctrl[C.ctrl.length - 1]; e[1] = shoreZ(e[0]) - 30;
+{ const C = PLAN.canal, e = C.ctrl[C.ctrl.length - 1]; e[1] = shoreZ(e[0]) + 24;
   C.path = makePath(C.ctrl, 4);
   // (old fields, for code not yet moved to the path)
   C.x0 = C.ctrl[0][0]; C.z = C.ctrl[0][1]; C.bendX = e[0];
