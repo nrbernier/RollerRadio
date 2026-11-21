@@ -270,7 +270,7 @@ function buildDistricts(K, S, F) {
   X('park', buildPark, buildCrag, fillPark, h => wild(h, U.rng(2026)));
   X('obs', buildObservatory, fillObservatory);
   X('site', buildSite); X('tower', buildTower);
-  X('vine', h => vineyards(h, U.rng(2027)));
+  vineyards(H, U.rng(2027));          // (laid out on the real outline: no frame)
   X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
   fillRoutes(H); lap('routes');
   buildJunctions(H.K); lap('junctions');
