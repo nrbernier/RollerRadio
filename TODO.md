@@ -1,5 +1,29 @@
 # Downtone — to do
 
+## Compact city: clean up every street and bridge (branch `compact-city`)
+The street network is decided (PLAN.roads in plan.js); how it looks on the ground is still buggy. Ride every
+street end to end on a phone, then fix:
+- Junctions: where two streets meet, one clean junction (no overlapping ribbons, no z-fighting, no gaps in the
+  sidewalk; the lane dashes stop at the junction). Same where downtown's grid streets meet its ring street.
+- Ends: every street ends on another street or at a place (station forecourt, lido, observatory terrace); no
+  stubs from the old districts' streets poking out past their new outlines (market lanes, old town lanes,
+  park trails, the old canal-quarter quays).
+- Ground patches cut by the district outlines (the blotchy grey and sand edges outside downtown's ring and
+  round the market): give every district a clean edge (kerb or grass verge) instead.
+- Bridges: every street that crosses the canal has a bridge that meets the street at both ends (heights,
+  width, sidewalks, parapet rails line up); footbridges land on the quays; nothing dips into the canal.
+- Street over or under the metro: the viaduct clears every street with room to spare; where the line is in a
+  cutting near a street, the street bridges it. No pier stands in a street or a sidewalk.
+- Old town streets (ring, three radials) on the hill: no steps in the ribbon, sidewalks follow the slope.
+- Cars: they drive the new streets; check they turn at junctions and never drive through a station or a house.
+- Then `tools/geom.py` and the physics/camera bot on the new map.
+
+## Compact city: still to place
+- Docks and lakeshore along the new shore (they still follow the old one; the lakeshore's pier things sit in
+  the water)
+- People, animals, music spots and ambiences that still use old positions (life.js, fauna.js, music.js,
+  game.js zones, debug.js jump list)
+
 ## Fixes and checks
 - Pedestrians on the metro rails: seen in Central station and again near the forest (three walkers sit at platform
   depth near Central; cause not found yet)

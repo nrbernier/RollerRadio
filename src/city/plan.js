@@ -127,22 +127,24 @@ const PLAN = {
     // along the lake from the lido to the docks road
     promenade: { width: 10, ctrl: [[-470, 522], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
     docks: { width: 12, ctrl: [[560, 0], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
-    ring: { width: 10, loop: true, ctrl: circlePts(300, -410, 132, 12, 0.06).map(([x, z]) => [x, -410 + (z + 410) * 0.78]) },   // the old town's ring street, round its hill
-    oldSouth: { width: 9, ctrl: [[300, -307], [306, -220], [316, -110], [330, 10]] },             // from the ring down to the cross street
-    oldWest: { width: 9, ctrl: [[174, -372], [130, -300], [100, -240], [76, -194]] },             // from the ring to the main street
-    oldNorth: { width: 9, ctrl: [[300, -513], [210, -568], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
+    ring: { width: 10, loop: true, ctrl: circlePts(300, -440, 132, 12, 0.06).map(([x, z]) => [x, -440 + (z + 440) * 0.78]) },   // the old town's ring street, round its hill
+    oldSouth: { width: 9, ctrl: [[300, -337], [250, -318], [215, -260], [200, -184]] },           // from the ring down to downtown's ring street
+    oldWest: { width: 9, ctrl: [[172, -400], [130, -320], [100, -250], [76, -194]] },             // from the ring to the main street
+    oldNorth: { width: 9, ctrl: [[300, -543], [210, -580], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
   },
-  // metro: a loop round downtown with rounded corners. Each station stands on a straight stretch, clear of
-  // the streets (they cross the line between stations). West: Forest (downtown meets the forest); south:
-  // Canal; east: Market and Old Town (where downtown, market and old town meet); then north into the old
-  // town's hill in a tunnel, out past the vineyards (Vineyards station) and round. Clockwise from Vineyards.
-  metroLoop: { x0: -300, z0: -430, x1: 252, z1: 252, r: 80 },
+  // metro: a loop round downtown. West: Forest (downtown meets the forest); the north-west corner cut on a
+  // diagonal through the vineyards (Vineyards); then dead straight east into the old town's hill, with Old Town
+  // station underground in it; out of the hill the line bends south down the market's west edge (Market),
+  // and back west along downtown's south side (Canal). Every station stands on a straight stretch, clear of
+  // the streets; streets cross between stations (the line goes over them, or under them in the hill).
+  // The polygon's corners are rounded with radius r (clockwise from the south-west).
+  metroLoop: { pts: [[-300, 252], [-300, -236], [-120, -446], [300, -412], [300, 252]], r: [80, 70, 70, 90, 80] },
   stations: [
-    { key: 'vineyards', name: 'Vineyards', at: [-150, -430] },
-    { key: 'hilltop',   name: 'Old Town',  at: [252, -118] },
-    { key: 'market',    name: 'Market',    at: [252, 110] },
-    { key: 'canal',     name: 'Canal',     at: [-20, 252] },
     { key: 'forest',    name: 'Forest',    at: [-300, -20] },
+    { key: 'vineyards', name: 'Vineyards', at: [-210, -338] },
+    { key: 'hilltop',   name: 'Old Town',  at: [232, -418], under: true },      // (its four stairways come up inside the ring street)
+    { key: 'market',    name: 'Market',    at: [300, 110] },
+    { key: 'canal',     name: 'Canal',     at: [-20, 252] },
   ],
   // hidden spots: local changes to the music, nothing to collect
   spots: [
@@ -241,7 +243,7 @@ function landH(x, z) {
   h += gauss(x - rx, 120) * (3 + 17 * ridgeUp);
   h -= gauss(Math.hypot(x - PLAN_REAL.pond.x, z - PLAN_REAL.pond.z), 70) * 5;              // the pond hollow
   h += gauss(Math.hypot(x + 436, z + 590), 70) * 5;                               // glasshouse knoll
-  h += gauss(Math.hypot(x - 300, z + 420), 220) * 24;                             // the old town's hill (the metro tunnels through it)
+  h += gauss(Math.hypot(x - 300, z + 420), 235) * 30;                             // the old town's hill (the metro tunnels through it)
   h += Math.min(11, gauss(Math.hypot(x + 56, z + 660), 155) * 15);                 // the summit
   h += gauss(Math.hypot(x + 130, z + 330), 120) * 9;                              // the vineyard spur (sunny side faces south)
   h += gauss(Math.hypot(x + 720, z - 300), 55) * 15;                              // the knoll the canal tunnels under

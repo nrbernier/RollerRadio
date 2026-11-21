@@ -3,15 +3,23 @@
 //  through the ridge between Park and Hilltop. Trains you can ride on
 //  (roof) and that knock you off the rails.
 // ============================================================
-// the loop: a rectangle with rounded corners (PLAN.metroLoop), clockwise from the north-west, as cubic
-// Béziers in metres. Every side is dead straight between its corners: the stations stand on them.
+// the loop: PLAN.metroLoop's polygon with its corners rounded, as cubic Béziers in metres. The sides
+// stay dead straight between the roundings: the stations stand on them.
 const METRO_SVG = (() => {
-  const { x0, z0, x1, z1, r } = PLAN.metroLoop, k = r * 0.5523, segs = [];
-  const line = (a, b) => segs.push([a, [U.lerp(a[0], b[0], 1 / 3), U.lerp(a[1], b[1], 1 / 3)], [U.lerp(a[0], b[0], 2 / 3), U.lerp(a[1], b[1], 2 / 3)], b]);
-  line([x0 + r, z0], [x1 - r, z0]); segs.push([[x1 - r, z0], [x1 - r + k, z0], [x1, z0 + r - k], [x1, z0 + r]]);
-  line([x1, z0 + r], [x1, z1 - r]); segs.push([[x1, z1 - r], [x1, z1 - r + k], [x1 - r + k, z1], [x1 - r, z1]]);
-  line([x1 - r, z1], [x0 + r, z1]); segs.push([[x0 + r, z1], [x0 + r - k, z1], [x0, z1 - r + k], [x0, z1 - r]]);
-  line([x0, z1 - r], [x0, z0 + r]); segs.push([[x0, z0 + r], [x0, z0 + r - k], [x0 + r - k, z0], [x0 + r, z0]]);
+  const P = PLAN.metroLoop.pts, R = PLAN.metroLoop.r, n = P.length, segs = [], corner = [];
+  for (let i = 0; i < n; i++) {
+    const a = P[(i - 1 + n) % n], v = P[i], b = P[(i + 1) % n];
+    const l1 = Math.hypot(v[0] - a[0], v[1] - a[1]), l2 = Math.hypot(b[0] - v[0], b[1] - v[1]);
+    const u1 = [(v[0] - a[0]) / l1, (v[1] - a[1]) / l1], u2 = [(b[0] - v[0]) / l2, (b[1] - v[1]) / l2];
+    const th = Math.acos(U.clamp(u1[0] * u2[0] + u1[1] * u2[1], -1, 1)), t = R[i] * Math.tan(th / 2), h = 4 / 3 * Math.tan(th / 4) * R[i];
+    const A = [v[0] - u1[0] * t, v[1] - u1[1] * t], B = [v[0] + u2[0] * t, v[1] + u2[1] * t];
+    corner.push([A, [A[0] + u1[0] * h, A[1] + u1[1] * h], [B[0] - u2[0] * h, B[1] - u2[1] * h], B]);
+  }
+  for (let i = 0; i < n; i++) {
+    segs.push(corner[i]);
+    const a = corner[i][3], b = corner[(i + 1) % n][0];
+    segs.push([a, [U.lerp(a[0], b[0], 1 / 3), U.lerp(a[1], b[1], 1 / 3)], [U.lerp(a[0], b[0], 2 / 3), U.lerp(a[1], b[1], 2 / 3)], b]);
+  }
   return segs;
 })();
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
@@ -21,7 +29,7 @@ const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceilin
 // (north of downtown two streets cross the cutting on bridges; a third, and the avenue, pass under a proper span)
 const METRO_WAY = [];        // (pins go back in once the streets are laid: phase 5)
 const METRO_LIFT = {};      // Hilltop stands a little taller, so the street just west of it clears the deck
-const METRO_TUNNEL = ['vineyards', 'hilltop'];   // the span that may go under the hill
+const METRO_TUNNEL = ['vineyards', 'market'];   // the stretch that may go under the ground: through the old town's hill   // the span that may go under the hill
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
@@ -60,13 +68,27 @@ function planMetro() {
   const inDown = (p) => p.x > DOWNTOWN[0] && p.x < DOWNTOWN[2] && p.z > DOWNTOWN[1] && p.z < DOWNTOWN[3];
   const under = pts.map(inDown);
   for (const st of stations) {
-    st.under = under[st.i];
+    st.under = st.under || under[st.i];
+    if (st.under) for (let d = -half; d <= half; d++) under[(st.i + d + N) % N] = true;
     let g = st.under ? 1e9 : -1e9; for (let d = -half; d <= half; d++) g = st.under ? Math.min(g, ground[(st.i + d + N) % N]) : Math.max(g, ground[(st.i + d + N) % N]);
     st.y = st.under ? g - 10 : g + METRO.clear - 1 + (METRO_LIFT[st.key] || 0);
     for (let d = -half; d <= half; d++) fixed[(st.i + d + N) % N] = st.y;
   }
   // street crossings: the line is pinned well under the street (which then bridges the cutting) or well over it
-  const ways = METRO_WAY.map(w => {
+  // where a street crosses the line (between stations): the line goes over it on a viaduct; in the hill it stays in the tunnel
+  const autoWays = [];
+  for (const rd of Object.values(PLAN.roads)) {
+    let last = -1e9;
+    for (const [x, z] of rd.path.pts) {
+      let bi = -1, bd = 1e9; for (let i = 0; i < N; i += 1) { const d = Math.hypot(pts[i].x - x, pts[i].z - z); if (d < bd) { bd = d; bi = i; } }
+      if (bd > 3 || Math.abs(bi - last) < 20) continue;
+      last = bi;
+      if (stations.some(st => Math.abs(((bi - st.i) % N + N + N / 2) % N - N / 2) < half + 6)) continue;
+      if (Math.hypot(pts[bi].x - 300, pts[bi].z + 420) < 250) continue;          // (inside the old town's hill)
+      autoWays.push({ at: [pts[bi].x, pts[bi].z], dy: 7.6 });
+    }
+  }
+  const ways = METRO_WAY.concat(autoWays).map(w => {
     let bi = 0, bd = 1e9; pts.forEach((p, i) => { const d = Math.hypot(p.x - w.at[0], p.z - w.at[1]); if (d < bd) { bd = d; bi = i; } });
     const wp = { i: bi, y: ground[bi] + w.dy, half: 2, way: true };
     for (let d = -2; d <= 2; d++) fixed[(bi + d + N) % N] = wp.y;
@@ -91,6 +113,7 @@ function planMetro() {
     for (let i = 0; i < N; i++) {
       if (fixed[i] !== null) continue;
       if (under[i]) y[i] = Math.min(y[i], ground[i] - 10);
+      if (inTunnelSpan(i) && Math.hypot(pts[i].x - 300, pts[i].z + 420) < 200) y[i] = Math.min(y[i], ground[i] - 12);   // well inside the old town's hill: a bored tunnel
       else if (!inTunnelSpan(i) && !free[i]) y[i] = Math.max(y[i], ground[i] + 6);
     }
     // smooth (never touching the platforms)
