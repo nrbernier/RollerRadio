@@ -142,7 +142,7 @@ const PLAN = {
   stations: [
     { key: 'forest',    name: 'Forest',    at: [-300, -20] },
     { key: 'vineyards', name: 'Vineyards', at: [-210, -338] },
-    { key: 'hilltop',   name: 'Old Town',  at: [232, -417], under: true },      // (its four stairways come up inside the ring street)
+    { key: 'hilltop',   name: 'Old Town',  at: [232, -417], under: true, entrances: 2 },      // (two stairways up into the walled town)
     { key: 'market',    name: 'Market',    at: [317, 110] },
     { key: 'canal',     name: 'Canal',     at: [-20, 252] },
   ],
