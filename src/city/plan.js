@@ -100,8 +100,8 @@ const PLAN = {
   districts: [
     { key: 'park', name: 'Forest', ctrl: [[-760, -800], [-254, -770], [-226, -470], [-258, -266], [-318, -30], [-392, 170], [-530, 236], [-760, 236]] },
     { key: 'obs', name: 'Observatory', ctrl: circlePts(-56, -640, 105, 9, 0.08) },
-    { key: 'oldtown', name: 'Old town', ctrl: [[35, -566], [212, -655], [515, -604], [588, -400], [548, -262], [388, -130], [229, -120], [53, -186], [0, -333]] },
-    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [206, 150], [60, 216], [-194, 150], [-242, -50]] },
+    { key: 'oldtown', name: 'Old town', ctrl: [[40, -580], [212, -662], [515, -612], [590, -410], [548, -262], [388, -150], [270, -150], [200, -220], [40, -380]] },
+    { key: 'business', name: 'Downtown', ctrl: [[-236, -184], [0, -198], [196, -182], [214, -20], [208, 178], [0, 212], [-206, 202], [-246, 0]] },
     { key: 'market', name: 'Market', ctrl: [[254, -86], [530, -80], [596, 66], [494, 206], [325, 222], [214, 100], [214, -28]] },
     { key: 'canals', name: 'Canals', ctrl: [[-640, 252], [-141, 230], [212, 268], [222, 350], [150, 462], [40, 470], [-353, 455], [-640, 402]] },
     { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 502], [290, 502], [226, 402]] },
@@ -119,28 +119,31 @@ const PLAN = {
   // one of its streets, crosses the canal on the stone bridge and ends at the promenade; the cross
   // street follows one of downtown's east–west streets from the forest to the docks road.
   roads: {
-    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -186], [76, -60], [76, 80], [76, 216], [80, 300], [76, 360], [74, 430], [70, 500]] },
-    cross: { width: 14, ctrl: [[-640, -4], [-470, -20], [-330, -8], [-250, -12], [-60, -12], [180, -12], [330, -12], [470, -14], [560, -12], [640, -4]] },
-    promenade: { width: 10, ctrl: [[-640, 528], [-480, 520], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
-    docks: { width: 12, ctrl: [[560, -12], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
-    ring: { width: 10, loop: true, ctrl: circlePts(292, -392, 132, 12, 0.06).map(([x, z]) => [x, -392 + (z + 392) * 0.78]) },   // the old town's ring street, on the hill's contour
-    oldSouth: { width: 9, ctrl: [[292, -289], [300, -200], [310, -110], [330, -12]] },             // from the ring down to the cross street
-    oldWest: { width: 9, ctrl: [[166, -355], [120, -300], [96, -240], [76, -186]] },             // from the ring to the main street
-    oldNorth: { width: 9, ctrl: [[292, -495], [210, -560], [120, -590], [30, -578], [-30, -560]] }, // from the ring to the observatory's terrace
+    // the ring round downtown: its grid streets end on it
+    downtown: { width: 14, loop: true, ctrl: [[-236, -184], [0, -198], [196, -182], [214, -20], [208, 178], [0, 212], [-206, 202], [-246, 0]] },
+    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -194], [76, -60], [76, 80], [76, 212], [80, 300], [76, 360], [74, 430], [70, 500]] },
+    // from Forest station's forecourt, through downtown, past the market to the docks road
+    cross: { width: 14, ctrl: [[-284, 12], [-246, 12], [-60, 12], [180, 12], [330, 10], [470, 4], [560, 0]] },
+    // along the lake from the lido to the docks road
+    promenade: { width: 10, ctrl: [[-470, 522], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
+    docks: { width: 12, ctrl: [[560, 0], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
+    ring: { width: 10, loop: true, ctrl: circlePts(300, -410, 132, 12, 0.06).map(([x, z]) => [x, -410 + (z + 410) * 0.78]) },   // the old town's ring street, round its hill
+    oldSouth: { width: 9, ctrl: [[300, -307], [306, -220], [316, -110], [330, 10]] },             // from the ring down to the cross street
+    oldWest: { width: 9, ctrl: [[174, -372], [130, -300], [100, -240], [76, -194]] },             // from the ring to the main street
+    oldNorth: { width: 9, ctrl: [[300, -513], [210, -568], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
   },
-  // metro: one loop round the city, eight stations (in order along the line)
+  // metro: a loop round downtown with rounded corners. Each station stands on a straight stretch, clear of
+  // the streets (they cross the line between stations). West: Forest (downtown meets the forest); south:
+  // Canal; east: Market and Old Town (where downtown, market and old town meet); then north into the old
+  // town's hill in a tunnel, out past the vineyards (Vineyards station) and round. Clockwise from Vineyards.
+  metroLoop: { x0: -300, z0: -430, x1: 252, z1: 252, r: 80 },
   stations: [
-    { key: 'summit',    name: 'Observatory', at: [-30, -470] },
-    { key: 'hilltop',   name: 'Old Town',    at: [330, -560] },
-    { key: 'market',    name: 'Market',      at: [560, -100] },
-    { key: 'harbour',   name: 'Harbour',     at: [440, 420] },
-    { key: 'canal',     name: 'Canal',       at: [-10, 430] },
-    { key: 'lakeshore', name: 'Lakeshore',   at: [-380, 448] },
-    { key: 'forest',    name: 'Forest',      at: [-500, -40] },
-    { key: 'central',   name: 'Central',     at: [6, 64] },
+    { key: 'vineyards', name: 'Vineyards', at: [-150, -430] },
+    { key: 'hilltop',   name: 'Old Town',  at: [252, -118] },
+    { key: 'market',    name: 'Market',    at: [252, 110] },
+    { key: 'canal',     name: 'Canal',     at: [-20, 252] },
+    { key: 'forest',    name: 'Forest',    at: [-300, -20] },
   ],
-  // the line's shape between the stations (stations are on it too)
-  metroVia: { summit: [[120, -600]], hilltop: [[520, -420]], market: [[600, 200]], harbour: [[200, 470]], canal: [], lakeshore: [[-560, 320]], forest: [[-300, 0]], central: [[-40, -220]] },
   // hidden spots: local changes to the music, nothing to collect
   spots: [
     { key: 'glasshouse', at: [-436, -584] },
@@ -153,8 +156,8 @@ const PLAN = {
   ],
   // landmarks, where districts meet (placed by their builders; these are their anchors)
   places: {
-    summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [166, -125],
-    site: [-154, 173], central: [6, 64], recordShop: [522, 170], ferris: [-247, 493], lido: [-480, 505],
+    summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [150, -109],
+    site: [-154, 173], central: [-20, 252], recordShop: [522, 170], ferris: [-247, 493], lido: [-480, 505],
     waterTower: [262, 322], lighthouse: [560, 626],
   },
   vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
@@ -238,7 +241,7 @@ function landH(x, z) {
   h += gauss(x - rx, 120) * (3 + 17 * ridgeUp);
   h -= gauss(Math.hypot(x - PLAN_REAL.pond.x, z - PLAN_REAL.pond.z), 70) * 5;              // the pond hollow
   h += gauss(Math.hypot(x + 436, z + 590), 70) * 5;                               // glasshouse knoll
-  h += gauss(Math.hypot(x - 292, z + 392), 240) * 13;                             // the old town's hill
+  h += gauss(Math.hypot(x - 300, z + 420), 220) * 24;                             // the old town's hill (the metro tunnels through it)
   h += Math.min(11, gauss(Math.hypot(x + 56, z + 660), 155) * 15);                 // the summit
   h += gauss(Math.hypot(x + 130, z + 330), 120) * 9;                              // the vineyard spur (sunny side faces south)
   h += gauss(Math.hypot(x + 720, z - 300), 55) * 15;                              // the knoll the canal tunnels under

@@ -13,9 +13,9 @@ const XF_GROUPS = {
   oldtown:  { d: [-408, 408],  keep: 'oldtown', margin: 12 },        // the bell tower's square at the south edge (phase 4 relays the old town)
   market:   { d: [-344, 96],   keep: 'market', margin: 30 },        // the hall just south of the cross street
   cellar:   { d: [-368, -8],   keep: null },                         // the record shop, in the market's south corner
-  business: { d: [-56, 480],   keep: 'business', margin: 24 },       // the sunken street down the middle
+  business: { d: [-56, 504],   keep: 'business', margin: -4 },       // (inside its ring street)       // the sunken street down the middle
   site:     { d: [24, 224],    keep: null },
-  tower:    { d: [96, 304],    keep: null },                        // the Needle, where downtown, old town and market meet
+  tower:    { d: [80, 320],    keep: null },                        // the Needle, where downtown, old town and market meet
   canals:   { d: [0, -152],    keep: 'canals', margin: 8 },
   docks:    { d: [-320, -696], keep: 'docks', margin: 20 },
   lake:     { d: [0, -688],    keep: 'lake', margin: 30 },
@@ -72,7 +72,7 @@ const PLAN0 = {
 PLAN0.byKey = Object.fromEntries(PLAN0.districts.map(d => [d.key, d]));
 const shoreZ0 = (x) => PLAN0.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5;
 PLAN0.canalEnd = shoreZ0(PLAN0.canal.bendX) - 48;
-const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'], STATION_ALIAS = { park: 'forest', docks: 'harbour' };
+const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'], STATION_ALIAS = { park: 'forest', docks: 'market', harbour: 'canal', central: 'canal' };
 
 // ---------- running a builder in its frame ----------
 // (the real versions of the questions a builder asks)
@@ -116,6 +116,13 @@ function xfCentre(v) {
 const XF_TRIM = new Set(['boxes', 'camBoxes', 'ramps', 'treeList', 'lamps', 'benches', 'sounds', 'spots', 'pigeonSpots', 'gullSpots', 'fountains', 'dishes']);
 const XF_SKIP = new Set(['group', 'cells', 'metro', 'stations', 'roads', 'far', 'slabs', 'mats', 'grid', 'spawn', 'waters', 'canal', 'canalWaterMat', 'lakeMat', 'dynBoxes', 'addDyn']);
 
+// is a rect (in the current frame) well inside the district being built?
+function xfInside(x0, z0, x1, z1, inset) {
+  if (!XF.g || !XF.keep) return true;
+  const S = PLAN_REAL.byKey[XF.keep].shape;
+  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) if (shapeDist(S, x + XF.dx, z + XF.dz) > -inset) return false;
+  return true;
+}
 // a geometry moved into place, keeping only the triangles whose centre is kept
 function xfClip(geo, M) {
   const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(M), P = g.attributes.position.array, n = P.length / 9, keep = [];

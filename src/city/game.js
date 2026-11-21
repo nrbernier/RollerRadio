@@ -71,7 +71,7 @@ const hooks = {
 let ZONE_LIST = null;
 function zoneAt(x, z) {
   if (!ZONE_LIST) {
-    const W = Game.W, cs = PLAN.stations.find(s => s.key === 'central').at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
+    const W = Game.W, cs = (PLAN.stations.find(s => s.key === 'central') || PLAN.stations.find(s => s.key === 'canal')).at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
     ZONE_LIST = [
       ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -470, -560, 90], ['plaza', cs[0], cs[1], 75],
       ['cellar', cel[0], cel[1], 22], ['pier', -330, 590, 50], ['yard', 430, 400, 90],

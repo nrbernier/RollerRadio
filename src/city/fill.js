@@ -207,7 +207,7 @@ function fillRoutes(H) {
   // it ends in a turning circle round a little tree island
   { const roads = Object.entries(W.roads || {});
     const distTo = (x, z, P) => { let d = 1e9; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); d = Math.min(d, Math.hypot(ax + dx * u - x, az + dz * u - z)); } return d; };
-    for (const [k, rd] of roads) for (const end of (k === 'oblique' || k === 'ring' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
+    for (const [k, rd] of roads) for (const end of (k === 'oblique' || (PLAN.roads[k] && PLAN.roads[k].loop) ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
       let [x, z] = end;
       { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 580) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
       if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;

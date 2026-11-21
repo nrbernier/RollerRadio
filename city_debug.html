@@ -2986,8 +2986,8 @@ const PLAN = {
   districts: [
     { key: 'park', name: 'Forest', ctrl: [[-760, -800], [-254, -770], [-226, -470], [-258, -266], [-318, -30], [-392, 170], [-530, 236], [-760, 236]] },
     { key: 'obs', name: 'Observatory', ctrl: circlePts(-56, -640, 105, 9, 0.08) },
-    { key: 'oldtown', name: 'Old town', ctrl: [[35, -566], [212, -655], [515, -604], [588, -400], [548, -262], [388, -130], [229, -120], [53, -186], [0, -333]] },
-    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [206, 150], [60, 216], [-194, 150], [-242, -50]] },
+    { key: 'oldtown', name: 'Old town', ctrl: [[40, -580], [212, -662], [515, -612], [590, -410], [548, -262], [388, -150], [270, -150], [200, -220], [40, -380]] },
+    { key: 'business', name: 'Downtown', ctrl: [[-236, -184], [0, -198], [196, -182], [214, -20], [208, 178], [0, 212], [-206, 202], [-246, 0]] },
     { key: 'market', name: 'Market', ctrl: [[254, -86], [530, -80], [596, 66], [494, 206], [325, 222], [214, 100], [214, -28]] },
     { key: 'canals', name: 'Canals', ctrl: [[-640, 252], [-141, 230], [212, 268], [222, 350], [150, 462], [40, 470], [-353, 455], [-640, 402]] },
     { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 502], [290, 502], [226, 402]] },
@@ -3005,28 +3005,31 @@ const PLAN = {
   // one of its streets, crosses the canal on the stone bridge and ends at the promenade; the cross
   // street follows one of downtown's east–west streets from the forest to the docks road.
   roads: {
-    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -186], [76, -60], [76, 80], [76, 216], [80, 300], [76, 360], [74, 430], [70, 500]] },
-    cross: { width: 14, ctrl: [[-640, -4], [-470, -20], [-330, -8], [-250, -12], [-60, -12], [180, -12], [330, -12], [470, -14], [560, -12], [640, -4]] },
-    promenade: { width: 10, ctrl: [[-640, 528], [-480, 520], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
-    docks: { width: 12, ctrl: [[560, -12], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
-    ring: { width: 10, loop: true, ctrl: circlePts(292, -392, 132, 12, 0.06).map(([x, z]) => [x, -392 + (z + 392) * 0.78]) },   // the old town's ring street, on the hill's contour
-    oldSouth: { width: 9, ctrl: [[292, -289], [300, -200], [310, -110], [330, -12]] },             // from the ring down to the cross street
-    oldWest: { width: 9, ctrl: [[166, -355], [120, -300], [96, -240], [76, -186]] },             // from the ring to the main street
-    oldNorth: { width: 9, ctrl: [[292, -495], [210, -560], [120, -590], [30, -578], [-30, -560]] }, // from the ring to the observatory's terrace
+    // the ring round downtown: its grid streets end on it
+    downtown: { width: 14, loop: true, ctrl: [[-236, -184], [0, -198], [196, -182], [214, -20], [208, 178], [0, 212], [-206, 202], [-246, 0]] },
+    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -194], [76, -60], [76, 80], [76, 212], [80, 300], [76, 360], [74, 430], [70, 500]] },
+    // from Forest station's forecourt, through downtown, past the market to the docks road
+    cross: { width: 14, ctrl: [[-284, 12], [-246, 12], [-60, 12], [180, 12], [330, 10], [470, 4], [560, 0]] },
+    // along the lake from the lido to the docks road
+    promenade: { width: 10, ctrl: [[-470, 522], [-320, 512], [-160, 500], [-20, 482], [60, 470], [170, 452], [230, 440]] },
+    docks: { width: 12, ctrl: [[560, 0], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
+    ring: { width: 10, loop: true, ctrl: circlePts(300, -410, 132, 12, 0.06).map(([x, z]) => [x, -410 + (z + 410) * 0.78]) },   // the old town's ring street, round its hill
+    oldSouth: { width: 9, ctrl: [[300, -307], [306, -220], [316, -110], [330, 10]] },             // from the ring down to the cross street
+    oldWest: { width: 9, ctrl: [[174, -372], [130, -300], [100, -240], [76, -194]] },             // from the ring to the main street
+    oldNorth: { width: 9, ctrl: [[300, -513], [210, -568], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
   },
-  // metro: one loop round the city, eight stations (in order along the line)
+  // metro: a loop round downtown with rounded corners. Each station stands on a straight stretch, clear of
+  // the streets (they cross the line between stations). West: Forest (downtown meets the forest); south:
+  // Canal; east: Market and Old Town (where downtown, market and old town meet); then north into the old
+  // town's hill in a tunnel, out past the vineyards (Vineyards station) and round. Clockwise from Vineyards.
+  metroLoop: { x0: -300, z0: -430, x1: 252, z1: 252, r: 80 },
   stations: [
-    { key: 'summit',    name: 'Observatory', at: [-30, -470] },
-    { key: 'hilltop',   name: 'Old Town',    at: [330, -560] },
-    { key: 'market',    name: 'Market',      at: [560, -100] },
-    { key: 'harbour',   name: 'Harbour',     at: [440, 420] },
-    { key: 'canal',     name: 'Canal',       at: [-10, 430] },
-    { key: 'lakeshore', name: 'Lakeshore',   at: [-380, 448] },
-    { key: 'forest',    name: 'Forest',      at: [-500, -40] },
-    { key: 'central',   name: 'Central',     at: [6, 64] },
+    { key: 'vineyards', name: 'Vineyards', at: [-150, -430] },
+    { key: 'hilltop',   name: 'Old Town',  at: [252, -118] },
+    { key: 'market',    name: 'Market',    at: [252, 110] },
+    { key: 'canal',     name: 'Canal',     at: [-20, 252] },
+    { key: 'forest',    name: 'Forest',    at: [-300, -20] },
   ],
-  // the line's shape between the stations (stations are on it too)
-  metroVia: { summit: [[120, -600]], hilltop: [[520, -420]], market: [[600, 200]], harbour: [[200, 470]], canal: [], lakeshore: [[-560, 320]], forest: [[-300, 0]], central: [[-40, -220]] },
   // hidden spots: local changes to the music, nothing to collect
   spots: [
     { key: 'glasshouse', at: [-436, -584] },
@@ -3039,8 +3042,8 @@ const PLAN = {
   ],
   // landmarks, where districts meet (placed by their builders; these are their anchors)
   places: {
-    summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [166, -125],
-    site: [-154, 173], central: [6, 64], recordShop: [522, 170], ferris: [-247, 493], lido: [-480, 505],
+    summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [150, -109],
+    site: [-154, 173], central: [-20, 252], recordShop: [522, 170], ferris: [-247, 493], lido: [-480, 505],
     waterTower: [262, 322], lighthouse: [560, 626],
   },
   vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
@@ -3124,7 +3127,7 @@ function landH(x, z) {
   h += gauss(x - rx, 120) * (3 + 17 * ridgeUp);
   h -= gauss(Math.hypot(x - PLAN_REAL.pond.x, z - PLAN_REAL.pond.z), 70) * 5;              // the pond hollow
   h += gauss(Math.hypot(x + 436, z + 590), 70) * 5;                               // glasshouse knoll
-  h += gauss(Math.hypot(x - 292, z + 392), 240) * 13;                             // the old town's hill
+  h += gauss(Math.hypot(x - 300, z + 420), 220) * 24;                             // the old town's hill (the metro tunnels through it)
   h += Math.min(11, gauss(Math.hypot(x + 56, z + 660), 155) * 15);                 // the summit
   h += gauss(Math.hypot(x + 130, z + 330), 120) * 9;                              // the vineyard spur (sunny side faces south)
   h += gauss(Math.hypot(x + 720, z - 300), 55) * 15;                              // the knoll the canal tunnels under
@@ -3375,7 +3378,7 @@ function hillTrees(F) {
 // ============================================================
 // the sunken street: a cutting twelve metres deep where a downtown street used to climb the hill.
 // The floor is five terrain vertices wide (so its walls can stand exactly on grid lines).
-const VALLEY = { x: -114, floorHalf: 16, rimHalf: 24, z0: -735, z1: -625, z2: -400, z3: -246, depth: 12, bridges: [-618, -492, -366] };
+const VALLEY = { x: -114, floorHalf: 16, rimHalf: 24, z0: -690, z1: -600, z2: -440, z3: -340, depth: 12, bridges: [-618, -492, -366] };   // (shortened to fit the compact downtown)
 const VALLEY_RAMP = [-560, -499];          // the ramp back up, against the east wall (the coping opens where it lands)
 function valleyK(z) {
   const V = VALLEY; if (z <= V.z0 || z >= V.z3) return 0;
@@ -5178,21 +5181,25 @@ if (typeof module !== 'undefined') module.exports = MOVES;
 //  through the ridge between Park and Hilltop. Trains you can ride on
 //  (roof) and that knock you off the rails.
 // ============================================================
-// the loop: through every station and the points between them (PLAN.metroVia), smoothed as a closed
-// Catmull-Rom curve and handed on as cubic Béziers in metres
+// the loop: a rectangle with rounded corners (PLAN.metroLoop), clockwise from the north-west, as cubic
+// Béziers in metres. Every side is dead straight between its corners: the stations stand on them.
 const METRO_SVG = (() => {
-  const P = []; for (const st of PLAN.stations) { P.push(st.at); for (const v of (PLAN.metroVia[st.key] || [])) P.push(v); }
-  const n = P.length, T = P.map((p, i) => { const a = P[(i - 1 + n) % n], b = P[(i + 1) % n]; return [(b[0] - a[0]) / 2, (b[1] - a[1]) / 2]; });
-  return P.map((p, i) => { const q = P[(i + 1) % n]; return [p, [p[0] + T[i][0] / 3, p[1] + T[i][1] / 3], [q[0] - T[(i + 1) % n][0] / 3, q[1] - T[(i + 1) % n][1] / 3], q]; });
+  const { x0, z0, x1, z1, r } = PLAN.metroLoop, k = r * 0.5523, segs = [];
+  const line = (a, b) => segs.push([a, [U.lerp(a[0], b[0], 1 / 3), U.lerp(a[1], b[1], 1 / 3)], [U.lerp(a[0], b[0], 2 / 3), U.lerp(a[1], b[1], 2 / 3)], b]);
+  line([x0 + r, z0], [x1 - r, z0]); segs.push([[x1 - r, z0], [x1 - r + k, z0], [x1, z0 + r - k], [x1, z0 + r]]);
+  line([x1, z0 + r], [x1, z1 - r]); segs.push([[x1, z1 - r], [x1, z1 - r + k], [x1 - r + k, z1], [x1 - r, z1]]);
+  line([x1 - r, z1], [x0 + r, z1]); segs.push([[x0 + r, z1], [x0 + r - k, z1], [x0, z1 - r + k], [x0, z1 - r]]);
+  line([x0, z1 - r], [x0, z0 + r]); segs.push([[x0, z0 + r], [x0, z0 + r - k], [x0 + r - k, z0], [x0 + r, z0]]);
+  return segs;
 })();
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
-const DOWNTOWN = [-230, -150, 190, 190];
+const DOWNTOWN = [0, 0, 0, 0];      // (the compact city has no underground stretch under downtown: the line goes round it)
 const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
 // where the line meets a street at an awkward height it is pinned: `dy` metres from the ground at that point
 // (north of downtown two streets cross the cutting on bridges; a third, and the avenue, pass under a proper span)
 const METRO_WAY = [];        // (pins go back in once the streets are laid: phase 5)
 const METRO_LIFT = {};      // Hilltop stands a little taller, so the street just west of it clears the deck
-const METRO_TUNNEL = ['summit', 'hilltop'];   // the span that may go under the hill
+const METRO_TUNNEL = ['vineyards', 'hilltop'];   // the span that may go under the hill
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
@@ -6390,6 +6397,7 @@ function buildBusiness(H) {
     for (const [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
       if (inPlace(x0, z0, x1, z1)) continue;
+      if (!xfInside(x0, z0, x1, z1, 10)) continue;       // (clear of the ring street round downtown)
       const faces = []; if (x0 === bx0 && i > 0) faces.push('w'); if (x1 === bx1 && i < xs.length - 2) faces.push('e'); if (z0 === bz0 && j > 0) faces.push('n'); if (z1 === bz1 && j < zs.length - 2) faces.push('s');
       if (underSkyRail(x0, z0, x1, z1)) { for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); } continue; }
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
@@ -8234,7 +8242,7 @@ function fillRoutes(H) {
   // it ends in a turning circle round a little tree island
   { const roads = Object.entries(W.roads || {});
     const distTo = (x, z, P) => { let d = 1e9; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); d = Math.min(d, Math.hypot(ax + dx * u - x, az + dz * u - z)); } return d; };
-    for (const [k, rd] of roads) for (const end of (k === 'oblique' || k === 'ring' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
+    for (const [k, rd] of roads) for (const end of (k === 'oblique' || (PLAN.roads[k] && PLAN.roads[k].loop) ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
       let [x, z] = end;
       { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 580) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
       if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;
@@ -9333,9 +9341,9 @@ const XF_GROUPS = {
   oldtown:  { d: [-408, 408],  keep: 'oldtown', margin: 12 },        // the bell tower's square at the south edge (phase 4 relays the old town)
   market:   { d: [-344, 96],   keep: 'market', margin: 30 },        // the hall just south of the cross street
   cellar:   { d: [-368, -8],   keep: null },                         // the record shop, in the market's south corner
-  business: { d: [-56, 480],   keep: 'business', margin: 24 },       // the sunken street down the middle
+  business: { d: [-56, 504],   keep: 'business', margin: -4 },       // (inside its ring street)       // the sunken street down the middle
   site:     { d: [24, 224],    keep: null },
-  tower:    { d: [96, 304],    keep: null },                        // the Needle, where downtown, old town and market meet
+  tower:    { d: [80, 320],    keep: null },                        // the Needle, where downtown, old town and market meet
   canals:   { d: [0, -152],    keep: 'canals', margin: 8 },
   docks:    { d: [-320, -696], keep: 'docks', margin: 20 },
   lake:     { d: [0, -688],    keep: 'lake', margin: 30 },
@@ -9392,7 +9400,7 @@ const PLAN0 = {
 PLAN0.byKey = Object.fromEntries(PLAN0.districts.map(d => [d.key, d]));
 const shoreZ0 = (x) => PLAN0.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5;
 PLAN0.canalEnd = shoreZ0(PLAN0.canal.bendX) - 48;
-const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'], STATION_ALIAS = { park: 'forest', docks: 'harbour' };
+const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'], STATION_ALIAS = { park: 'forest', docks: 'market', harbour: 'canal', central: 'canal' };
 
 // ---------- running a builder in its frame ----------
 // (the real versions of the questions a builder asks)
@@ -9436,6 +9444,13 @@ function xfCentre(v) {
 const XF_TRIM = new Set(['boxes', 'camBoxes', 'ramps', 'treeList', 'lamps', 'benches', 'sounds', 'spots', 'pigeonSpots', 'gullSpots', 'fountains', 'dishes']);
 const XF_SKIP = new Set(['group', 'cells', 'metro', 'stations', 'roads', 'far', 'slabs', 'mats', 'grid', 'spawn', 'waters', 'canal', 'canalWaterMat', 'lakeMat', 'dynBoxes', 'addDyn']);
 
+// is a rect (in the current frame) well inside the district being built?
+function xfInside(x0, z0, x1, z1, inset) {
+  if (!XF.g || !XF.keep) return true;
+  const S = PLAN_REAL.byKey[XF.keep].shape;
+  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) if (shapeDist(S, x + XF.dx, z + XF.dz) > -inset) return false;
+  return true;
+}
 // a geometry moved into place, keeping only the triangles whose centre is kept
 function xfClip(geo, M) {
   const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(M), P = g.attributes.position.array, n = P.length / 9, keep = [];
@@ -10766,7 +10781,7 @@ const hooks = {
 let ZONE_LIST = null;
 function zoneAt(x, z) {
   if (!ZONE_LIST) {
-    const W = Game.W, cs = PLAN.stations.find(s => s.key === 'central').at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
+    const W = Game.W, cs = (PLAN.stations.find(s => s.key === 'central') || PLAN.stations.find(s => s.key === 'canal')).at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
     ZONE_LIST = [
       ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -470, -560, 90], ['plaza', cs[0], cs[1], 75],
       ['cellar', cel[0], cel[1], 22], ['pier', -330, 590, 50], ['yard', 430, 400, 90],

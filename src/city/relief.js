@@ -6,7 +6,7 @@
 // ============================================================
 // the sunken street: a cutting twelve metres deep where a downtown street used to climb the hill.
 // The floor is five terrain vertices wide (so its walls can stand exactly on grid lines).
-const VALLEY = { x: -114, floorHalf: 16, rimHalf: 24, z0: -735, z1: -625, z2: -400, z3: -246, depth: 12, bridges: [-618, -492, -366] };
+const VALLEY = { x: -114, floorHalf: 16, rimHalf: 24, z0: -690, z1: -600, z2: -440, z3: -340, depth: 12, bridges: [-618, -492, -366] };   // (shortened to fit the compact downtown)
 const VALLEY_RAMP = [-560, -499];          // the ramp back up, against the east wall (the coping opens where it lands)
 function valleyK(z) {
   const V = VALLEY; if (z <= V.z0 || z >= V.z3) return 0;

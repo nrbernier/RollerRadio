@@ -341,6 +341,7 @@ function buildBusiness(H) {
     for (const [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
       if (inPlace(x0, z0, x1, z1)) continue;
+      if (!xfInside(x0, z0, x1, z1, 10)) continue;       // (clear of the ring street round downtown)
       const faces = []; if (x0 === bx0 && i > 0) faces.push('w'); if (x1 === bx1 && i < xs.length - 2) faces.push('e'); if (z0 === bz0 && j > 0) faces.push('n'); if (z1 === bz1 && j < zs.length - 2) faces.push('s');
       if (underSkyRail(x0, z0, x1, z1)) { for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); } continue; }
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
