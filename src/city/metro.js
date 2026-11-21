@@ -3,23 +3,21 @@
 //  through the ridge between Park and Hilltop. Trains you can ride on
 //  (roof) and that knock you off the rails.
 // ============================================================
-// the loop (cubic Béziers in metres), starting at Hilltop: down under downtown to Central, out to Harbour
-// across the canal, east and north to Market, then up the old town's hill (through it) back to Hilltop.
-// (the joints are smooth: each segment leaves a station the way the last one arrived)
-const METRO_SVG = [
-  [[200, -300], [90, -290], [80, 30], [170, 150]],
-  [[170, 150], [230, 230], [110, 440], [180, 470]],
-  [[180, 470], [250, 500], [470, 300], [430, 60]],
-  [[430, 60], [400, -120], [330, -310], [200, -300]],
-];
+// the loop: through every station and the points between them (PLAN.metroVia), smoothed as a closed
+// Catmull-Rom curve and handed on as cubic Béziers in metres
+const METRO_SVG = (() => {
+  const P = []; for (const st of PLAN.stations) { P.push(st.at); for (const v of (PLAN.metroVia[st.key] || [])) P.push(v); }
+  const n = P.length, T = P.map((p, i) => { const a = P[(i - 1 + n) % n], b = P[(i + 1) % n]; return [(b[0] - a[0]) / 2, (b[1] - a[1]) / 2]; });
+  return P.map((p, i) => { const q = P[(i + 1) % n]; return [p, [p[0] + T[i][0] / 3, p[1] + T[i][1] / 3], [q[0] - T[(i + 1) % n][0] / 3, q[1] - T[(i + 1) % n][1] / 3], q]; });
+})();
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
-const DOWNTOWN = [-200, -160, 196, 186];
+const DOWNTOWN = [-230, -150, 190, 190];
 const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
 // where the line meets a street at an awkward height it is pinned: `dy` metres from the ground at that point
 // (north of downtown two streets cross the cutting on bridges; a third, and the avenue, pass under a proper span)
 const METRO_WAY = [];        // (pins go back in once the streets are laid: phase 5)
 const METRO_LIFT = {};      // Hilltop stands a little taller, so the street just west of it clears the deck
-const METRO_TUNNEL = ['market', 'hilltop'];   // the span that may go under the hill
+const METRO_TUNNEL = ['summit', 'hilltop'];   // the span that may go under the hill
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {

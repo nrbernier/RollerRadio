@@ -256,7 +256,8 @@ function buildDistricts(K, S, F) {
   X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
   buildCable(H); lap('cable car');
   X('skate', fillSouthStrip);
-  X('canals', buildCanals, fillCanalQuarter);
+  buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
+  X('canals', fillCanalQuarter);
   X('lake', buildLakeshore, fillLakeshore, h => musicGarden(h, -500, 905, U.rng(2025)));
   X('business', buildBusiness, buildValley, fillBusiness);
   X('market', buildMarket, fillMarketPeople);
@@ -300,6 +301,7 @@ function buildBusiness(H) {
   const underSkyRail = (x0, z0, x1, z1) => { for (let t = 0; t <= 1; t += 0.05) { const x = U.lerp(skyA[0], skyB[0], t), z = U.lerp(skyA[1], skyB[1], t); if (x > x0 - 5 && x < x1 + 5 && z > z0 - 5 && z < z1 + 5) return true; } return false; };
   W.walkLines = W.walkLines || [];
   for (let i = 1; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
+    if (xs[i] === 132) continue;           // (the compact city's main street runs here)
     const x = xs[i] + jog[i][j], za = j === 0 ? R[1] + 4 : zs[j] - street / 2, zb = j === zs.length - 2 ? R[3] - 4 : zs[j + 1] + street / 2;
     // (north of downtown the metro runs in a cutting: the street crosses it on a bridge)
     const cut = j === 0 ? cuttingSpan(W.metro, x, za, zb) : null;
@@ -308,17 +310,8 @@ function buildBusiness(H) {
     W.walkLines.push([[x - street / 2 - 1, za + 4], [x - street / 2 - 1, zb - 4]], [[x + street / 2 + 1, za + 4], [x + street / 2 + 1, zb - 4]]);
     W.bizStreets.push({ x, z0: za, z1: zb });
   }
-  for (const z of zs.slice(1, -1)) { for (const [a, b] of (VALLEY.bridges.includes(z) ? [[R[0] + 4, VALLEY.x - VALLEY.rimHalf], [VALLEY.x + VALLEY.rimHalf, R[2] - 4]] : [[R[0] + 4, R[2] - 4]])) { groundRibbon(B, [[a, z], [b, z]], street + 6, '#cfc8bb', 'walk', 0.07); groundRibbon(B, [[a, z], [b, z]], street - 4, '#55535f', 'road', 0.1); } W.walkLines.push([[R[0] + 10, z - street / 2 - 1], [R[2] - 10, z - street / 2 - 1]]); }
-  // the oblique avenue: from the plaza's north-east corner up to the street below Hilltop, tree-lined
-  const ob = [[plaza[2] - 6, plaza[1] + 4], [214, -250], [328, -492]];
-  groundRibbon(B, ob, street + 8, '#cfc8bb', 'walk', 0.075); const OP = groundRibbon(B, ob, street - 4, '#55535f', 'road', 0.105); roadDashes(B, OP);
-  H.line(ob, street / 2 + 4);
-  W.roads.oblique = { pts: ob, width: street - 4, P: OP };
-  for (let k = 0; k < ob.length - 1; k++) {
-    const [ax, az] = ob[k], [bx, bz] = ob[k + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
-    for (const sd of [-1, 1]) W.walkLines.push([[ax - uz * sd * (street / 2 + 2), az + ux * sd * (street / 2 + 2)], [bx - uz * sd * (street / 2 + 2), bz + ux * sd * (street / 2 + 2)]]);
-    for (let t = 8; t < L - 6; t += 14) for (const sd of [-1, 1]) { const tx = ax + ux * t - uz * sd * (street / 2 + 1.5), tz = az + uz * t + ux * sd * (street / 2 + 1.5); if (Math.abs(tx - cs[0]) < 75 && Math.abs(tz - cs[1]) < 65) continue; H.tree(tx, tz, { s: 0.8, color: '#5aa35a', color2: '#4a8f4a' }); }
-  }
+  for (const z of zs.slice(1, -1)) { if (z === -492) continue;      /* (the cross street runs here) */ for (const [a, b] of (VALLEY.bridges.includes(z) ? [[R[0] + 4, VALLEY.x - VALLEY.rimHalf], [VALLEY.x + VALLEY.rimHalf, R[2] - 4]] : [[R[0] + 4, R[2] - 4]])) { groundRibbon(B, [[a, z], [b, z]], street + 6, '#cfc8bb', 'walk', 0.07); groundRibbon(B, [[a, z], [b, z]], street - 4, '#55535f', 'road', 0.1); } W.walkLines.push([[R[0] + 10, z - street / 2 - 1], [R[2] - 10, z - street / 2 - 1]]); }
+  // (the old oblique avenue up to Hilltop is gone: the compact city's old town has its own streets)
   H.patch(plaza, '#d8cfbf', 'tiles', 0.08); H.reserve(plaza);
   // fountain in the plaza
   const fx = cs[0] + 40, fz = cs[1] + 32, fy = terrainAt(fx, fz);

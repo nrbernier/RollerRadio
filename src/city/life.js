@@ -256,20 +256,22 @@ const Life = (() => {
     ]);
     dogIM = new THREE.InstancedMesh(dogG, toon('#ffffff', { noCache: true }), Math.max(1, dogs.length)); dogIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); dogIM.frustumCulled = false; dogIM.count = 0; dogIM.setColorAt(0, _c.set('#ffffff')); W.group.add(dogIM);
     // cars on the big roads: two lanes each way, U-turn at the ends
-    for (const [key, n2] of [['boulevard', 8], ['avenue', 8], ['hill', 3], ['oblique', 3]]) {
+    for (const [key, n2] of [['main', 6], ['cross', 6], ['ring', 3], ['promenade', 3], ['docks', 3]]) {
       const road = W.roads[key]; if (!road) continue;
       const P = road.pts; const segs = []; let len = 0; for (let j = 0; j < P.length - 1; j++) { const l = Math.hypot(P[j + 1][0] - P[j][0], P[j + 1][1] - P[j][1]); segs.push({ a: P[j], b: P[j + 1], l, s0: len }); len += l; }
       for (let i = 0; i < n2; i++) {
         const g = carMesh(cars.length);
-        cars.push({ g, segs, len, s: (i / n2) * len * 2, v: key === 'hill' ? 7 : 10 + r() * 3, lane: key === 'hill' ? 2.6 : 3.2, x: 0, z: 0, y: 0, fx: 0, fz: 1, vx: 0, vz: 0, slope: 0 });
+        cars.push({ g, segs, len, s: (i / n2) * len * 2, v: key === 'ring' ? 7 : 10 + r() * 3, lane: key === 'ring' || key === 'promenade' ? 2.6 : 3.2, x: 0, z: 0, y: 0, fx: 0, fz: 1, vx: 0, vz: 0, slope: 0 });
       }
     }
     // long boats on the canal: slow, low, you can ride on them (and fall off)
     const C = PLAN.canal;
     for (let i = 0; i < 4; i++) {
       const g = boatMesh(['#2f5f6a', '#8a3a2a', '#3a4a6a', '#5a6a3a'][i]);
-      const route = i < 3 ? { a: [C.x0 + 40, C.z + (i % 2 ? 4 : -4)], b: [C.bendX - 30, C.z + (i % 2 ? 4 : -4)] } : { a: [C.bendX + (i % 2 ? 4 : -4), C.z + 40], b: [C.bendX + (i % 2 ? 4 : -4), shoreZ(C.bendX) - 30] };
-      const len = Math.hypot(route.b[0] - route.a[0], route.b[1] - route.a[1]);
+      const lane = i % 2 ? 4 : -4, CP = C.path.pts, pts = CP.map((p, k) => { const q = CP[Math.min(k + 1, CP.length - 1)], o = CP[Math.max(k - 1, 0)], dx = q[0] - o[0], dz = q[1] - o[1], l = Math.hypot(dx, dz) || 1; return [p[0] - dz / l * lane, p[1] + dx / l * lane]; });
+      const pacc = [0]; for (let k = 1; k < pts.length; k++) pacc.push(pacc[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+      const route = { pts, acc: pacc, s0: 30 };
+      const len = route.acc[route.acc.length - 1] - 60;
       boats.push({ g, route, len, s: (i * 0.37 % 1) * len, dir: i % 2 ? 1 : -1, v: 2.2, wait: 0, x: 0, z: 0, fx: 1, fz: 0, vx: 0, vz: 0, y: C.waterY + 0.75, hit: { tag: 'boat', vx: 0, vz: 0, boat: true } });
     }
     // sailboats on the lake, drifting
@@ -577,8 +579,12 @@ const Life = (() => {
       if (b.sail) { const u = b.sail.userData; u.a += dt * u.sp * 0.2; b.sail.position.set(u.cx + Math.cos(u.a) * u.r, Math.sin(Game.t * 0.8 + u.a) * 0.15, u.cz + Math.sin(u.a) * u.r * 0.5); b.sail.rotation.y = -u.a + Math.PI; b.sail.rotation.z = Math.sin(Game.t * 0.6 + u.a) * 0.05; sailKit.write(b.sail); continue; }
       if (b.wait > 0) { b.wait -= dt; b.vx = b.vz = 0; }
       else { b.s += b.v * dt * b.dir; if (b.s > b.len) { b.s = b.len; b.dir = -1; b.wait = 6; } else if (b.s < 0) { b.s = 0; b.dir = 1; b.wait = 6; } }
-      const ux = (b.route.b[0] - b.route.a[0]) / b.len, uz = (b.route.b[1] - b.route.a[1]) / b.len;
-      b.x = b.route.a[0] + ux * b.s; b.z = b.route.a[1] + uz * b.s;
+      let ux, uz;
+      if (b.route.pts) {         // along the canal
+        const R = b.route, s = b.s + R.s0; let k = b.k || 0; while (k < R.pts.length - 2 && R.acc[k + 1] < s) k++; while (k > 0 && R.acc[k] > s) k--; b.k = k;
+        const a = R.pts[k], c = R.pts[k + 1], L = R.acc[k + 1] - R.acc[k] || 1, t = (s - R.acc[k]) / L; ux = (c[0] - a[0]) / L; uz = (c[1] - a[1]) / L;
+        b.x = a[0] + (c[0] - a[0]) * t; b.z = a[1] + (c[1] - a[1]) * t;
+      } else { ux = (b.route.b[0] - b.route.a[0]) / b.len; uz = (b.route.b[1] - b.route.a[1]) / b.len; b.x = b.route.a[0] + ux * b.s; b.z = b.route.a[1] + uz * b.s; }
       b.fx = ux * b.dir; b.fz = uz * b.dir;
       if (!b.wait || b.wait <= 0) { b.vx = b.fx * b.v; b.vz = b.fz * b.v; }
       b.hit.vx = b.vx; b.hit.vz = b.vz;

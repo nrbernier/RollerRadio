@@ -11,7 +11,8 @@ const XF_GROUPS = {
   park:     { d: [464, 304],   keep: 'park', margin: 12 },          // the pond lands where the pond is
   obs:      { d: [-152, 616],  keep: 'obs', margin: 60 },            // the observatory on the summit, its terrace looking down the main street
   oldtown:  { d: [-408, 408],  keep: 'oldtown', margin: 12 },        // the bell tower's square at the south edge (phase 4 relays the old town)
-  market:   { d: [-344, 40],   keep: 'market', margin: 30 },
+  market:   { d: [-344, 96],   keep: 'market', margin: 30 },        // the hall just south of the cross street
+  cellar:   { d: [-368, -8],   keep: null },                         // the record shop, in the market's south corner
   business: { d: [-56, 480],   keep: 'business', margin: 24 },       // the sunken street down the middle
   site:     { d: [24, 224],    keep: null },
   tower:    { d: [96, 304],    keep: null },                        // the Needle, where downtown, old town and market meet
@@ -38,7 +39,7 @@ const XF_CONSTS = [
   [() => OLD_PADS, 'oldtown', (o, dx, dz) => { for (const p of o) _xpt(p, dx, dz); }],
   [() => OLD_Q, 'oldtown', (o, dx, dz) => { for (const q of o) _xpt(q.at, dx, dz); }],
   [() => MKT, 'market', (o, dx, dz) => { _xrc(o.hall, dx, dz); _xrc(o.field, dx, dz); _xpt(o.tower, dx, dz); for (let i = 0; i < o.cross.length; i++) o.cross[i] += dx; for (let i = 0; i < o.lanes.length; i++) o.lanes[i] += dz; for (const n of o.inns) _xrc(n, dx, dz); _xrc(o.dyers, dx, dz); }],
-  [() => CELLAR, 'market', _xrc],
+  [() => CELLAR, 'cellar', _xrc],
   [() => SKATE, 'skate', _xrc],
   [() => OBS_T, 'obs', _xpt],
 ].map(([get, home, shift]) => ({ get, home, shift, off: [0, 0] }));     // off: what has been added to the written values
@@ -71,7 +72,7 @@ const PLAN0 = {
 PLAN0.byKey = Object.fromEntries(PLAN0.districts.map(d => [d.key, d]));
 const shoreZ0 = (x) => PLAN0.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5;
 PLAN0.canalEnd = shoreZ0(PLAN0.canal.bendX) - 48;
-const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'];
+const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'], STATION_ALIAS = { park: 'forest', docks: 'harbour' };
 
 // ---------- running a builder in its frame ----------
 // (the real versions of the questions a builder asks)
@@ -198,7 +199,7 @@ function xfRun(H, g, ...fns) {
   const saved = { districts: PLAN.districts, byKey: PLAN.byKey, stations: PLAN.stations, spots: PLAN.spots, canal: PLAN.canal, pond: PLAN.pond, docksQuayZ: PLAN.docksQuayZ, boulevardX: PLAN.boulevardX, avenueZ: PLAN.avenueZ };
   PLAN.districts = PLAN0.districts; PLAN.byKey = PLAN0.byKey; PLAN.canal = PLAN0.canal;
   PLAN.docksQuayZ = PLAN0.docksQuayZ; PLAN.boulevardX = PLAN0.boulevardX; PLAN.avenueZ = PLAN0.avenueZ;
-  PLAN.stations = OLD_STATIONS.map(key => { const s = saved.stations.find(t => t.key === key); return { key, name: s ? s.name : key, at: s ? [s.at[0] - dx, s.at[1] - dz] : [1e6, 1e6] }; });
+  PLAN.stations = OLD_STATIONS.map(key => { const s = saved.stations.find(t => t.key === key) || saved.stations.find(t => t.key === STATION_ALIAS[key]); return { key, name: s ? s.name : key, at: s ? [s.at[0] - dx, s.at[1] - dz] : [1e6, 1e6] }; });
   PLAN.spots = saved.spots.map(s => ({ key: s.key, at: [s.at[0] - dx, s.at[1] - dz] }));
   PLAN.pond = Object.assign({}, saved.pond, { x: saved.pond.x - dx, z: saved.pond.z - dz });
   xfFrame(g);
