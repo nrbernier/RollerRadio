@@ -169,6 +169,12 @@ function buildWalledTown(H, r) {
     const d = 7.5 + r() * 2;
     row(true, bx0, bx1, bz0, bz0 + d, 'n'); row(true, bx0, bx1, bz1 - d, bz1, 's');
     row(false, bz0 + d, bz1 - d, bx0, bx0 + d, 'w'); row(false, bz0 + d, bz1 - d, bx1 - d, bx1, 'e');
+    // a second ring behind the first, back to back, facing a little court in the middle (medieval blocks are full)
+    { const ix0 = bx0 + d, ix1 = bx1 - d, iz0 = bz0 + d, iz1 = bz1 - d, d2 = 6 + r() * 1.5;
+      if (ix1 - ix0 > 2 * d2 + 8 && iz1 - iz0 > 2 * d2 + 8) {
+        row(true, ix0, ix1, iz0, iz0 + d2, 's'); row(true, ix0, ix1, iz1 - d2, iz1, 'n');
+        row(false, iz0 + d2, iz1 - d2, ix0, ix0 + d2, 'e'); row(false, iz0 + d2, iz1 - d2, ix1 - d2, ix1, 'w');
+      } }
     // the yard in the middle: a tree or a well
     const mx = (bx0 + bx1) / 2, mz = (bz0 + bz1) / 2;
     if (bx1 - bx0 > 2 * d + 6 && bz1 - bz0 > 2 * d + 6 && oldWallIn(mx, mz, 10) && H.clearOf(mx - 2, mz - 2, mx + 2, mz + 2, 0)) H.tree(mx, mz, { s: 0.8, color: '#5f8f4a', color2: '#7aa055' });

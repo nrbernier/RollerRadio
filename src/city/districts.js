@@ -269,6 +269,7 @@ function buildDistricts(K, S, F) {
   X('vine', h => vineyards(h, U.rng(2027)));
   X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
   fillRoutes(H); lap('routes');
+  buildJunctions(H.K); lap('junctions');
   return H;
 }
 

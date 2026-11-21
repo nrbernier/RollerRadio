@@ -42,12 +42,63 @@ function groundRibbon(B, pts, width, color, kind = 'road', lift = 0.09, step = 4
   // make sure faces point up
   const n = g.attributes.normal.array; if (n[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
   B.add(g, null, color, kind, { outlineT: 0, edges: false });
+  // streets are remembered (in real coordinates, only where they're drawn) so junctions can be laid over them
+  if (!groundRibbon.noLog && (kind === 'walk' || kind === 'road')) {
+    if (kind === 'walk') groundRibbon.lastWalk = { pts, width };
+    else {
+      const full = groundRibbon.lastWalk && groundRibbon.lastWalk.pts === pts ? groundRibbon.lastWalk.width : width + 4;
+      const dx = (typeof XF !== 'undefined' && XF.g) ? XF.dx : 0, dz = (typeof XF !== 'undefined' && XF.g) ? XF.dz : 0;
+      let run = [];
+      const flush = () => { if (run.length > 1) (groundRibbon.log = groundRibbon.log || []).push({ pts: run, w: width, full, color }); run = []; };
+      for (const p of P) { const x = p[0] + dx, z = p[1] + dz; if (typeof XF !== 'undefined' && XF.g && !xfKeepPoint(x, z)) flush(); else run.push([x, z]); }
+      flush();
+    }
+  }
   // a copy for the far view (just under the near one), so streets don't stop dead in the distance
   if (groundRibbon.far && width >= 8 && (kind === 'road' || kind === 'walk')) {
     const p2 = g.attributes.position.array, per = 36 * 16;
     for (let o = 0; o < p2.length; o += per) { const a = Array.from(p2.subarray(o, Math.min(p2.length, o + per))); for (let i = 1; i < a.length; i += 3) a[i] -= 0.05; const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); groundRibbon.far.add(fg, null, color); }
   }
   return P;
+}
+// ---------- junctions: where streets meet, one clean piece of asphalt ----------
+// A street that runs into another one is carried on across that one's sidewalk to its centre (a T); two streets
+// that cross each carry on across the other's whole width (an X). Laid last, just above the dashes.
+function buildJunctions(K) {
+  const B = K.B, L = groundRibbon.log || [];
+  const seg = (P, i) => [P[i], P[i + 1]];
+  const inter = (a, b, c, d) => { const r = [b[0] - a[0], b[1] - a[1]], s2 = [d[0] - c[0], d[1] - c[1]], den = r[0] * s2[1] - r[1] * s2[0]; if (Math.abs(den) < 1e-9) return null; const t = ((c[0] - a[0]) * s2[1] - (c[1] - a[1]) * s2[0]) / den, u = ((c[0] - a[0]) * r[1] - (c[1] - a[1]) * r[0]) / den; return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a[0] + r[0] * t, a[1] + r[1] * t, t, u] : null; };
+  const acc = (P) => { const A = [0]; for (let i = 1; i < P.length; i++) A.push(A[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1])); return A; };
+  const at = (P, A, s) => { s = U.clamp(s, 0, A[A.length - 1]); let i = 0; while (i < P.length - 2 && A[i + 1] < s) i++; const t = (s - A[i]) / ((A[i + 1] - A[i]) || 1); return [U.lerp(P[i][0], P[i + 1][0], t), U.lerp(P[i][1], P[i + 1][1], t)]; };
+  const near = (P, x, z) => { let bd = 1e9, bq = null; for (let i = 0; i < P.length - 1; i++) { const [a, b] = seg(P, i), dx = b[0] - a[0], dz = b[1] - a[1], u = U.clamp(((x - a[0]) * dx + (z - a[1]) * dz) / ((dx * dx + dz * dz) || 1), 0, 1), q = [a[0] + dx * u, a[1] + dz * u], d = Math.hypot(q[0] - x, q[1] - z); if (d < bd) { bd = d; bq = q; } } return [bd, bq]; };
+  const box = (P) => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; };
+  const R = L.map(r => ({ ...r, A: acc(r.pts), bb: box(r.pts) }));
+  const lay = (pts, w, color) => { groundRibbon.noLog = true; groundRibbon(B, pts, w, color, 'road', 0.14, 2); groundRibbon.noLog = false; };
+  const done = [];
+  const seen = (x, z) => done.some(([a, b]) => Math.hypot(a - x, b - z) < 3);
+  for (let i = 0; i < R.length; i++) for (let j = 0; j < R.length; j++) {
+    if (i === j) continue;
+    const a = R[i], b = R[j], pad = 20;
+    if (a.bb[2] < b.bb[0] - pad || a.bb[0] > b.bb[2] + pad || a.bb[3] < b.bb[1] - pad || a.bb[1] > b.bb[3] + pad) continue;
+    // a's ends running into b (T)
+    for (const end of [0, a.pts.length - 1]) {
+      const E = a.pts[end], [d, C] = near(b.pts, E[0], E[1]);
+      if (d > b.full / 2 + 3 || d < 0.5 || inCanal(C[0], C[1]) || seen(C[0] + i * 1e-3, C[1])) continue;
+      const back = a.pts[end === 0 ? 1 : a.pts.length - 2], ux = E[0] - back[0], uz = E[1] - back[1], l = Math.hypot(ux, uz) || 1;
+      lay([[E[0] - ux / l * 2, E[1] - uz / l * 2], C], a.w, a.color);
+      done.push([C[0] + i * 1e-3, C[1]]);
+    }
+    // a and b crossing (X): each is carried across the other's full width
+    if (i < j) for (let p = 0; p < a.pts.length - 1; p++) for (let q = 0; q < b.pts.length - 1; q++) {
+      const I = inter(a.pts[p], a.pts[p + 1], b.pts[q], b.pts[q + 1]); if (!I || inCanal(I[0], I[1]) || seen(I[0], I[1])) continue;
+      const sa = a.A[p] + (a.A[p + 1] - a.A[p]) * I[2], sb = b.A[q] + (b.A[q + 1] - b.A[q]) * I[3];
+      const ea = Math.min(sa, a.A[a.A.length - 1] - sa), eb = Math.min(sb, b.A[b.A.length - 1] - sb);
+      if (ea < b.full / 2 + 2 || eb < a.full / 2 + 2) continue;          // (that's a T, laid above)
+      lay([at(a.pts, a.A, sa - b.full / 2 - 0.5), at(a.pts, a.A, sa + b.full / 2 + 0.5)], a.w, a.color);
+      lay([at(b.pts, b.A, sb - a.full / 2 - 0.5), at(b.pts, b.A, sb + a.full / 2 + 0.5)], b.w, b.color);
+      done.push([I[0], I[1]]);
+    }
+  }
 }
 // dashed centre line
 function roadDashes(B, P, color = '#f2ead0', w = 0.25, dash = 3, gap = 5) {

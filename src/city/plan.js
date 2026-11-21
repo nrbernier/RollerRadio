@@ -121,7 +121,7 @@ const PLAN = {
   roads: {
     // the ring round downtown: its grid streets end on it
     downtown: { width: 14, loop: true, ctrl: [[-236, -184], [0, -198], [196, -182], [214, -20], [208, 178], [0, 212], [-206, 202], [-246, 0]] },
-    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [40, -226], [76, -194], [76, -60], [76, 80], [76, 212], [80, 300], [76, 360], [72, 420], [64, 474]] },      // (ends on the promenade)
+    main: { width: 14, ctrl: [[-50, -556], [-24, -470], [-70, -404], [-96, -336], [-44, -262], [24, -244], [66, -230], [76, -212], [76, -194], [76, -60], [76, 80], [76, 212], [80, 300], [76, 360], [72, 420], [64, 474]] },      // (ends on the promenade)
     // from Forest station's forecourt, through downtown, past the market to the docks road
     cross: { width: 14, ctrl: [[-284, 12], [-246, 12], [-60, 12], [180, 12], [330, 10], [470, 4], [560, 0]] },
     // along the lake from the lido to the docks road
@@ -129,7 +129,7 @@ const PLAN = {
     docks: { width: 12, ctrl: [[560, 0], [572, 100], [560, 200], [520, 280], [470, 380], [400, 440], [300, 452], [230, 440]] },
     ring: { width: 10, loop: true, ctrl: circlePts(300, -440, 132, 12, 0.06).map(([x, z]) => [x, -440 + (z + 440) * 0.78]) },   // the old town's ring street, round its hill
     oldSouth: { width: 9, ctrl: [[300, -337], [250, -318], [215, -260], [200, -184]] },           // from the ring down to downtown's ring street
-    oldWest: { width: 9, ctrl: [[172, -400], [130, -320], [100, -250], [76, -194]] },             // from the ring to the main street
+    oldWest: { width: 9, ctrl: [[172, -400], [130, -320], [100, -268], [66, -230]] },             // from the ring down to the main street (a T just above downtown)
     oldNorth: { width: 9, ctrl: [[300, -543], [210, -580], [120, -592], [30, -580], [-30, -560]] }, // from the ring to the observatory's terrace
   },
   // metro: a loop round downtown. West: Forest (downtown meets the forest); the north-west corner cut on a
