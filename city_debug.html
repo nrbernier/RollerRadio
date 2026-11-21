@@ -2885,75 +2885,194 @@ if (typeof module !== 'undefined') module.exports = KIT;
 })();
 
 // ============================================================
-//  CITY PLAN — the approved map, in metres
+//  CITY PLAN — the map, in metres
 //  x runs east, z runs south (towards the lake). North is uphill.
-//  Map units from the sketch convert at 6 m per unit.
+//  The compact city (Nov 2026): about 1.2 × 1.4 km, curved district edges,
+//  landmarks where districts meet. Shapes are drawn with a few control
+//  points and smoothed; `rect` is each shape's bounding box (for old code).
 // ============================================================
-const M6 = (u, v) => [(u - 190) * 6, (v - 260) * 6];
 
+// ---------- curves ----------
+// closed Catmull-Rom through control points, `per` samples per span
+function smoothLoop(P, per = 8) {
+  const n = P.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+    for (let k = 0; k < per; k++) out.push(crPoint(p0, p1, p2, p3, k / per));
+  }
+  return out;
+}
+// open Catmull-Rom (ends repeated), resampled every `step` metres
+function smoothPath(P, step = 4) {
+  const n = P.length, dense = [];
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(n - 1, i + 2)];
+    for (let k = 0; k < 24; k++) dense.push(crPoint(p0, p1, p2, p3, k / 24));
+  }
+  dense.push(P[n - 1].slice());
+  const out = [dense[0]]; let acc = 0;
+  for (let i = 1; i < dense.length; i++) {
+    const a = dense[i - 1], b = dense[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    let t = step - acc;
+    while (t <= L) { out.push([a[0] + (b[0] - a[0]) * t / L, a[1] + (b[1] - a[1]) * t / L]); t += step; }
+    acc = L - (t - step);
+  }
+  const last = dense[dense.length - 1], pl = out[out.length - 1];
+  if (Math.hypot(last[0] - pl[0], last[1] - pl[1]) > step * 0.3) out.push(last.slice()); else out[out.length - 1] = last.slice();
+  return out;
+}
+function crPoint(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t2 * t;
+  const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+  return [f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])];
+}
+const circlePts = (cx, cz, r, n = 10, wob = 0) => Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2, rr = r * (1 + wob * Math.sin(a * 3 + 1)); return [cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]; });
+
+// a closed shape: smoothed outline, bounding box, segments filed in a grid for fast distance queries
+function makeShape(ctrl, per = 8) {
+  const poly = smoothLoop(ctrl, per);
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  for (const [x, z] of poly) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+  return { ctrl, poly, rect: [x0, z0, x1, z1] };
+}
+// signed distance to a shape's outline: negative inside
+function shapeDist(S, x, z) {
+  const r = S.rect, bx = Math.max(r[0] - x, 0, x - r[2]), bz = Math.max(r[1] - z, 0, z - r[3]), bd = Math.hypot(bx, bz);
+  if (bd > 240) return bd;                      // far outside: the box is close enough
+  const P = S.poly, n = P.length; let best = 1e18, inside = false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const [ax, az] = P[j], [cx, cz] = P[i], dx = cx - ax, dz = cz - az, L2 = dx * dx + dz * dz || 1;
+    const t = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1), ex = ax + dx * t - x, ez = az + dz * t - z, d2 = ex * ex + ez * ez;
+    if (d2 < best) best = d2;
+    if ((az > z) !== (cz > z) && x < ax + (z - az) * dx / (cz - az)) inside = !inside;
+  }
+  return inside ? -Math.sqrt(best) : Math.sqrt(best);
+}
+function inShape(S, x, z) { return shapeDist(S, x, z) < 0; }
+
+// a path (open polyline) with a grid of its segments, for distances along roads and the canal
+function makePath(ctrl, step = 4, cellSize = 32, loop = false) {
+  const pts = loop ? smoothPath(smoothLoop(ctrl, 12).concat([smoothLoop(ctrl, 12)[0]]), step) : smoothPath(ctrl, step), grid = new Map(), key = (i, j) => i + ',' + j;
+  for (let k = 0; k < pts.length - 1; k++) {
+    const [ax, az] = pts[k], [bx, bz] = pts[k + 1];
+    for (let i = Math.floor(Math.min(ax, bx) / cellSize); i <= Math.floor(Math.max(ax, bx) / cellSize); i++)
+      for (let j = Math.floor(Math.min(az, bz) / cellSize); j <= Math.floor(Math.max(az, bz) / cellSize); j++) { const kk = key(i, j); (grid.get(kk) || grid.set(kk, []).get(kk)).push(k); }
+  }
+  const acc = [0]; for (let k = 1; k < pts.length; k++) acc.push(acc[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  return { ctrl, pts, grid, cellSize, acc, len: acc[acc.length - 1] };
+}
+// distance to a path within `reach` metres (else Infinity); out = { d, k, t, s } (segment, fraction, arc length)
+const _pd = { d: 0, k: 0, t: 0, s: 0 };
+function pathDist(Pa, x, z, reach = 64, out = _pd) {
+  const cs = Pa.cellSize, r = Math.ceil(reach / cs), ci = Math.floor(x / cs), cj = Math.floor(z / cs);
+  let best = Infinity, bk = -1, bt = 0; const seen = pathDist.seen || (pathDist.seen = new Set()); seen.clear();
+  for (let i = ci - r; i <= ci + r; i++) for (let j = cj - r; j <= cj + r; j++) {
+    const L = Pa.grid.get(i + ',' + j); if (!L) continue;
+    for (const k of L) {
+      if (seen.has(k)) continue; seen.add(k);
+      const [ax, az] = Pa.pts[k], [bx, bz] = Pa.pts[k + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+      const t = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1), d = Math.hypot(ax + dx * t - x, az + dz * t - z);
+      if (d < best) { best = d; bk = k; bt = t; }
+    }
+  }
+  out.d = best; out.k = bk; out.t = bt; out.s = bk < 0 ? 0 : Pa.acc[bk] + (Pa.acc[bk + 1] - Pa.acc[bk]) * bt;
+  return out;
+}
+
+// ---------- the map ----------
 const PLAN = {
-  shoreZ: 1236,                 // where the beach meets the lake (wiggles a little with x)
-  canal: { z: 474, half: 12, x0: -1072, bendX: 306, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
-  docksQuayZ: 1198,
-  // districts: rect in metres, palette, ground colour and the music recipe key
+  frame: [-600, -700, 600, 700],      // the city proper; hills rise outside it
+  // districts: smoothed outlines (control points) and the music recipe key
   districts: [
-    { key: 'park',     name: 'Forest park',   rect: [-1032, -1440, -276, 180] },
-    { key: 'obs',      name: 'Observatory',   rect: [-240, -1440, 420, -1044] },
-    { key: 'oldtown',  name: 'Old town',      rect: [456, -1440, 1032, -372] },
-    { key: 'business', name: 'Business',      rect: [-240, -996, 396, 240] },
-    { key: 'market',   name: 'Market',        rect: [468, -324, 1032, 288] },
-    { key: 'canals',   name: 'Canals',        rect: [-1032, 240, 396, 792] },
-    { key: 'docks',    name: 'Docks',         rect: [468, 396, 1032, 1200] },
-    { key: 'lake',     name: 'Lakeshore',     rect: [-1032, 840, 252, 1236] },
+    { key: 'park', name: 'Forest', ctrl: [[-760, -800], [-254, -770], [-226, -470], [-258, -266], [-318, -30], [-392, 170], [-530, 236], [-760, 236]] },
+    { key: 'obs', name: 'Observatory', ctrl: circlePts(-53, -622, 96, 9, 0.08) },
+    { key: 'oldtown', name: 'Old town', ctrl: [[35, -566], [212, -655], [515, -604], [588, -400], [548, -262], [388, -130], [229, -120], [53, -186], [0, -333]] },
+    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [180, 106], [18, 206], [-194, 142], [-242, -50]] },
+    { key: 'market', name: 'Market', ctrl: [[254, -86], [530, -80], [596, 66], [494, 206], [325, 222], [214, 100], [214, -28]] },
+    { key: 'canals', name: 'Canals', ctrl: [[-640, 252], [-141, 230], [212, 268], [222, 350], [150, 462], [40, 470], [-353, 455], [-640, 402]] },
+    { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 505], [290, 505], [226, 402]] },
+    { key: 'lake', name: 'Lakeshore', ctrl: [[-640, 430], [-200, 470], [-14, 512], [60, 524], [60, 640], [-640, 640]] },
   ],
+  // the lakeshore: beach line (wiggles), a small bay where the canal comes out
+  shore: { z: 548, tilt: -0.06, bayX: 80, bayR: 70, bayDepth: 16 },
+  docksQuayZ: 505, docksX: [222, 660],
+  // the canal: comes out of a tunnel under a knoll at the west edge, winds east under the main street,
+  // turns south and ends in a basin behind the promenade (a lock gate, the lake beyond)
+  canal: { ctrl: [[-662, 300], [-560, 318], [-430, 344], [-300, 298], [-160, 322], [-20, 352], [76, 386], [102, 446], [84, 0]], half: 11, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
+  // streets that join the districts (each district lays its own small streets)
+  roads: {
+    main: { width: 14, ctrl: [[-53, -560], [-20, -470], [-60, -400], [-98, -330], [-40, -232], [40, -150], [62, -40], [30, 64], [62, 160], [96, 250], [104, 340], [70, 430], [40, 500]] },   // summit to the lake, zigzag
+    cross: { width: 14, ctrl: [[-620, 10], [-388, -16], [-250, 18], [-60, 6], [176, -14], [388, 50], [620, 34]] },
+    ring: { width: 10, loop: true, ctrl: circlePts(292, -392, 132, 12, 0.06).map(([x, z]) => [x, -392 + (z + 392) * 0.78]) },   // the old town's ring street, on the hill's contour
+  },
+  // metro: four stations on a loop (order along the line: hilltop, central, harbour, market)
   stations: [
-    { key: 'hilltop', name: 'Hilltop', at: M6(235, 115) },
-    { key: 'market',  name: 'Market',  at: M6(280, 262) },
-    { key: 'docks',   name: 'Docks',   at: M6(295, 400) },
-    { key: 'harbour', name: 'Harbour', at: M6(205, 440) },
-    { key: 'canal',   name: 'Canal',   at: M6(125, 350) },
-    { key: 'central', name: 'Central', at: M6(195, 265) },
-    { key: 'park',    name: 'Park',    at: M6(80, 175) },
+    { key: 'hilltop', name: 'Hilltop', at: [200, -300] },
+    { key: 'central', name: 'Central', at: [170, 150] },
+    { key: 'harbour', name: 'Harbour', at: [180, 470] },
+    { key: 'market',  name: 'Market',  at: [430, 60] },
   ],
   // hidden spots: local changes to the music, nothing to collect
   spots: [
-    { key: 'glasshouse', at: M6(40, 112) },
-    { key: 'belltower',  at: M6(300, 165) },
-    { key: 'rooftop',    at: M6(222, 205) },
-    { key: 'cellar',     at: M6(338, 288) },
-    { key: 'arch',       at: [-60, 474] },
-    { key: 'watertower', at: M6(340, 432) },
-    { key: 'lighthouse', at: [-480, 1585] },
+    { key: 'glasshouse', at: [-318, 86] },
+    { key: 'belltower',  at: [330, -430] },
+    { key: 'rooftop',    at: [-10, -30] },
+    { key: 'cellar',     at: [300, -96] },
+    { key: 'arch',       at: [90, 400] },       // where the main street crosses the canal (set exactly below)
+    { key: 'watertower', at: [262, 322] },
+    { key: 'lighthouse', at: [560, 626] },
   ],
-  pond: { x: -880, z: -180, r: 95 },
-  boulevardX: 432,
-  avenueZ: 336,
+  // landmarks, where districts meet (placed by their builders; these are their anchors)
+  places: {
+    summit: [-53, -622], crag: [-242, -500], vineyards: [-110, -310], glasshouse: [-318, 86], needle: [162, -128],
+    site: [-150, 172], central: [170, 150], recordShop: [300, -96], ferris: [-247, 493], lido: [-480, 505],
+    waterTower: [262, 322], lighthouse: [560, 626],
+  },
+  vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
+  pond: { x: -416, z: 127, r: 58 },
+  boulevardX: 104, avenueZ: 10,          // (old names) the main street's x near the lake, the cross street's z
 };
+for (const d of PLAN.districts) { d.shape = makeShape(d.ctrl); d.rect = d.shape.rect; }
 PLAN.byKey = Object.fromEntries(PLAN.districts.map(d => [d.key, d]));
+PLAN.vineyardShape = makeShape(PLAN.vineyards, 6);
+for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.loop);
 
-// smooth district membership: 1 well inside, fading to 0 about `soft` metres outside the rect
+// the canal path ends a little behind the shore: the basin
+{ const C = PLAN.canal, e = C.ctrl[C.ctrl.length - 1]; e[1] = shoreZ(e[0]) - 30;
+  C.path = makePath(C.ctrl, 4);
+  // (old fields, for code not yet moved to the path)
+  C.x0 = C.ctrl[0][0]; C.z = C.ctrl[0][1]; C.bendX = e[0];
+  // where the main street crosses it: the stone bridge with the echo
+  const M = PLAN.roads.main.path; let best = 1e9, at = null;
+  for (const [x, z] of M.pts) { const d = pathDist(C.path, x, z, 40).d; if (d < best) { best = d; at = [x, z]; } }
+  if (at) PLAN.spots.find(s => s.key === 'arch').at = at;
+}
+
+// smooth district membership: 1 well inside, fading to 0 about `soft` metres outside the outline
 function rectDist(r, x, z) {
   const dx = Math.max(r[0] - x, 0, x - r[2]), dz = Math.max(r[1] - z, 0, z - r[3]);
   const out = Math.hypot(dx, dz);
   if (out > 0) return out;
   return -Math.min(x - r[0], r[2] - x, z - r[1], r[3] - z);     // negative inside
 }
-function districtWeights(x, z, out = {}, soft = 110) {
-  let sum = 0;
+function districtDist(d, x, z) { return shapeDist(d.shape, x, z); }
+function districtWeights(x, z, out = {}, soft = 70) {
+  let sum = 0, best = null, bd = 1e9;
   for (const d of PLAN.districts) {
-    const s = rectDist(d.rect, x, z);
+    const s = districtDist(d, x, z);
+    if (s < bd) { bd = s; best = d.key; }
     const w = U.smooth(U.clamp(1 - (s + soft * 0.5) / soft, 0, 1));
     out[d.key] = w; sum += w;
   }
-  if (sum < 1e-4) { let best = null, bd = 1e9; for (const d of PLAN.districts) { const s = rectDist(d.rect, x, z); if (s < bd) { bd = s; best = d.key; } } for (const k in out) out[k] = 0; out[best] = 1; return out; }
+  if (sum < 1e-4) { for (const k in out) out[k] = 0; out[best] = 1; return out; }
   for (const k in out) out[k] /= sum;
   return out;
 }
-function districtAt(x, z) { let best = null, bd = 1e9; for (const d of PLAN.districts) { const s = rectDist(d.rect, x, z); if (s < bd) { bd = s; best = d; } } return best; }
+function districtAt(x, z) { let best = null, bd = 1e9; for (const d of PLAN.districts) { const s = districtDist(d, x, z); if (s < bd) { bd = s; best = d; } } return best; }
 
 // ---------- the land ----------
-// monotone cubic through the north–south profile (z → height)
-const PROFILE = [[-1700, 150], [-1440, 134], [-1200, 104], [-996, 78], [-720, 56], [-324, 25], [0, 12], [150, 7], [300, 5], [700, 4.6], [900, 3.6], [1180, 2.6], [1236, 2.0]];
+// monotone cubic through the north–south profile (z → height): about 70 m from the top of the city to the shore
+const PROFILE = [[-822, 77.5], [-700, 69.5], [-588, 54.5], [-492, 41.5], [-363, 30.5], [-177, 15], [-26, 8.5], [44, 6], [114, 5], [301, 4.6], [394, 3.6], [525, 2.6], [551, 2.0]];
 const _pm = (() => {
   const P = PROFILE, n = P.length, d = [], m = [];
   for (let i = 0; i < n - 1; i++) d.push((P[i + 1][1] - P[i][1]) / (P[i + 1][0] - P[i][0]));
@@ -2963,77 +3082,70 @@ const _pm = (() => {
 })();
 function profileH(z) {
   const P = PROFILE;
-  if (z <= P[0][0]) return P[0][1];
+  if (z <= P[0][0]) return P[0][1] + (P[0][0] - z) * 0.06;
   if (z >= P[P.length - 1][0]) return P[P.length - 1][1];
   let i = 0; while (z > P[i + 1][0]) i++;
   const h = P[i + 1][0] - P[i][0], t = (z - P[i][0]) / h, t2 = t * t, t3 = t2 * t;
   return (2 * t3 - 3 * t2 + 1) * P[i][1] + (t3 - 2 * t2 + t) * h * _pm[i] + (-2 * t3 + 3 * t2) * P[i + 1][1] + (t3 - t2) * h * _pm[i + 1];
 }
-const gauss = (d, r) => Math.exp(-(d * d) / (r * r));
+function gauss(d, r) { return Math.exp(-(d * d) / (r * r)); }
 // a hill that starts gently at the city edge and levels off at `top` metres
-const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 300) * 0.04;
-// the canal stops short of the beach, in a basin behind the promenade
-function canalEndZ() { return shoreZ(PLAN.canal.bendX) - 48; }
-function shoreZ(x) { return PLAN.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5; }
+const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 200) * 0.04;
+// the canal's basin end (just behind the promenade)
+function canalEndZ() { const P = PLAN.canal.path.pts; return P[P.length - 1][1]; }
+function shoreZ(x) {
+  const S = PLAN.shore;
+  return S.z + x * S.tilt + Math.sin(x / 90) * 8 + Math.sin(x / 37 + 1.3) * 3 - gauss(x - S.bayX, S.bayR) * S.bayDepth;
+}
 // the raw land before carving
 function landH(x, z) {
   let h = profileH(z);
-  // the forest ridge runs up the west side and joins the observatory hill
-  const rx = U.lerp(-640, -560, U.clamp((180 - z) / 1600, 0, 1));
-  const ridgeUp = U.clamp((300 - z) / 1700, 0, 1);
-  h += gauss(x - rx, 230) * (6 + 34 * ridgeUp);
-  h -= gauss(Math.hypot(x + 880, z + 180), 130) * 9;                     // the pond hollow
-  h += gauss(Math.hypot(x + 900, z + 900), 160) * 10;                    // glasshouse knoll
-  // the hill under the old town and the observatory summit
-  h += gauss(Math.hypot(x - 760, z + 1200), 520) * 26;
-  const sd = Math.hypot(x - 90, z + 1290);
-  h += Math.min(22, gauss(sd, 330) * 30);
-  // a ridge spur between park and hilltop (the metro tunnels through it)
-  h += gauss(Math.hypot(x + 300, z + 860), 240) * 22;
-  // the canal comes out of a tunnel under a wooded knoll at the city's west edge
-  h += gauss(Math.hypot(x + 1150, z - 474), 95) * 30;
-  // the edge of the world: hills all round (outside the city)
-  // (they rise, then roll: no green walls in the distance)
-  const ex = Math.max(0, Math.abs(x) - 1060), en = Math.max(0, -1490 - z);
-  h += edgeRise(ex, 210, 640) + edgeRise(en, 240, 620);
+  // the forest ridge runs down the west side and joins the summit
+  const rx = U.lerp(-470, -400, U.clamp((150 - z) / 900, 0, 1)), ridgeUp = U.clamp((220 - z) / 850, 0, 1);
+  h += gauss(x - rx, 120) * (3 + 17 * ridgeUp);
+  h -= gauss(Math.hypot(x - PLAN.pond.x, z - PLAN.pond.z), 70) * 5;              // the pond hollow
+  h += gauss(Math.hypot(x + 330, z - 50), 70) * 5;                                // glasshouse knoll
+  h += gauss(Math.hypot(x - 292, z + 392), 240) * 13;                             // the old town's hill
+  h += Math.min(11, gauss(Math.hypot(x + 53, z + 622), 155) * 15);                 // the summit
+  h += gauss(Math.hypot(x + 130, z + 330), 120) * 9;                              // the vineyard spur (sunny side faces south)
+  h += gauss(Math.hypot(x + 720, z - 300), 55) * 15;                              // the knoll the canal tunnels under
+  // the edge of the world: hills all round (outside the city); they rise, then roll
+  const ex = Math.max(0, Math.abs(x) - 620), en = Math.max(0, -730 - z);
+  h += edgeRise(ex, 110, 320) + edgeRise(en, 120, 310);
   // a little ground swell
-  h += Math.sin(x * 0.011 + z * 0.004) * 1.1 + Math.sin(z * 0.017 - x * 0.006) * 0.8;
+  h += Math.sin(x * 0.022 + z * 0.008) * 0.6 + Math.sin(z * 0.034 - x * 0.012) * 0.45;
   return h;
 }
-// flat places: docks, the canal quays, the lakeshore promenade, plazas
+// flat places: docks, the canal quays, the lakeshore promenade
 function cityHeight(x, z) {
   let h = landH(x, z);
   const C = PLAN.canal;
-  // canal quarter: a flat, slightly raised bank
-  const inCanals = U.smooth(U.clamp(1 - rectDist([-1060, 300, 430, 760], x, z) / 60, 0, 1));
-  h = U.lerp(h, C.quayY + Math.sin(x * 0.01) * 0.2, inCanals);
+  // canal quarter and the canal's banks: a flat, slightly raised quay level
+  const dq = districtDist(PLAN.byKey.canals, x, z), dc = pathDist(C.path, x, z, 80).d;
+  const inCanals = Math.max(U.smooth(U.clamp(1 - dq / 50, 0, 1)), U.smooth(U.clamp(1 - (dc - C.half - 24) / 30, 0, 1)));
+  h = U.lerp(h, C.quayY + Math.sin(x * 0.02) * 0.2, inCanals);
   // docks: flat hardstanding
-  const inDocks = U.smooth(U.clamp(1 - rectDist([460, 380, 1060, PLAN.docksQuayZ], x, z) / 50, 0, 1));
+  const inDocks = U.smooth(U.clamp(1 - districtDist(PLAN.byKey.docks, x, z) / 40, 0, 1));
   h = U.lerp(h, 3.8, inDocks);
   // lake: beach then the lake bed
   const sz = shoreZ(x), dz = z - sz;
-  if (dz > -60) {
-    const beach = U.clamp((dz + 60) / 60, 0, 1);
+  if (dz > -50) {
+    const beach = U.clamp((dz + 50) / 50, 0, 1);
     h = U.lerp(h, 2.0, U.smooth(beach) * (inDocks > 0.5 ? 0 : 1));
     if (dz > 0 && inDocks < 0.5) h = 2.0 - dz * 0.09 - Math.max(0, dz - 40) * 0.06;
   }
-  if (z > PLAN.docksQuayZ + 4 && x > 452 && x < 1076) h = Math.min(h, -6);
+  if (z > PLAN.docksQuayZ + 4 && x > PLAN.docksX[0] && x < PLAN.docksX[1]) h = Math.min(h, -6);
   return h;
 }
-// is (x, z) open water? (canal or lake; the lake is anything past the shore)
-function inCanal(x, z) {
-  const C = PLAN.canal;
-  if (x > C.x0 && x < C.bendX + C.half && Math.abs(z - C.z) < C.half) return true;
-  if (Math.abs(x - C.bendX) < C.half && z > C.z && z < canalEndZ()) return true;
-  return false;
-}
+// is (x, z) open water in the canal? (the lake is anything past the shore)
+function inCanal(x, z) { return pathDist(PLAN.canal.path, x, z, 16).d < PLAN.canal.half; }
 
 // ============================================================
 //  TERRAIN — the city's heightfield: one grid for drawing and collision
-//  Grid lines fall exactly on the canal quays and the docks quay, so their
-//  walls can be straight boxes. Collision reads the same triangles the mesh draws.
+//  Collision reads the same triangles the mesh draws. The canal winds, so the cells
+//  along it are left out of the mesh and a quay apron (world.js) covers their edges.
 // ============================================================
-const TER = { x0: -1098, z0: -1514, cell: 8, nx: 276, nz: 376 };
+const TER = { x0: -664, z0: -784, cell: 8, nx: 166, nz: 212 };
 TER.x1 = TER.x0 + TER.nx * TER.cell; TER.z1 = TER.z0 + TER.nz * TER.cell;
 
 function buildHeights() {
@@ -3041,14 +3153,15 @@ function buildHeights() {
   const H = new Float32Array((nx + 1) * (nz + 1));
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) H[j * (nx + 1) + i] = cityHeight(x0 + i * cell, z0 + j * cell);
   TER.H = H;
-  // the canal: vertices strictly inside the channel drop to the bed (edges stay at quay height)
+  // the canal: vertices well inside the channel drop to the bed (those near the walls stay at quay height)
   const C = PLAN.canal;
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
-    const inside = (x > C.x0 && x < C.bendX + C.half - 0.1 && Math.abs(z - C.z) < C.half - 0.1) || (Math.abs(x - C.bendX) < C.half - 0.1 && z > C.z && z < canalEndZ());
-    if (inside) H[j * (nx + 1) + i] = C.bedY;
+    if (pathDist(C.path, x, z, 24).d < C.half - cell) H[j * (nx + 1) + i] = C.bedY;
   }
 }
+// cells the terrain mesh leaves out along the canal (any part of them may be in the channel)
+function canalCell(cx, cz) { return pathDist(PLAN.canal.path, cx, cz, 32).d < PLAN.canal.half + TER.cell * 0.72; }
 // lower the ground along a corridor (centreline points [x, y, z]) to floorY(t) + off
 function carveCorridor(pts, half, off = -0.6) {
   const { nx, nz, x0, z0, cell, H } = TER;
@@ -3123,7 +3236,7 @@ function terrainMeshes(paint, mat) {
   const hole = (i, j) => {   // a cell that lies inside the canal (or a dug-out hole) is not drawn
     const cx = x0 + (i + 0.5) * cell, cz = z0 + (j + 0.5) * cell;
     if (inHole(cx, cz)) return true;
-    return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < canalEndZ());
+    return canalCell(cx, cz);
   };
   for (let tj = 0; tj < nz; tj += TILE) for (let ti = 0; ti < nx; ti += TILE) {
     const ni = Math.min(TILE, nx - ti), nj = Math.min(TILE, nz - tj), NG = (ni + 1) * (nj + 1);
@@ -3189,12 +3302,12 @@ function terrainMeshes(paint, mat) {
 const hillFbm = (x, z) => Math.sin(x * 0.0031 + Math.sin(z * 0.0023) * 2) * 0.5 + Math.sin(z * 0.0042 - x * 0.0017 + 1.7) * 0.35 + Math.sin((x + z) * 0.009) * 0.15;
 const hillWood = (x, z) => hillFbm(x * 1.7 + 300, z * 1.7 - 200) > 0.25;
 function hillY(x, z) {
-  const out = Math.max(0, Math.abs(x) - 1250, -1650 - z);
+  const out = Math.max(0, Math.abs(x) - 690, -820 - z);
   let y = landH(x, z) - 0.4 + U.smooth(U.clamp(out / 600, 0, 1)) * (hillFbm(x, z) * 55 + Math.sin(x * 0.0013 + 2) * 25);
   // the lake lies between two headlands: the hills carry on down both shores and sink slowly into the water
   // far to the south (no wall of mountains stopping dead at the beach)
-  if (z > 1100) { const lake = 1 - U.smooth(U.clamp((Math.abs(x) - 1180) / 700, 0, 1)), far = U.smooth(U.clamp((z - 1900) / 1300, 0, 1));
-    y = Math.min(y, U.lerp(y, -8, Math.max(lake * U.clamp((z - 1100) / 200, 0, 1), far))); }
+  if (z > 470) { const lake = 1 - U.smooth(U.clamp((Math.abs(x) - 640) / 450, 0, 1)), far = U.smooth(U.clamp((z - 1000) / 900, 0, 1));
+    y = Math.min(y, U.lerp(y, -8, Math.max(lake * U.clamp((z - 470) / 140, 0, 1), far))); }
   return y;
 }
 function outerHills(mat) {
@@ -5046,31 +5159,30 @@ if (typeof module !== 'undefined') module.exports = MOVES;
 //  through the ridge between Park and Hilltop. Trains you can ride on
 //  (roof) and that knock you off the rails.
 // ============================================================
-// the loop, as drawn on the sketch (cubic Béziers in map units), starting at Hilltop
+// the loop (cubic Béziers in metres), starting at Hilltop: down under downtown to Central, out to Harbour
+// across the canal, east and north to Market, then up the old town's hill (through it) back to Hilltop.
 // (the joints are smooth: each segment leaves a station the way the last one arrived)
 const METRO_SVG = [
-  [[235, 115], [260, 129], [270, 200], [280, 262]],
-  [[280, 262], [290, 320], [302, 360], [295, 400]],
-  [[295, 400], [290, 428], [240, 445], [205, 440]],
-  [[205, 440], [165, 435], [130, 400], [125, 350]],
-  [[125, 350], [122, 310], [195, 320], [195, 265]],     // north into Central, straight through it…
-  [[195, 265], [195, 215], [80, 230], [80, 175]],       // …then west under downtown, and north into Park
-  [[80, 175], [80, 125], [190, 90], [235, 115]],        // north out of Park, round through the ridge to Hilltop
+  [[200, -300], [90, -290], [80, 30], [170, 150]],
+  [[170, 150], [230, 230], [110, 440], [180, 470]],
+  [[180, 470], [250, 500], [470, 300], [430, 60]],
+  [[430, 60], [400, -120], [330, -310], [200, -300]],
 ];
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
-const DOWNTOWN = [-250, -700, 370, 250];
+const DOWNTOWN = [-200, -160, 196, 186];
 const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
 // where the line meets a street at an awkward height it is pinned: `dy` metres from the ground at that point
 // (north of downtown two streets cross the cutting on bridges; a third, and the avenue, pass under a proper span)
-const METRO_WAY = [{ at: [-116, -908], dy: -7.4 }, { at: [-1, -920], dy: -7.6 }, { at: [132, -914], dy: 7.6 }, { at: [-224, 336], dy: 7.6 }];
-const METRO_LIFT = { hilltop: 2.5 };      // Hilltop stands a little taller, so the street just west of it clears the deck
+const METRO_WAY = [];        // (pins go back in once the streets are laid: phase 5)
+const METRO_LIFT = {};      // Hilltop stands a little taller, so the street just west of it clears the deck
+const METRO_TUNNEL = ['market', 'hilltop'];   // the span that may go under the hill
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
   // sample the Béziers evenly
   const raw = [];
   for (const seg of METRO_SVG) {
-    const P = seg.map(([u, v]) => M6(u, v));
+    const P = seg;
     for (let i = 0; i < 400; i++) {
       const t = i / 400, a = 1 - t;
       raw.push([a * a * a * P[0][0] + 3 * a * a * t * P[1][0] + 3 * a * t * t * P[2][0] + t * t * t * P[3][0], a * a * a * P[0][1] + 3 * a * a * t * P[1][1] + 3 * a * t * t * P[2][1] + t * t * t * P[3][1]]);
@@ -5127,8 +5239,8 @@ function planMetro() {
   }
   for (let i = 0; i < N; i++) if (fixed[i] !== null) y[i] = fixed[i];
   // the gallery section (Park → Hilltop) may go under the hill; everywhere else stay above it
-  const park = stations.find(s => s.key === 'park'), hill = stations.find(s => s.key === 'hilltop');
-  const inTunnelSpan = (i) => { const a = park.i + half, b = hill.i - half + N; const ii = i < park.i ? i + N : i; return ii > a && ii < b; };
+  const tA = stations.find(s => s.key === METRO_TUNNEL[0]), tB = stations.find(s => s.key === METRO_TUNNEL[1]);
+  const inTunnelSpan = (i) => { const a = tA.i + half, b = tB.i - half + (tB.i < tA.i ? N : 0); const ii = i < tA.i ? i + N : i; return ii > a && ii < b; };
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < N; i++) {
       if (fixed[i] !== null) continue;
@@ -5663,7 +5775,7 @@ function paintGround(x, z, y, steep, out) {
   for (const k in _gw) { if (_gw[k] < 0.001) continue; _gc.set(GROUND_COLS[k]); out.r += _gc.r * _gw[k]; out.g += _gc.g * _gw[k]; out.b += _gc.b * _gw[k]; }
   // beaches and wet sand
   const dz = z - shoreZ(x);
-  if (dz > -45 && !(x > 452 && x < 1076)) { _gc.set(dz > 0 ? '#c9b98a' : '#e6d7a8'); out.lerp(_gc, U.smooth(U.clamp((dz + 45) / 25, 0, 1))); }
+  if (dz > -45 && !(x > PLAN.docksX[0] && x < PLAN.docksX[1])) { _gc.set(dz > 0 ? '#c9b98a' : '#e6d7a8'); out.lerp(_gc, U.smooth(U.clamp((dz + 45) / 25, 0, 1))); }
   // steep ground shows rock
   if (steep > 0.28) out.lerp(_gc.set('#8c8170'), U.clamp((steep - 0.28) * 3, 0, 0.8));
   // a little variation so big lawns aren't flat
@@ -5763,7 +5875,7 @@ function buildCity() {
   });
   const W = K.W;
   groundRibbon.far = F; W.far = F; W.slabs = S; W.mats = mats; W.sounds = []; W.spots = []; W.benches = []; W.lamps = []; W.npcs = []; W.vehicles = [];
-  W.spawn = V3(96, 0, -1168); W.spawnYaw = 0;
+  W.spawn = V3(PLAN.places.summit[0], 0, PLAN.places.summit[1] + 20); W.spawnYaw = 0;
   W.spawn.y = terrainAt(W.spawn.x, W.spawn.z);
   // ground
   const terrain = terrainMeshes(paintGround, mats.ground); W.group.add(terrain);
@@ -5772,10 +5884,10 @@ function buildCity() {
   // lake: a huge sheet of water, and a dark floor far below so you never see through it
   const lakeMat = new THREE.MeshBasicMaterial({ color: 0x6fb0c8, map: mats.waterTex, transparent: true, opacity: 0.78, depthWrite: false });
   mats.waterTex.repeat.set(1, 1);
-  const lake = new THREE.Mesh(new THREE.PlaneGeometry(9000, 6000, 1, 1), lakeMat); lake.rotation.x = -Math.PI / 2; lake.position.set(0, 0, 1150 + 3000); lake.renderOrder = 3; W.group.add(lake);
+  const lake = new THREE.Mesh(new THREE.PlaneGeometry(9000, 6000, 1, 1), lakeMat); lake.rotation.x = -Math.PI / 2; lake.position.set(0, 0, 470 + 3000); lake.renderOrder = 3; W.group.add(lake);
   const lakeUV = lake.geometry.attributes.uv; for (let i = 0; i < lakeUV.count; i++) lakeUV.setXY(i, lakeUV.getX(i) * 900, lakeUV.getY(i) * 600); lakeUV.needsUpdate = true;
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12000, 8000), new THREE.MeshBasicMaterial({ color: 0x23485a })); floor.rotation.x = -Math.PI / 2; floor.position.set(0, -14, 3000); W.group.add(floor);
-  W.waters.push({ x0: -6000, z0: 1150, x1: 6000, z1: 9000, y: 0, deep: true, lake: true });
+  W.waters.push({ x0: -6000, z0: 470, x1: 6000, z1: 9000, y: 0, deep: true, lake: true });
   W.lakeMat = lakeMat;
   buildCanal(K, S, F);
   buildRoads(K, S, F);
@@ -5785,7 +5897,7 @@ function buildCity() {
   buildDistricts(K, S, F);
   lap('districts');
   // the edges of the world: soft invisible walls on the hills
-  for (const b of [[-1300, -1700, -1050, 1300], [1052, -1700, 1300, 1300], [-1300, -1700, 1300, -1480]]) W.boxes.push({ x0: b[0], y0: -50, z0: b[1], x1: b[2], y1: 400, z1: b[3], tag: 'edge', nocam: true });
+  for (const b of [[-900, -1100, -650, 800], [650, -1100, 900, 800], [-900, -1100, 900, -760]]) W.boxes.push({ x0: b[0], y0: -50, z0: b[1], x1: b[2], y1: 400, z1: b[3], tag: 'edge', nocam: true });
   K.finish();
   lap('finish');
   // ground = terrain (with canals open), slabs, train roofs, plus kit boxes
@@ -5812,73 +5924,76 @@ function buildCity() {
 }
 
 // ---------- canal ----------
+// the canal follows PLAN.canal.path: stone walls and a coping along both banks, a paved apron
+// over the cut-out terrain cells, the bed, the water; a tunnel portal at the west end, a lock at the basin
 function buildCanal(K, S, F) {
-  const W = K.W, C = PLAN.canal, B = K.B;
-  const wall = '#8f8577', top = '#b9b0a0';
-  const sz = canalEndZ();
-  // walls (thin boxes from the bed up to the quay), a stone coping on top
-  const walls = [
-    [C.x0, C.z - C.half - 1, C.bendX + C.half, C.z - C.half],             // north
-    [C.x0, C.z + C.half, C.bendX - C.half, C.z + C.half + 1],             // south (west of the bend)
-    [C.bendX - C.half - 1, C.z + C.half, C.bendX - C.half, sz],           // west side of the bend
-    [C.bendX + C.half, C.z - C.half, C.bendX + C.half + 1, sz],           // east side of the bend
-    [C.bendX - C.half - 1, sz, C.bendX + C.half + 1, sz + 1],             // the end of the basin
-  ];
-  for (const [x0, z0, x1, z1] of walls) {
-    // in pieces, so the cells can cull them
-    const alongX = x1 - x0 > z1 - z0, L = alongX ? x1 - x0 : z1 - z0;
-    for (let s = 0; s < L; s += 32) {
-      const a = s, b = Math.min(L, s + 32);
-      const X0 = alongX ? x0 + a : x0, X1 = alongX ? x0 + b : x1, Z0 = alongX ? z0 : z0 + a, Z1 = alongX ? z1 : z0 + b;
-      B.box(X0, C.bedY, Z0, X1, C.quayY - 0.05, Z1, wall, 'brick', { outlineT: 0, edges: false });
-      B.box(X0 - (alongX ? 0 : 0.4), C.quayY - 0.05, Z0 - (alongX ? 0.4 : 0), X1 + (alongX ? 0 : 0.4), C.quayY + 0.2, Z1 + (alongX ? 0.4 : 0), top, 'paving', { outlineT: 0.04, edges: false });
+  const W = K.W, C = PLAN.canal, B = K.B, P = C.path.pts, n = P.length;
+  const wall = '#8f8577', top = '#b9b0a0', pave = '#b9ad98';
+  const N = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; });
+  const obox = (ax, az, bx, bz, off, thick, y0, y1, col, kind, ol) => {
+    const L = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(bx - ax, bz - az);
+    const m = new THREE.Matrix4().makeRotationY(yaw).setPosition((ax + bx) / 2, (y0 + y1) / 2, (az + bz) / 2);
+    B.add(new THREE.BoxGeometry(thick, y1 - y0, L + 0.35), m, col, kind, { outlineT: ol, edges: false });
+  };
+  // walls + coping, in 8 m pieces (every second sample), each side
+  for (let i = 0; i < n - 1; i += 2) {
+    const j = Math.min(n - 1, i + 2);
+    for (const sd of [-1, 1]) {
+      const o = C.half + 0.5, ax = P[i][0] + N[i][0] * o * sd, az = P[i][1] + N[i][1] * o * sd, bx = P[j][0] + N[j][0] * o * sd, bz = P[j][1] + N[j][1] * o * sd;
+      obox(ax, az, bx, bz, 0, 1, C.bedY, C.quayY - 0.05, wall, 'brick', 0);
+      const o2 = C.half + 0.3, cx = P[i][0] + N[i][0] * o2 * sd, cz = P[i][1] + N[i][1] * o2 * sd, dx = P[j][0] + N[j][0] * o2 * sd, dz = P[j][1] + N[j][1] * o2 * sd;
+      obox(cx, cz, dx, dz, 0, 1.4, C.quayY - 0.05, C.quayY + 0.2, top, 'paving', 0.04);
     }
   }
-  // the bed
-  for (let x = C.x0; x < C.bendX + C.half; x += 64) B.box(x, C.bedY - 0.5, C.z - C.half, Math.min(C.bendX + C.half, x + 64), C.bedY, C.z + C.half, '#4a5a50', 'plain', { outlineT: 0, edges: false });
-  for (let z = C.z + C.half; z < sz; z += 64) B.box(C.bendX - C.half, C.bedY - 0.5, z, C.bendX + C.half, C.bedY, Math.min(sz, z + 64), '#4a5a50', 'plain', { outlineT: 0, edges: false });
-  // water: separate meshes (always drawn) + the deep-water zones
-  const wm = new THREE.MeshBasicMaterial({ color: 0x5f9fa0, map: W.mats.waterTex, transparent: true, opacity: 0.8, depthWrite: false });
-  const addWater = (x0, z0, x1, z1) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), wm); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, C.waterY, (z0 + z1) / 2); m.renderOrder = 3;
-    const uv = m.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (x1 - x0) / 10, uv.getY(i) * (z1 - z0) / 10); uv.needsUpdate = true;
-    W.group.add(m);
-    W.waters.push({ x0, z0, x1, z1, y: C.waterY, deep: true, canal: true });
+  // strips along the path: (inner offset, outer offset, y at inner, y at outer or null = on the terrain)
+  const strip = (o0, o1, y0, y1, col, kind, mesh) => {
+    const pos = [], uv = [];
+    for (let i = 0; i < n - 1; i++) for (const sd of (o0 === -o1 ? [1] : [-1, 1])) {
+      const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? y0 : y1), z]; };
+      const a = q(i, o0), b = q(i, o1), c = q(i + 1, o0), d = q(i + 1, o1);
+      // faces up whichever side we're on
+      if (sd > 0) pos.push(...a, ...c, ...b, ...b, ...c, ...d); else pos.push(...a, ...b, ...c, ...b, ...d, ...c);
+      if (mesh) for (const p of [a, c, b, b, c, d]) uv.push(p[0] / 10, p[2] / 10);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
+    if (mesh) { g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g; }
+    B.add(g, null, col, kind, { outlineT: 0, edges: false });
   };
-  addWater(C.x0, C.z - C.half, C.bendX + C.half, C.z + C.half);
-  // the tunnel mouth: a stone portal across canal and quays, a dark arch, a keystone, a lamp each side
-  { const x = C.x0, top = Math.max(C.quayY + 9, terrainAt(x - 6, C.z) + 1.5), st = '#8f8676';
-    K.box(x - 10, C.bedY, C.z - C.half - 16, x, top, C.z - C.half + 0.5, st, 'brick', { outlineT: 0.08 });
-    K.box(x - 10, C.bedY, C.z + C.half - 0.5, x, top, C.z + C.half + 16, st, 'brick', { outlineT: 0.08 });
-    K.box(x - 10, C.quayY + 4.2, C.z - C.half + 0.5, x, top, C.z + C.half - 0.5, st, 'brick', { outlineT: 0.08 });
-    K.box(x - 10, C.bedY, C.z - C.half, x - 9, C.quayY + 4.3, C.z + C.half, '#0d0c12', 'plain', { outlineT: 0 });
-    B.box(x - 9.5, C.quayY + 4.0, C.z - C.half + 0.4, x + 0.05, C.quayY + 4.4, C.z + C.half - 0.4, '#0d0c12', 'plain', { outlineT: 0, edges: false });
-    for (let k = -5; k <= 5; k++) B.box(x - 0.1, C.quayY + 4.2, C.z + k * 2.1 - 0.9, x + 0.35, C.quayY + (k === 0 ? 6.2 : 5.4), C.z + k * 2.1 + 0.9, k === 0 ? '#d9cfb8' : '#b5ab98', 'plain', { outlineT: 0.04 });
-    B.box(x - 0.2, top, C.z - C.half - 16.3, x + 0.4, top + 0.6, C.z + C.half + 16.3, '#d9cfb8', 'plain', { outlineT: 0.05 });
-    for (const sd of [-1, 1]) { K.cyl(x + 1.2, C.quayY, C.z + sd * (C.half + 5), 0.1, 3.2, '#2a2838', { outline: 0.03, seg: 6 }); B.box(x + 0.9, C.quayY + 3.2, C.z + sd * (C.half + 5) - 0.3, x + 1.5, C.quayY + 3.7, C.z + sd * (C.half + 5) + 0.3, '#ffe9b0', 'lamp', { outlineT: 0, edges: false }); }
-    // inside, the water runs on into the dark for a few metres
-    addWater(x - 9, C.z - C.half, x, C.z + C.half);
+  strip(C.half + 1.0, C.half + 15, C.quayY + 0.12, null, pave, 'walk');           // the quay apron, both sides
+  strip(-C.half - 1, C.half + 1, C.bedY, C.bedY, '#4a5a50', 'plain');             // the bed
+  // water: one mesh (always drawn) + a deep-water zone (game.js checks inCanal inside its box)
+  const wm = new THREE.MeshBasicMaterial({ color: 0x5f9fa0, map: W.mats.waterTex, transparent: true, opacity: 0.8, depthWrite: false });
+  { const g = strip(-C.half - 0.6, C.half + 0.6, C.waterY, C.waterY, null, null, true), m = new THREE.Mesh(g, wm); m.renderOrder = 3; W.group.add(m); }
+  { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+    W.waters.push({ x0: x0 - C.half - 12, z0: z0 - C.half, x1: x1 + C.half, z1: z1 + C.half, y: C.waterY, deep: true, canal: true }); }
+  // the tunnel mouth (the path starts heading east): a stone portal across canal and quays, a dark arch, a keystone, a lamp each side
+  { const x = C.x0, cz = C.z, top = Math.max(C.quayY + 9, terrainAt(x - 6, cz) + 1.5), st = '#8f8676';
+    K.box(x - 10, C.bedY, cz - C.half - 16, x, top, cz - C.half + 0.5, st, 'brick', { outlineT: 0.08 });
+    K.box(x - 10, C.bedY, cz + C.half - 0.5, x, top, cz + C.half + 16, st, 'brick', { outlineT: 0.08 });
+    K.box(x - 10, C.quayY + 4.2, cz - C.half + 0.5, x, top, cz + C.half - 0.5, st, 'brick', { outlineT: 0.08 });
+    K.box(x - 10, C.bedY, cz - C.half, x - 9, C.quayY + 4.3, cz + C.half, '#0d0c12', 'plain', { outlineT: 0 });
+    B.box(x - 9.5, C.quayY + 4.0, cz - C.half + 0.4, x + 0.05, C.quayY + 4.4, cz + C.half - 0.4, '#0d0c12', 'plain', { outlineT: 0, edges: false });
+    for (let k = -5; k <= 5; k++) B.box(x - 0.1, C.quayY + 4.2, cz + k * 2.1 - 0.9, x + 0.35, C.quayY + (k === 0 ? 6.2 : 5.4), cz + k * 2.1 + 0.9, k === 0 ? '#d9cfb8' : '#b5ab98', 'plain', { outlineT: 0.04 });
+    B.box(x - 0.2, top, cz - C.half - 16.3, x + 0.4, top + 0.6, cz + C.half + 16.3, '#d9cfb8', 'plain', { outlineT: 0.05 });
+    for (const sd of [-1, 1]) { K.cyl(x + 1.2, C.quayY, cz + sd * (C.half + 5), 0.1, 3.2, '#2a2838', { outline: 0.03, seg: 6 }); B.box(x + 0.9, C.quayY + 3.2, cz + sd * (C.half + 5) - 0.3, x + 1.5, C.quayY + 3.7, cz + sd * (C.half + 5) + 0.3, '#ffe9b0', 'lamp', { outlineT: 0, edges: false }); }
   }
-  addWater(C.bendX - C.half, C.z + C.half, C.bendX + C.half, sz);
+  // the basin's end: a wall across, and a lock gate in it (the lake beyond)
+  { const e = P[n - 1], d = N[n - 1], ax = e[0] + d[0] * (C.half + 1), az = e[1] + d[1] * (C.half + 1), bx = e[0] - d[0] * (C.half + 1), bz = e[1] - d[1] * (C.half + 1);
+    const fx = -d[1], fz = d[0];      // along the canal, onwards
+    obox(ax + fx * 0.5, az + fz * 0.5, bx + fx * 0.5, bz + fz * 0.5, 0, 1, C.bedY, C.quayY - 0.05, wall, 'brick', 0);
+    obox(ax - fx * 2.7, az - fz * 2.7, bx - fx * 2.7, bz - fz * 2.7, 0, 0.6, C.bedY, C.quayY - 0.6, '#7a5a3a', 'wood', 0.05); }
   W.canalWaterMat = wm;
-  // the weir where the canal steps down into the lake
-  // (the basin ends in a wall behind the promenade: a lock gate in it, the lake beyond)
-  for (const sd of [-1, 1]) B.box(C.bendX + sd * 0.3 - (sd < 0 ? C.half - 0.3 : 0), C.bedY, sz - 3, C.bendX + sd * 0.3 + (sd > 0 ? C.half - 0.3 : 0), C.quayY - 0.6, sz - 2.4, '#7a5a3a', 'wood', { outlineT: 0.05 });
-  F.box(C.x0, C.bedY, C.z - C.half - 1, C.bendX + C.half + 1, C.quayY, C.z - C.half, wall, 0);
   W.canal = C;
 }
 
 // ---------- the big roads (district streets are laid by each district) ----------
-const ROADS = {
-  boulevard: [[432, -720], [432, -360], [432, 0], [432, 400], [432, 800], [432, 1190]],
-  avenue: [[-1040, 336], [-600, 336], [-200, 336], [200, 336], [432, 336], [800, 336], [1040, 336]],
-  hill: [[432, -720], [520, -790], [660, -852], [600, -905], [372, -960], [290, -1000], [216, -1044]],
-};
+// (their lines are in PLAN.roads)
 function buildRoads(K, S, F) {
   const W = K.W, B = K.B;
   W.roads = {};
-  for (const [key, pts] of Object.entries(ROADS)) {
-    const width = key === 'boulevard' ? 20 : key === 'avenue' ? 16 : 11;
+  for (const [key, road] of Object.entries(PLAN.roads)) {
+    const pts = road.path.pts, width = road.width;
     // sidewalks first (wider, paler), then the asphalt on top
     groundRibbon(B, pts, width + 7, '#c8c1b4', 'walk', 0.07);
     const P = groundRibbon(B, pts, width, '#5a5868', 'road', 0.1);
@@ -6477,9 +6592,10 @@ function buildPark(H) {
   buildGlasshouse(H, gh[0], gh[1]);
   // the forest: big trees except on trails, the pond, clearings and the station
   const clear = [[-900, -888, 46], [-660, -510, 70], [pond.x, pond.z, pond.r + 18], [-760, -100, 40], [-560, -1300, 55], [-440, -1000, 30]];
-  const pst = PLAN.stations.find(s => s.key === 'park').at;
+  const pst = (PLAN.stations.find(s => s.key === 'park') || { at: [1e9, 1e9] }).at;     // (no Park station on the compact map)
   for (let x = R[0] + 8; x < R[2] - 4; x += 15) for (let z = R[1] + 8; z < R[3] - 4; z += 15) {
     const tx = x + (r() - 0.5) * 12, tz = z + (r() - 0.5) * 12;
+    if (districtDist(PLAN.byKey.park, tx, tz) > 6 * r()) continue;      // the forest's ragged edge
     if (clear.some(([cx, cz, cr]) => Math.hypot(tx - cx, tz - cz) < cr)) continue;
     // glades: patches of open meadow
     const glade = Math.sin(tx * 0.013) * Math.sin(tz * 0.011) > 0.55;
@@ -6487,7 +6603,7 @@ function buildPark(H) {
     if (!H.clearOf(tx - 1, tz - 1, tx + 1, tz + 1, 1)) continue;
     const big = r() < 0.7, dark = r();
     const col = dark < 0.33 ? '#2f5f34' : dark < 0.66 ? '#3a6f3a' : '#47803f';
-    if (tz < -1000 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
+    if (tz < -500 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
     else H.tree(tx, tz, { s: big ? 1.9 + r() * 0.9 : 1.1 + r() * 0.4, h: big ? 6.4 : 4.4, r: 3.4, color: col, color2: dark < 0.5 ? '#36693a' : '#4f8a44', tall: big, trunk: '#5a4232' });
   }
   // (shafts of light through the canopy: see Fauna — they follow the sun)
@@ -8097,9 +8213,9 @@ function fillRoutes(H) {
   // it ends in a turning circle round a little tree island
   { const roads = Object.entries(W.roads || {});
     const distTo = (x, z, P) => { let d = 1e9; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); d = Math.min(d, Math.hypot(ax + dx * u - x, az + dz * u - z)); } return d; };
-    for (const [k, rd] of roads) for (const end of (k === 'oblique' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
+    for (const [k, rd] of roads) for (const end of (k === 'oblique' || k === 'ring' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
       let [x, z] = end;
-      { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 1000) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
+      { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 580) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
       if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;
       if (inCanal(x, z)) continue;
       const R = rd.width * 0.95 + 4;
@@ -8111,17 +8227,12 @@ function fillRoutes(H) {
       H.block(x, z, R + 2);
     }
   }
-  const hill = ROADS.hill.slice().reverse();     // from the observatory end, downhill
+  const hill = PLAN.roads.main.path.pts.slice(4, 64);     // the main street's top, from the summit downhill
   const side = (pts, off, h) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 3) { const x = ax + ux * t - uz * off, z = az + uz * t + ux * off; out.push([x, terrainAt(x, z) + h, z]); } } return out; };
   const gr = side(hill, 6.4, 0.85);
   K.rail(gr.slice(2, -3), { color: '#e9e4f5', postColor: '#5b6078', round: 3 });
   for (let k = 2; k < gr.length - 3; k += 3) H.sound(gr[k][0], gr[k][1] - 0.8, gr[k][2], 1.6, 'fence');
-  // the boulevard median: a planted ledge with a grind on each edge, gaps for crossing every 140 m
-  const bx = PLAN.boulevardX;
-  for (let z = -700; z < -330; z += 140) {
-    const z1 = Math.min(z + 120, -330);
-    H.ledge([[bx, z], [bx, z1]], { h: 0.55, w: 1.6, color: '#bdb8ae', shrub: '#5a8f4a', top: '#d8d4cc' });
-  }
+  // (the old boulevard's median ledge goes back in when the main street gets its furniture: phase 5)
 }
 
 function fillDistricts(H) {
@@ -9257,7 +9368,7 @@ const Sky = (() => {
     const cS = c('#f2f4f8'), cR = c('#7a8aa8'), cB = c('#5a6a88');
     for (let i = 0; i < seg; i++) {
       const a0 = Math.PI * 0.08 + i / seg * Math.PI * 0.84, a1 = Math.PI * 0.08 + (i + 1) / seg * Math.PI * 0.84;
-      const p = (a, y) => [Math.cos(a) * R0, y, 1100 + Math.sin(a) * R0 * 0.75];
+      const p = (a, y) => [Math.cos(a) * R0, y, 500 + Math.sin(a) * R0 * 0.75];
       const h0 = ridge(a0), h1 = ridge(a1);
       // three bands: blue foot, rock, and snow only above the snow line
       const snow = 470, m0 = Math.min(h0, snow), m1 = Math.min(h1, snow);
@@ -10393,8 +10504,8 @@ function zoneAt(x, z) {
   if (!ZONE_LIST) {
     const W = Game.W, cs = PLAN.stations.find(s => s.key === 'central').at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
     ZONE_LIST = [
-      ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -640, -760, 130], ['plaza', cs[0], cs[1], 75],
-      ['cellar', cel[0], cel[1], 22], ['pier', -480, 1420, 70], ['yard', 760, 880, 130],
+      ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -470, -560, 90], ['plaza', cs[0], cs[1], 75],
+      ['cellar', cel[0], cel[1], 22], ['pier', -330, 590, 50], ['yard', 430, 400, 90],
     ];
     if (W.bell) ZONE_LIST.push(['square', W.bell.x, W.bell.z, 45]);
   }
@@ -10478,14 +10589,14 @@ function bindUI() {
 function drawMap(cv) {
   if (!cv) return;
   const W = Game.W, c = cv.getContext('2d'), S = cv.width;
-  const x0 = -1100, x1 = 1100, z0 = -1450, z1 = 1450, k = S / Math.max(x1 - x0, z1 - z0), ox = (S - (x1 - x0) * k) / 2;
+  const x0 = -660, x1 = 660, z0 = -760, z1 = 680, k = S / Math.max(x1 - x0, z1 - z0), ox = (S - (x1 - x0) * k) / 2;
   const X = (x) => ox + (x - x0) * k, Z = (z) => (z - z0) * k;
   c.fillStyle = '#e8dfcc'; c.fillRect(0, 0, S, S);
   const tint = { park: '#a9c98f', obs: '#c9cfa0', oldtown: '#e3c9a4', business: '#cfd3d8', market: '#e8c7a0', canals: '#bcd2b8', docks: '#c9c0b2', lake: '#d9e3b8' };
-  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillStyle = tint[d.key] || '#ddd'; c.fillRect(X(a), Z(b), (e - a) * k, (f - b) * k); }
+  for (const d of PLAN.districts) { c.fillStyle = tint[d.key] || '#ddd'; c.beginPath(); d.shape.poly.forEach(([x, z], i) => i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z))); c.closePath(); c.fill(); }
   // the lake
   c.fillStyle = '#8fbcd0'; c.beginPath(); c.moveTo(X(x0), Z(z1)); for (let x = x0; x <= x1; x += 20) c.lineTo(X(x), Z(shoreZ(x))); c.lineTo(X(x1), Z(z1)); c.fill();
-  const C = PLAN.canal; c.fillStyle = '#8fbcd0'; c.fillRect(X(C.x0), Z(C.z - C.half), (C.bendX + C.half - C.x0) * k, C.half * 2 * k); c.fillRect(X(C.bendX - C.half), Z(C.z), C.half * 2 * k, (canalEndZ() - C.z) * k);
+  { const C = PLAN.canal; c.strokeStyle = '#8fbcd0'; c.lineWidth = Math.max(2, C.half * 2 * k); c.lineJoin = 'round'; c.beginPath(); C.path.pts.forEach(([x, z], i) => i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z))); c.stroke(); }
   if (PLAN.pond) { c.beginPath(); c.arc(X(PLAN.pond.x), Z(PLAN.pond.z), PLAN.pond.r * k, 0, 7); c.fill(); }
   // roads
   c.strokeStyle = '#8a8698'; c.lineCap = 'round';
@@ -10498,7 +10609,7 @@ function drawMap(cv) {
     for (const st of (W.stations || [])) { const sx = X(st.p.x), sz = Z(st.p.z); c.fillStyle = '#fff'; c.strokeStyle = '#1b1a24'; c.lineWidth = 2; c.beginPath(); c.arc(sx, sz, S / 75, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#1b1a24'; c.fillText(st.name, sx + S / 55, sz); } }
   // district names
   c.font = `500 ${Math.round(S / 30)}px ${FONT.title}`; c.textAlign = 'center'; c.fillStyle = 'rgba(27,26,36,.55)';
-  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillText(d.name, X((a + e) / 2), Z((b + f) / 2)); }
+  for (const d of PLAN.districts) { const n = d.ctrl.length, cx = d.ctrl.reduce((a, p) => a + p[0], 0) / n, cz = d.ctrl.reduce((a, p) => a + p[1], 0) / n; c.fillText(d.name, X(U.clamp(cx, x0 + 60, x1 - 60)), Z(U.clamp(cz, z0 + 40, z1 - 40))); }
   c.textAlign = 'left';
   // you
   const p = Game.player, px = X(p.pos.x), pz = Z(p.pos.z), a = p.yaw;
@@ -10643,6 +10754,7 @@ function updateWorld(dt, bi) {
     if (!(pos.x > w.x0 && pos.x < w.x1 && pos.z > w.z0 && pos.z < w.z1)) continue;
     if (w.pond && Math.hypot(pos.x - W.pond.x, pos.z - W.pond.z) > W.pond.r * 0.72) continue;
     if (w.lake && pos.z < shoreZ(pos.x)) continue;
+    if (w.canal && !inCanal(pos.x, pos.z)) continue;
     if (pos.y < w.y - 0.6) { deep = w; break; }
     if (pos.y <= w.y + 0.05 && p.mode === 'ground') wet = w;
   }

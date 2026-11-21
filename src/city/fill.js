@@ -207,9 +207,9 @@ function fillRoutes(H) {
   // it ends in a turning circle round a little tree island
   { const roads = Object.entries(W.roads || {});
     const distTo = (x, z, P) => { let d = 1e9; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = U.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); d = Math.min(d, Math.hypot(ax + dx * u - x, az + dz * u - z)); } return d; };
-    for (const [k, rd] of roads) for (const end of (k === 'oblique' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
+    for (const [k, rd] of roads) for (const end of (k === 'oblique' || k === 'ring' ? [] : [rd.pts[0], rd.pts[rd.pts.length - 1]])) {
       let [x, z] = end;
-      { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 1000) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
+      { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 580) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
       if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;
       if (inCanal(x, z)) continue;
       const R = rd.width * 0.95 + 4;
@@ -221,17 +221,12 @@ function fillRoutes(H) {
       H.block(x, z, R + 2);
     }
   }
-  const hill = ROADS.hill.slice().reverse();     // from the observatory end, downhill
+  const hill = PLAN.roads.main.path.pts.slice(4, 64);     // the main street's top, from the summit downhill
   const side = (pts, off, h) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 3) { const x = ax + ux * t - uz * off, z = az + uz * t + ux * off; out.push([x, terrainAt(x, z) + h, z]); } } return out; };
   const gr = side(hill, 6.4, 0.85);
   K.rail(gr.slice(2, -3), { color: '#e9e4f5', postColor: '#5b6078', round: 3 });
   for (let k = 2; k < gr.length - 3; k += 3) H.sound(gr[k][0], gr[k][1] - 0.8, gr[k][2], 1.6, 'fence');
-  // the boulevard median: a planted ledge with a grind on each edge, gaps for crossing every 140 m
-  const bx = PLAN.boulevardX;
-  for (let z = -700; z < -330; z += 140) {
-    const z1 = Math.min(z + 120, -330);
-    H.ledge([[bx, z], [bx, z1]], { h: 0.55, w: 1.6, color: '#bdb8ae', shrub: '#5a8f4a', top: '#d8d4cc' });
-  }
+  // (the old boulevard's median ledge goes back in when the main street gets its furniture: phase 5)
 }
 
 function fillDistricts(H) {

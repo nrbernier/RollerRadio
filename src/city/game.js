@@ -73,8 +73,8 @@ function zoneAt(x, z) {
   if (!ZONE_LIST) {
     const W = Game.W, cs = PLAN.stations.find(s => s.key === 'central').at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
     ZONE_LIST = [
-      ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -640, -760, 130], ['plaza', cs[0], cs[1], 75],
-      ['cellar', cel[0], cel[1], 22], ['pier', -480, 1420, 70], ['yard', 760, 880, 130],
+      ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -470, -560, 90], ['plaza', cs[0], cs[1], 75],
+      ['cellar', cel[0], cel[1], 22], ['pier', -330, 590, 50], ['yard', 430, 400, 90],
     ];
     if (W.bell) ZONE_LIST.push(['square', W.bell.x, W.bell.z, 45]);
   }
@@ -158,14 +158,14 @@ function bindUI() {
 function drawMap(cv) {
   if (!cv) return;
   const W = Game.W, c = cv.getContext('2d'), S = cv.width;
-  const x0 = -1100, x1 = 1100, z0 = -1450, z1 = 1450, k = S / Math.max(x1 - x0, z1 - z0), ox = (S - (x1 - x0) * k) / 2;
+  const x0 = -660, x1 = 660, z0 = -760, z1 = 680, k = S / Math.max(x1 - x0, z1 - z0), ox = (S - (x1 - x0) * k) / 2;
   const X = (x) => ox + (x - x0) * k, Z = (z) => (z - z0) * k;
   c.fillStyle = '#e8dfcc'; c.fillRect(0, 0, S, S);
   const tint = { park: '#a9c98f', obs: '#c9cfa0', oldtown: '#e3c9a4', business: '#cfd3d8', market: '#e8c7a0', canals: '#bcd2b8', docks: '#c9c0b2', lake: '#d9e3b8' };
-  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillStyle = tint[d.key] || '#ddd'; c.fillRect(X(a), Z(b), (e - a) * k, (f - b) * k); }
+  for (const d of PLAN.districts) { c.fillStyle = tint[d.key] || '#ddd'; c.beginPath(); d.shape.poly.forEach(([x, z], i) => i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z))); c.closePath(); c.fill(); }
   // the lake
   c.fillStyle = '#8fbcd0'; c.beginPath(); c.moveTo(X(x0), Z(z1)); for (let x = x0; x <= x1; x += 20) c.lineTo(X(x), Z(shoreZ(x))); c.lineTo(X(x1), Z(z1)); c.fill();
-  const C = PLAN.canal; c.fillStyle = '#8fbcd0'; c.fillRect(X(C.x0), Z(C.z - C.half), (C.bendX + C.half - C.x0) * k, C.half * 2 * k); c.fillRect(X(C.bendX - C.half), Z(C.z), C.half * 2 * k, (canalEndZ() - C.z) * k);
+  { const C = PLAN.canal; c.strokeStyle = '#8fbcd0'; c.lineWidth = Math.max(2, C.half * 2 * k); c.lineJoin = 'round'; c.beginPath(); C.path.pts.forEach(([x, z], i) => i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z))); c.stroke(); }
   if (PLAN.pond) { c.beginPath(); c.arc(X(PLAN.pond.x), Z(PLAN.pond.z), PLAN.pond.r * k, 0, 7); c.fill(); }
   // roads
   c.strokeStyle = '#8a8698'; c.lineCap = 'round';
@@ -178,7 +178,7 @@ function drawMap(cv) {
     for (const st of (W.stations || [])) { const sx = X(st.p.x), sz = Z(st.p.z); c.fillStyle = '#fff'; c.strokeStyle = '#1b1a24'; c.lineWidth = 2; c.beginPath(); c.arc(sx, sz, S / 75, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#1b1a24'; c.fillText(st.name, sx + S / 55, sz); } }
   // district names
   c.font = `500 ${Math.round(S / 30)}px ${FONT.title}`; c.textAlign = 'center'; c.fillStyle = 'rgba(27,26,36,.55)';
-  for (const d of PLAN.districts) { const [a, b, e, f] = d.rect; c.fillText(d.name, X((a + e) / 2), Z((b + f) / 2)); }
+  for (const d of PLAN.districts) { const n = d.ctrl.length, cx = d.ctrl.reduce((a, p) => a + p[0], 0) / n, cz = d.ctrl.reduce((a, p) => a + p[1], 0) / n; c.fillText(d.name, X(U.clamp(cx, x0 + 60, x1 - 60)), Z(U.clamp(cz, z0 + 40, z1 - 40))); }
   c.textAlign = 'left';
   // you
   const p = Game.player, px = X(p.pos.x), pz = Z(p.pos.z), a = p.yaw;
@@ -323,6 +323,7 @@ function updateWorld(dt, bi) {
     if (!(pos.x > w.x0 && pos.x < w.x1 && pos.z > w.z0 && pos.z < w.z1)) continue;
     if (w.pond && Math.hypot(pos.x - W.pond.x, pos.z - W.pond.z) > W.pond.r * 0.72) continue;
     if (w.lake && pos.z < shoreZ(pos.x)) continue;
+    if (w.canal && !inCanal(pos.x, pos.z)) continue;
     if (pos.y < w.y - 0.6) { deep = w; break; }
     if (pos.y <= w.y + 0.05 && p.mode === 'ground') wet = w;
   }

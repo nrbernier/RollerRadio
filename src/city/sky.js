@@ -73,7 +73,7 @@ const Sky = (() => {
     const cS = c('#f2f4f8'), cR = c('#7a8aa8'), cB = c('#5a6a88');
     for (let i = 0; i < seg; i++) {
       const a0 = Math.PI * 0.08 + i / seg * Math.PI * 0.84, a1 = Math.PI * 0.08 + (i + 1) / seg * Math.PI * 0.84;
-      const p = (a, y) => [Math.cos(a) * R0, y, 1100 + Math.sin(a) * R0 * 0.75];
+      const p = (a, y) => [Math.cos(a) * R0, y, 500 + Math.sin(a) * R0 * 0.75];
       const h0 = ridge(a0), h1 = ridge(a1);
       // three bands: blue foot, rock, and snow only above the snow line
       const snow = 470, m0 = Math.min(h0, snow), m1 = Math.min(h1, snow);

@@ -1,9 +1,9 @@
 // ============================================================
 //  TERRAIN — the city's heightfield: one grid for drawing and collision
-//  Grid lines fall exactly on the canal quays and the docks quay, so their
-//  walls can be straight boxes. Collision reads the same triangles the mesh draws.
+//  Collision reads the same triangles the mesh draws. The canal winds, so the cells
+//  along it are left out of the mesh and a quay apron (world.js) covers their edges.
 // ============================================================
-const TER = { x0: -1098, z0: -1514, cell: 8, nx: 276, nz: 376 };
+const TER = { x0: -664, z0: -784, cell: 8, nx: 166, nz: 212 };
 TER.x1 = TER.x0 + TER.nx * TER.cell; TER.z1 = TER.z0 + TER.nz * TER.cell;
 
 function buildHeights() {
@@ -11,14 +11,15 @@ function buildHeights() {
   const H = new Float32Array((nx + 1) * (nz + 1));
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) H[j * (nx + 1) + i] = cityHeight(x0 + i * cell, z0 + j * cell);
   TER.H = H;
-  // the canal: vertices strictly inside the channel drop to the bed (edges stay at quay height)
+  // the canal: vertices well inside the channel drop to the bed (those near the walls stay at quay height)
   const C = PLAN.canal;
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
-    const inside = (x > C.x0 && x < C.bendX + C.half - 0.1 && Math.abs(z - C.z) < C.half - 0.1) || (Math.abs(x - C.bendX) < C.half - 0.1 && z > C.z && z < canalEndZ());
-    if (inside) H[j * (nx + 1) + i] = C.bedY;
+    if (pathDist(C.path, x, z, 24).d < C.half - cell) H[j * (nx + 1) + i] = C.bedY;
   }
 }
+// cells the terrain mesh leaves out along the canal (any part of them may be in the channel)
+function canalCell(cx, cz) { return pathDist(PLAN.canal.path, cx, cz, 32).d < PLAN.canal.half + TER.cell * 0.72; }
 // lower the ground along a corridor (centreline points [x, y, z]) to floorY(t) + off
 function carveCorridor(pts, half, off = -0.6) {
   const { nx, nz, x0, z0, cell, H } = TER;
@@ -93,7 +94,7 @@ function terrainMeshes(paint, mat) {
   const hole = (i, j) => {   // a cell that lies inside the canal (or a dug-out hole) is not drawn
     const cx = x0 + (i + 0.5) * cell, cz = z0 + (j + 0.5) * cell;
     if (inHole(cx, cz)) return true;
-    return (cx > C.x0 && cx < C.bendX + C.half && Math.abs(cz - C.z) < C.half) || (Math.abs(cx - C.bendX) < C.half && cz > C.z && cz < canalEndZ());
+    return canalCell(cx, cz);
   };
   for (let tj = 0; tj < nz; tj += TILE) for (let ti = 0; ti < nx; ti += TILE) {
     const ni = Math.min(TILE, nx - ti), nj = Math.min(TILE, nz - tj), NG = (ni + 1) * (nj + 1);
@@ -159,12 +160,12 @@ function terrainMeshes(paint, mat) {
 const hillFbm = (x, z) => Math.sin(x * 0.0031 + Math.sin(z * 0.0023) * 2) * 0.5 + Math.sin(z * 0.0042 - x * 0.0017 + 1.7) * 0.35 + Math.sin((x + z) * 0.009) * 0.15;
 const hillWood = (x, z) => hillFbm(x * 1.7 + 300, z * 1.7 - 200) > 0.25;
 function hillY(x, z) {
-  const out = Math.max(0, Math.abs(x) - 1250, -1650 - z);
+  const out = Math.max(0, Math.abs(x) - 690, -820 - z);
   let y = landH(x, z) - 0.4 + U.smooth(U.clamp(out / 600, 0, 1)) * (hillFbm(x, z) * 55 + Math.sin(x * 0.0013 + 2) * 25);
   // the lake lies between two headlands: the hills carry on down both shores and sink slowly into the water
   // far to the south (no wall of mountains stopping dead at the beach)
-  if (z > 1100) { const lake = 1 - U.smooth(U.clamp((Math.abs(x) - 1180) / 700, 0, 1)), far = U.smooth(U.clamp((z - 1900) / 1300, 0, 1));
-    y = Math.min(y, U.lerp(y, -8, Math.max(lake * U.clamp((z - 1100) / 200, 0, 1), far))); }
+  if (z > 470) { const lake = 1 - U.smooth(U.clamp((Math.abs(x) - 640) / 450, 0, 1)), far = U.smooth(U.clamp((z - 1000) / 900, 0, 1));
+    y = Math.min(y, U.lerp(y, -8, Math.max(lake * U.clamp((z - 470) / 140, 0, 1), far))); }
   return y;
 }
 function outerHills(mat) {

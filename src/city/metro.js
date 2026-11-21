@@ -3,31 +3,30 @@
 //  through the ridge between Park and Hilltop. Trains you can ride on
 //  (roof) and that knock you off the rails.
 // ============================================================
-// the loop, as drawn on the sketch (cubic Béziers in map units), starting at Hilltop
+// the loop (cubic Béziers in metres), starting at Hilltop: down under downtown to Central, out to Harbour
+// across the canal, east and north to Market, then up the old town's hill (through it) back to Hilltop.
 // (the joints are smooth: each segment leaves a station the way the last one arrived)
 const METRO_SVG = [
-  [[235, 115], [260, 129], [270, 200], [280, 262]],
-  [[280, 262], [290, 320], [302, 360], [295, 400]],
-  [[295, 400], [290, 428], [240, 445], [205, 440]],
-  [[205, 440], [165, 435], [130, 400], [125, 350]],
-  [[125, 350], [122, 310], [195, 320], [195, 265]],     // north into Central, straight through it…
-  [[195, 265], [195, 215], [80, 230], [80, 175]],       // …then west under downtown, and north into Park
-  [[80, 175], [80, 125], [190, 90], [235, 115]],        // north out of Park, round through the ridge to Hilltop
+  [[200, -300], [90, -290], [80, 30], [170, 150]],
+  [[170, 150], [230, 230], [110, 440], [180, 470]],
+  [[180, 470], [250, 500], [470, 300], [430, 60]],
+  [[430, 60], [400, -120], [330, -310], [200, -300]],
 ];
 // downtown: inside this rect the line runs underground; Central is a sunken station open to the sky
-const DOWNTOWN = [-250, -700, 370, 250];
+const DOWNTOWN = [-200, -160, 196, 186];
 const STN = { hw: 8.6, ceil: 7.5 };      // underground hall: half width, ceiling over the deck
 // where the line meets a street at an awkward height it is pinned: `dy` metres from the ground at that point
 // (north of downtown two streets cross the cutting on bridges; a third, and the avenue, pass under a proper span)
-const METRO_WAY = [{ at: [-116, -908], dy: -7.4 }, { at: [-1, -920], dy: -7.6 }, { at: [132, -914], dy: 7.6 }, { at: [-224, 336], dy: 7.6 }];
-const METRO_LIFT = { hilltop: 2.5 };      // Hilltop stands a little taller, so the street just west of it clears the deck
+const METRO_WAY = [];        // (pins go back in once the streets are laid: phase 5)
+const METRO_LIFT = {};      // Hilltop stands a little taller, so the street just west of it clears the deck
+const METRO_TUNNEL = ['market', 'hilltop'];   // the span that may go under the hill
 const METRO = { deckW: 11, trackOff: 2.3, step: 3, clear: 9, platLen: 96, bore: 9 };   // bore: least cover for a real tunnel (less: an open cutting)
 
 function planMetro() {
   // sample the Béziers evenly
   const raw = [];
   for (const seg of METRO_SVG) {
-    const P = seg.map(([u, v]) => M6(u, v));
+    const P = seg;
     for (let i = 0; i < 400; i++) {
       const t = i / 400, a = 1 - t;
       raw.push([a * a * a * P[0][0] + 3 * a * a * t * P[1][0] + 3 * a * t * t * P[2][0] + t * t * t * P[3][0], a * a * a * P[0][1] + 3 * a * a * t * P[1][1] + 3 * a * t * t * P[2][1] + t * t * t * P[3][1]]);
@@ -84,8 +83,8 @@ function planMetro() {
   }
   for (let i = 0; i < N; i++) if (fixed[i] !== null) y[i] = fixed[i];
   // the gallery section (Park → Hilltop) may go under the hill; everywhere else stay above it
-  const park = stations.find(s => s.key === 'park'), hill = stations.find(s => s.key === 'hilltop');
-  const inTunnelSpan = (i) => { const a = park.i + half, b = hill.i - half + N; const ii = i < park.i ? i + N : i; return ii > a && ii < b; };
+  const tA = stations.find(s => s.key === METRO_TUNNEL[0]), tB = stations.find(s => s.key === METRO_TUNNEL[1]);
+  const inTunnelSpan = (i) => { const a = tA.i + half, b = tB.i - half + (tB.i < tA.i ? N : 0); const ii = i < tA.i ? i + N : i; return ii > a && ii < b; };
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < N; i++) {
       if (fixed[i] !== null) continue;

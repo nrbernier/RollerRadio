@@ -560,9 +560,10 @@ function buildPark(H) {
   buildGlasshouse(H, gh[0], gh[1]);
   // the forest: big trees except on trails, the pond, clearings and the station
   const clear = [[-900, -888, 46], [-660, -510, 70], [pond.x, pond.z, pond.r + 18], [-760, -100, 40], [-560, -1300, 55], [-440, -1000, 30]];
-  const pst = PLAN.stations.find(s => s.key === 'park').at;
+  const pst = (PLAN.stations.find(s => s.key === 'park') || { at: [1e9, 1e9] }).at;     // (no Park station on the compact map)
   for (let x = R[0] + 8; x < R[2] - 4; x += 15) for (let z = R[1] + 8; z < R[3] - 4; z += 15) {
     const tx = x + (r() - 0.5) * 12, tz = z + (r() - 0.5) * 12;
+    if (districtDist(PLAN.byKey.park, tx, tz) > 6 * r()) continue;      // the forest's ragged edge
     if (clear.some(([cx, cz, cr]) => Math.hypot(tx - cx, tz - cz) < cr)) continue;
     // glades: patches of open meadow
     const glade = Math.sin(tx * 0.013) * Math.sin(tz * 0.011) > 0.55;
@@ -570,7 +571,7 @@ function buildPark(H) {
     if (!H.clearOf(tx - 1, tz - 1, tx + 1, tz + 1, 1)) continue;
     const big = r() < 0.7, dark = r();
     const col = dark < 0.33 ? '#2f5f34' : dark < 0.66 ? '#3a6f3a' : '#47803f';
-    if (tz < -1000 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
+    if (tz < -500 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
     else H.tree(tx, tz, { s: big ? 1.9 + r() * 0.9 : 1.1 + r() * 0.4, h: big ? 6.4 : 4.4, r: 3.4, color: col, color2: dark < 0.5 ? '#36693a' : '#4f8a44', tall: big, trunk: '#5a4232' });
   }
   // (shafts of light through the canopy: see Fauna — they follow the sun)

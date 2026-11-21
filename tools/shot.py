@@ -2,7 +2,7 @@ import sys, json, time, base64, asyncio
 from playwright.async_api import async_playwright
 
 URL = "file://" + str(__import__("pathlib").Path(__file__).resolve().parent.parent / "dist") + "/city_test.html" + (sys.argv[4] if len(sys.argv) > 4 else "")
-OUT = './'
+OUT = __import__('os').environ.get('SHOT_OUT', './')
 
 async def main():
     script = sys.argv[1] if len(sys.argv) > 1 else ''
