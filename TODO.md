@@ -22,10 +22,11 @@ street end to end on a phone, then fix:
 Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly this order.
 
 ### Streets and junctions
-- Junctions are overlapping ribbons: where two streets meet, sidewalks and asphalt from both stack up, lane dashes
-  run through the junction, and sidewalk corners stick out into the road (very visible at the old town's ring
-  street where the radial streets join, at the ring's south gate, and at downtown's ring corners). Wanted: one
-  junction piece per crossing (asphalt square, kerb radii, dashes stopping at the stop line).
+- Junctions: asphalt plates now cover every crossing and T (sidewalks and dashes no longer run through the
+  middle). Still missing: kerb radii at the corners (corners are square), stop lines, and a sliver of sidewalk
+  shows where a plate meets a curved street at a shallow angle (main street × old town road above downtown).
+- Downtown's own grid streets end in slanted cuts where the district outline trims them (north-west corner,
+  next to the ring street): end them square on the ring street instead.
 - Ground patches trimmed by the district outlines have zig-zag triangle edges (downtown's pale ground and its
   sidewalk patches round the ring street, the market's sand ground). Give every district a clean edge (kerb,
   verge, or a hedge) and stop trimming patches triangle by triangle.
@@ -40,7 +41,7 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
 - The arch spot's low ledge under the main street's stone bridge looks like loose white triangles from the quay.
 
 ### Districts
-- Old town: still empty patches inside the wall where the blocks meet the curve of the wall and round the
+- Old town: blocks now have a second ring of houses round a small court. Still empty patches inside the wall where the blocks meet the curve of the wall and round the
   station's two stairways; fill them with houses that follow the wall. The rows round the open places outside
   the wall (terraceRow) are still tall town houses: make them village houses too. Big shop windows on the
   medieval houses are too large (shopFront glass); make them small medieval shop fronts.
@@ -50,8 +51,10 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   layout (stall rows along lanes, the hall, the clock tower square) at the compact size.
 - Docks: an enormous grey yard with containers scattered at random. Make proper container stacks in rows,
   sheds, rail sidings, and fewer of them.
-- Vineyards: the rows read as flat green slabs and the terrace walls are broken into short pieces by the main
-  street. Rebuild as irregular terraces following the contours, with visible vines (phase 6).
+- Vineyards: rebuilt as irregular parcels on the real outline (rows along the contour, paths between parcels,
+  short terraces). Still: the pale downtown ground (the old sunken street's patch) shows under the south half;
+  the winemaker's house stands right by the viaduct.
+- Music garden: now on the summit's slope below the observatory; its gravel patch is very pale.
 - Empty grass: the strip between the forest edge and downtown (under the metro's west side), the slopes between
   the summit and the old town, and the strip between downtown's ring and the canal quarter (under the metro's
   south side) are large plain lawns. Fill them: allotments, a park with paths, sports pitches, trees along the
@@ -73,7 +76,16 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   the viaduct (houses under the market's side of the line, the market hall's corner).
 - The tunnel mouths on the old town's hill: look at them from the lanes (portal blocks, the cut in the slope).
 
+### Lido (new)
+- The lido's deck is a terrace 2 m above the lawn behind it (it must clear the ground at its back): the brick
+  retaining wall faces the cable car's station; a few steps or a lawn bank on that side would soften it.
+- The pool is shallow (you skate through it in a spray); deep water is the lake off the diving tower.
+- Its record (surf, 138 bpm) takes over within about 60 m; check the crossfade from the lakeshore's 92 bpm.
+
 ### Bugs found and fixed in this review
+- The move-as-a-block code re-processed every list on every group (a length was compared as an array), so each
+  group trimmed away what the earlier groups had registered: most collision boxes, lamps, sounds and spots of
+  the city were gone (only the last groups' remained). Fixed: buildings are solid again, 736 sound spots.
 - The ferris wheel (and anything else that a builder both added to the scene and registered) was moved twice by
   the move-as-a-block code: a second wheel stood by downtown. Fixed; instanced meshes now stay at the origin.
 - Turning circles were drawn where a street ends at a place (station, terrace, lido). Fixed.
@@ -81,8 +93,9 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
 ## Compact city: still to place
 - Docks and lakeshore along the new shore (they still follow the old one; the lakeshore's pier things sit in
   the water)
-- People, animals, music spots and ambiences that still use old positions (life.js, fauna.js, music.js,
-  game.js zones, debug.js jump list)
+- Done: animals (herds, rabbits, fireflies, kites, fisherman, balloon, hat), birds, sailboats, ducks on the
+  canal, the pier zone, the carousel (by the ferris wheel), the music garden. Still old: debug.js jump list
+  (sunken street, vineyards, covered lane, music garden, skatepark, beach huts).
 
 ## Fixes and checks
 - Pedestrians on the metro rails: seen in Central station and again near the forest (three walkers sit at platform
