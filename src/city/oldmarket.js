@@ -55,6 +55,7 @@ function buildOldTown(H) {
   // rows of houses round each open place, facing in
   for (const p of OLD_PADS) {
     const [x, z, hf, kind] = p; if (kind === 'court') continue;
+    if (!oldWallIn(x, z, -6)) continue;        // (outside the wall the open places stand among the village houses)
     const q = oldQ(x, z), g = 1.2;
     terraceRow(H, true, x - hf, x + hf, z - hf - g, -1, r, { q, shop: 0.4 }); terraceRow(H, true, x - hf, x + hf, z + hf + g, 1, r, { q, shop: 0.4 });
     terraceRow(H, false, z - hf, z + hf, x - hf - g, -1, r, { q, shop: 0.4 }); terraceRow(H, false, z - hf, z + hf, x + hf + g, 1, r, { q, shop: 0.4 });

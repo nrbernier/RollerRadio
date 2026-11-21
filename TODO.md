@@ -44,6 +44,8 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   station's two stairways; fill them with houses that follow the wall. The rows round the open places outside
   the wall (terraceRow) are still tall town houses: make them village houses too. Big shop windows on the
   medieval houses are too large (shopFront glass); make them small medieval shop fronts.
+- Between the old town and the market (south-east of the wall) the market's houses are tall flat-roofed town
+  houses with modern-looking windows: next to the medieval town they look out of place.
 - Market: a huge sand-coloured paved field with stalls scattered over it; it reads as empty. Give it a real
   layout (stall rows along lanes, the hall, the clock tower square) at the compact size.
 - Docks: an enormous grey yard with containers scattered at random. Make proper container stacks in rows,
