@@ -163,6 +163,10 @@ const Sound = (() => {
   Object.assign(I, {
     // electric bass: a filtered saw with an octave on top, over a sine
     ebass(t, m, dur, v = 1, d = musicOut, slap = false) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.004, 0.42 * v, Math.max(0.06, dur * 0.5), 0.0001, dur * 0.5); const f = filt('lowpass', 500, 2.5, g); f.frequency.setValueAtTime(slap ? 2400 : 1300, t); f.frequency.exponentialRampToValueAtTime(380, t + 0.14); osc('sawtooth', midiF(m), t, dur + 0.1, f); osc('square', midiF(m + 12), t, dur + 0.1, gain(f, 0.18)); osc('sine', midiF(m), t, dur + 0.1, gain(g, 0.8)); },
+    twang(t, m, dur, v = 1, d = musicOut) {         // surf guitar: a bright, slightly bent pick through a spring reverb
+      if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.002, 0.1 * v, Math.max(0.05, dur * 0.7), 0.0001, dur * 0.3);
+      const f = filt('lowpass', 2800, 3, g), o = osc('sawtooth', midiF(m) * 0.985, t, dur + 0.25, f); o.frequency.exponentialRampToValueAtTime(midiF(m), t + 0.04);
+      osc('square', midiF(m) * 1.003, t, dur + 0.25, gain(f, 0.35)); sends(g, 0.75, 0.3); },
     organ(t, notes, dur, v = 1, d = musicOut) { if (!voice(dur)) return; const g = gain(d, 0); env(g, t, 0.006, 0.045 * v, Math.max(0.04, dur * 0.4), 0.0001, dur * 0.6); for (const m of notes) { const f = midiF(m); osc('sine', f, t, dur + 0.05, g); osc('sine', f * 2, t, dur + 0.05, gain(g, 0.5)); osc('sine', f * 3, t, dur + 0.05, gain(g, 0.25)); } sends(g, 0.2, 0.1); },
     // guitar: one note or a strummed chord; short and bright for a chop, longer and dull for nylon
     chop(t, notes, v = 1, dec = 0.14, bright = 1, d = musicOut, dl = 0.1) { if (!voice(dec)) return; const g = gain(d, 0); env(g, t, 0.002, 0.1 * v, dec); const f = filt('lowpass', 3200 * bright, 2, g); f.frequency.setValueAtTime(3200 * bright, t); f.frequency.exponentialRampToValueAtTime(700, t + dec); notes.forEach((m, i) => { osc('sawtooth', midiF(m), t + i * 0.006, dec + 0.05, f); osc('triangle', midiF(m + 12), t + i * 0.006, dec + 0.05, gain(f, 0.4)); }); sends(g, 0.15, dl); },
@@ -438,6 +442,31 @@ const Sound = (() => {
         if (r() < 0.04) I.bell(t + r() * sd, deg(Math.floor(r() * 9), 1), v * (0.2 + r() * 0.3), musicOut, 3.2);
       }
     },
+    // ---- LIDO: surf. A driving tom beat and tambourine, an octave-jumping bass, a twangy guitar tune in harmonic
+    //      minor; the second half the guitar tremolo-picks long notes and the toms roll at every fourth bar.
+    lido: {
+      bpm: 138, beats: 4, sub: 4, swing: 0, root: 57, mode: 'harmonic', rev: 0.55, dly: 0.25,
+      moods: ['harmonic', 'harmonic', 'aeolian'], nightTempo: 0.06, nightGain: 1,
+      prog: [[0], [5], [6], [4]],                                   // Am – F – G – E
+      MEL: [[[0, 4, 2], [2, 4, 1], [3, 3, 1], [4, 2, 2], [6, 3, 2], [8, 4, 4], [12, 0, 4]], [[0, 5, 2], [2, 5, 1], [3, 4, 1], [4, 3, 2], [6, 4, 2], [8, 5, 6], [14, 4, 2]],
+        [[0, 6, 2], [2, 4, 2], [4, 6, 2], [6, 7, 2], [8, 6, 4], [12, 4, 4]], [[0, 6, 3], [3, 5, 1], [4, 4, 4], [8, 3, 2], [10, 2, 2], [12, 1, 4]]],
+      TR: [7, 5, 6, 4],
+      play(c) {
+        const { s, t, sd, v, r, st, e, bar } = c, b4 = bar % 4, b16 = bar % 16, trem = b16 >= 8;
+        st.sec = trem ? 'tremolo guitar' : b16 < 4 ? 'beat and bass' : 'guitar tune';
+        if (s === 0 || s === 8 || (s === 10 && e > 0.4)) I.kick(t, v * 0.8, musicOut, 120, 50, 0.2);
+        if (s === 4 || s === 12) I.snare(t, v * 0.7);
+        if (s % 2 === 0) I.shaker(t, v * (s % 8 === 4 ? 0.9 : 0.5));
+        if (b4 === 3 && s >= 8) I.conga(t, [150, 150, 130, 130, 115, 115, 100, 100][s - 8], v * 0.75);
+        else if (s === 6 || s === 14) I.conga(t, 140, v * 0.45);
+        if (s % 2 === 0) { const oct = s % 4 === 2 ? 12 : 0; I.ebass(t, low(deg(H.deg, -2)) + oct, sd * 1.6, v * 0.65); }
+        if (e > 0.3 && s % 4 === 2) I.organ(t, chord(3, 0), sd * 1.4, v * 0.55);
+        if (b16 >= 4 && !trem) at(this.MEL[b4], s, (d, l) => I.twang(t, deg(d, 0), l * sd * 0.9, v * 0.85));
+        if (trem) I.twang(t, deg(this.TR[b4], s % 8 < 6 ? 1 : 0), sd * 0.9, v * (s % 4 === 0 ? 0.55 : 0.38));
+        if (s === 0 && bar % 8 === 0) I.waves(t, sd * 24, v * 0.6);
+        if (r() < 0.015) I.whistle(t, deg(4, 1), deg(7, 1), sd * 3, v * 0.25);       // the lifeguard
+      }
+    },
   };
   for (const k in REC) { REC[k].key = k; REC[k].st = {}; REC[k].r = U.rng(k.length * 977 + 13); REC[k].e = 0.5; REC[k].f = 1; REC[k].w = 0; }
 
@@ -592,6 +621,14 @@ const Sound = (() => {
       trick: (t, sd, v, n) => { const ct = chord(4, 1); for (let i = 0; i < 3 + Math.min(n, 3); i++) I.musicbox(t + i * sd * 0.5, ct[i % 4] + 12, v * 0.6); },
       push: () => {},
       bass: (t, m, d, v) => I.drone(t, m, d, v * 0.5),
+    },
+    lido: {
+      lead: (t, m, v, dur) => I.twang(t, m, Math.min(0.5, (dur || 0.2) * 0.95), v * 0.8),
+      perc: (t, v, i) => i % 2 ? I.shaker(t, v) : I.conga(t, 140, v * 0.5),
+      land: (t, v) => { I.conga(t, 110, v * 0.8); I.snare(t, v * 0.5); },
+      trick: (t, sd, v, n) => { for (let i = 0; i < 6 + Math.min(n, 6); i++) I.twang(t + i * sd * 0.25, deg(9 - i, 0), sd * 0.3, v * 0.5); },
+      push: (t, v) => I.shaker(t, v * 0.6),
+      bass: (t, m, d, v) => I.ebass(t, m, d, v * 0.8),
     },
   };
   // the kits of the places you're in, by weight (two at most, at a border)

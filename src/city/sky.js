@@ -60,7 +60,8 @@ const Sky = (() => {
   const AMB = {
     park: [0.72, '#cfe8b0', '#8fae86', 0.45], obs: [1.05, '#ffffff', '#c8dcf0', 0.1], oldtown: [1.0, '#ffe8c8', '#e8d0b0', 0.2],
     business: [1.0, '#f0f6ff', '#c0d4e8', 0.15], market: [1.02, '#ffe0b0', '#f0c890', 0.35], canals: [0.92, '#e0ecf0', '#a8c4cc', 0.3],
-    docks: [0.9, '#f0e0d0', '#c8b8a8', 0.4], lake: [1.06, '#ffffff', '#c8e4f4', 0.15]
+    docks: [0.9, '#f0e0d0', '#c8b8a8', 0.4], lake: [1.06, '#ffffff', '#c8e4f4', 0.15],
+    lido: [1.1, '#fffaf0', '#bfeaf2', 0.2]
   };
   const ambC = new THREE.Color(), airC = new THREE.Color(), _a = new THREE.Color();
   S.weights = null;

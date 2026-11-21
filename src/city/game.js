@@ -74,7 +74,7 @@ function zoneAt(x, z) {
     const W = Game.W, cs = (PLAN.stations.find(s => s.key === 'central') || PLAN.stations.find(s => s.key === 'canal')).at, cel = PLAN.spots.find(s => s.key === 'cellar').at;
     ZONE_LIST = [
       ['pond', PLAN.pond.x, PLAN.pond.z, PLAN.pond.r + 25], ['deepwood', -470, -560, 90], ['plaza', cs[0], cs[1], 75],
-      ['cellar', cel[0], cel[1], 22], ['pier', -330, 590, 50], ['yard', 430, 400, 90],
+      ['cellar', cel[0], cel[1], 22], ['pier', -360, 640, 50], ['yard', 430, 400, 90],
     ];
     if (W.bell) ZONE_LIST.push(['square', W.bell.x, W.bell.z, 45]);
   }
@@ -407,6 +407,8 @@ function loop(now) {
     else p.syncRig(dt, bi.phase);
     // what the music needs to know
     districtWeights(p.pos.x, p.pos.z, _dw, 140);
+    // the lido is a place of its own, with its own record: it takes over within about 60 m of the pool
+    { const L = W.lido || { x: PLAN.places.lido[0], z: PLAN.places.lido[1] }, wl = U.smooth(U.clamp((95 - Math.hypot(p.pos.x - L.x, p.pos.z - L.z)) / 45, 0, 1)); for (const key in _dw) _dw[key] *= 1 - wl; _dw.lido = wl; }
     if (Game.radio && Game.radioK > 0.02) { const k = Game.radioK * 0.75; for (const key in _dw) _dw[key] *= 1 - k; _dw[Game.radio] = (_dw[Game.radio] || 0) + k; }
     Sound.setPlace(_dw, dt); Sky.S.weights = _dw;
     const ground = p.ground;

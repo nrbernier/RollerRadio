@@ -97,7 +97,7 @@ const Fauna = (() => {
     const kg = new THREE.BufferGeometry();
     kg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.9, 0, -0.6, 0, 0, 0, -1.1, 0, 0, 0.9, 0, 0, -1.1, 0, 0.6, 0, 0, 0, -1.1, 0, -0.08, -2.6, 0, 0.08, -2.6, 0], 3)); kg.computeVertexNormals();
     IM.kite = mkIM(kg, 4, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: true }));
-    const kitePos = [[-600, 'lake'], [-420, 'lake'], [-150, 'lake'], [10, 'lake']];
+    const kitePos = [[-440, 'lake'], [-290, 'lake'], [-150, 'lake'], [10, 'lake']];
     kitePos.forEach(([kx], i) => { const kz = shoreZ(kx) - 20, y = terrainAt(kx, kz); kites.push({ hx: kx, hz: kz, hy: y + 1.1, ph: r() * 6, col: ['#e4572e', '#f2c14e', '#2f8f9d', '#d9779a'][i] }); IM.kite.setColorAt(i, _c.set(kites[i].col)); W.npcs.push({ kind: 'stand', pts: [[kx, kz, 0, y]], style: 'lake', kids: true }); });
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(kites.length * 6), 3));
     kiteLines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x3a3550, transparent: true, opacity: 0.6 })); kiteLines.frustumCulled = false; W.group.add(kiteLines);

@@ -231,7 +231,7 @@ function xfRun(H, g, ...fns) {
     if (XF_SKIP.has(k) || typeof W[k] === 'function') continue;
     const v = W[k], b = before.get(k);
     if (Array.isArray(v)) {
-      const from = before.has(k) && Array.isArray(b) ? b : 0;
+      const from = typeof b === 'number' ? b : 0;        // (the length it had before)
       if (v.length <= from) continue;
       const fresh = v.splice(from);
       for (const e of fresh) xfShift(e, dx, dz, seen);

@@ -269,3 +269,93 @@ function buildLakeshore(H) {
   for (let i = 0; i < 140; i++) { const x = R[0] + 20 + r() * (R[2] - R[0] - 40), z = R[1] + 10 + r() * (shoreZ(x) - 70 - R[1]); if (H.clearOf(x - 2, z - 2, x + 2, z + 2, 1.5)) { H.tree(x, z, { s: 1.1 + r() * 0.6, h: 4.2, color: pick(r, ['#5f8f45', '#4f7f42', '#6f9a50']), color2: '#7aa055' }); H.reserve([x - 2, z - 2, x + 2, z + 2]); } }
   (W.pigeonSpots = W.pigeonSpots || []).push([px, pz0 - 20, 10], [0, mz - 30, 8]);
 }
+
+// ============================================================
+//  THE LIDO — a lake bath on a deck where the promenade ends: a 50 m pool, a row of changing cabins,
+//  sunshades, an entrance pavilion, and a diving tower over the lake. It has its own record (surf).
+// ============================================================
+const LIDO = { x0: -622, z0: 526, x1: -486, z1: 606, y: 3.2, pool: [-604, 548, -544, 578], waterY: 2.75 };
+function buildLido(H) {
+  const L = LIDO;
+  { let m = -1e9; for (let x = L.x0; x <= L.x1; x += 4) m = Math.max(m, terrainAt(x, L.z0), terrainAt(x, L.z0 + 6)); L.y = Math.round((m + 0.3) * 10) / 10; L.waterY = L.y - 0.45; }   // the deck just clears the ground at its back
+  const { K, W, B, S } = H, r = U.rng(4242), y = L.y, [px0, pz0, px1, pz1] = L.pool;
+  const lo = (x0, z0, x1, z1) => Math.min(terrainAt(x0, z0), terrainAt(x1, z0), terrainAt(x0, z1), terrainAt(x1, z1), -0.5) - 1.5;
+  const deck = '#cfc4ae', tile = '#7fd3e3', edge = '#f7f2e6';
+  // the deck: four slabs round the pool (the lake end stands on piles over the water)
+  const slab = (x0, z0, x1, z1) => K.box(x0, lo(x0, z0, x1, z1), z0, x1, y, z1, deck, 'tiles', { outlineT: 0.05 });
+  slab(L.x0, L.z0, L.x1, pz0); slab(L.x0, pz1, L.x1, L.z1 - 10); slab(L.x0, pz0, px0, pz1); slab(px1, pz0, L.x1, pz1);
+  K.box(L.x0, y - 0.6, L.z1 - 10, L.x1, y, L.z1, '#c9b48e', 'wood', { outlineT: 0.04 });          // the boards over the lake
+  for (let x = L.x0 + 2; x < L.x1; x += 8) for (const z of [L.z1 - 8, L.z1 - 1]) K.cyl(x, -2.5, z, 0.35, y - 0.6 + 2.5, '#6a5440', { outline: 0.02, seg: 6 });
+  // the pool: tiled floor and walls, a white coping, the water
+  K.box(px0, lo(px0, pz0, px1, pz1), pz0, px1, L.waterY - 0.5, pz1, tile, 'tiles', { outlineT: 0 });        // (shallow: you skate through it in a spray)
+  for (const [a, b, c, d] of [[px0, pz0 - 0.5, px1, pz0], [px0, pz1, px1, pz1 + 0.5], [px0 - 0.5, pz0, px0, pz1], [px1, pz0, px1 + 0.5, pz1]]) B.box(a, L.waterY - 0.5, b, c, y + 0.12, d, edge, 'plain', { outlineT: 0.03 });
+  { const wm = new THREE.Mesh(new THREE.PlaneGeometry(px1 - px0, pz1 - pz0), new THREE.MeshBasicMaterial({ color: 0x5fd0ea, map: W.mats.waterTex, transparent: true, opacity: 0.78, depthWrite: false }));
+    wm.rotation.x = -Math.PI / 2; wm.position.set((px0 + px1) / 2, L.waterY, (pz0 + pz1) / 2); wm.renderOrder = 4; W.group.add(wm);
+    const uv = wm.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 8, uv.getY(i) * 4); uv.needsUpdate = true; }
+  W.waters.push({ x0: px0, z0: pz0, x1: px1, z1: pz1, y: L.waterY, pool: true });
+  // lanes: ropes of red and white floats, dark lines on the floor
+  for (let k = 1; k < 6; k++) { const z = pz0 + k * (pz1 - pz0) / 6; for (let x = px0 + 0.6; x < px1 - 0.4; x += 0.8) B.box(x - 0.18, L.waterY - 0.08, z - 0.18, x + 0.18, L.waterY + 0.1, z + 0.18, Math.floor(x) % 4 < 2 ? '#e4572e' : '#ffffff', 'plain', { outlineT: 0, edges: false }); }
+  for (let k = 0; k < 6; k++) { const z = pz0 + (k + 0.5) * (pz1 - pz0) / 6; B.box(px0 + 2, L.waterY - 0.49, z - 0.25, px1 - 2, L.waterY - 0.46, z + 0.25, '#2f5f8a', 'plain', { outlineT: 0, edges: false }); }
+  // starting blocks at the west end, a ladder at each corner
+  for (let k = 0; k < 6; k++) { const z = pz0 + (k + 0.5) * (pz1 - pz0) / 6; K.box(px0 - 1.6, y, z - 0.45, px0 - 0.6, y + 0.75, z + 0.45, k % 2 ? '#2f8f9d' : '#f2efe6', 'plain', { outlineT: 0.04 }); }
+  for (const [x, z] of [[px1 - 2, pz0], [px1 - 2, pz1]]) K.rail([[x, y + 0.9, z], [x + 1.2, y + 0.9, z]], { color: '#c9d2dc', postMax: 1.2, round: 0 });
+  // changing cabins along the back: little huts, roofs in a row you can ride along
+  const cols = ['#f2efe6', '#7fd3e3', '#e4572e', '#f2efe6', '#f2c14e', '#7fd3e3'];
+  for (let x = L.x0 + 3, k = 0; x < px1 + 6; x += 3.4, k++) {
+    const z0 = L.z0 + 3, z1 = L.z0 + 8;
+    K.box(x, y, z0, x + 3.2, y + 2.7, z1, cols[k % cols.length], 'plain', { outlineT: 0.05 });
+    B.box(x + 0.8, y, z1, x + 2.4, y + 2.1, z1 + 0.05, '#3a3550', 'plain', { outlineT: 0, edges: false });          // the door
+  }
+  K.box(L.x0 + 2.6, y + 2.7, L.z0 + 2.4, px1 + 6.4, y + 2.95, L.z0 + 8.8, '#ffffff', 'plain', { outlineT: 0.05 });       // one long roof slab
+  // the entrance pavilion, where the promenade ends: a round-cornered box under a thin cantilevered roof
+  { const ex0 = L.x1 - 22, ex1 = L.x1 - 4, ez0 = L.z0 + 2, ez1 = L.z0 + 12;
+    K.box(ex0, y, ez0, ex1, y + 3.4, ez1, '#f2c14e', 'plain', { outlineT: 0.05 });
+    for (let x = ex0 + 2; x < ex1 - 1; x += 4) B.box(x, y + 0.9, ez1, x + 2.4, y + 2.6, ez1 + 0.05, '#3a3550', 'plain', { outlineT: 0, edges: false });      // the ticket windows
+    K.box(ex0 - 2, y + 3.4, ez0 - 2, ex1 + 4, y + 3.7, ez1 + 3, '#2f8f9d', 'plain', { outlineT: 0.06 });
+    for (let k = 0; k < 8; k++) B.box(ex0 - 2 + k * 3, y + 3.7, ez1 + 2.95, ex0 - 2 + k * 3 + 1.5, y + 4.2, ez1 + 3.1, k % 2 ? '#e4572e' : '#ffffff', 'plain', { outlineT: 0, edges: false });
+    for (const x of [ex1 + 3, ex0 - 1]) K.cyl(x, y, ez1 + 2, 0.2, 3.4, '#3a3550', { outline: 0.02, seg: 8 });
+    // a ramp up from the end of the promenade to the deck
+    const gx = L.x1 + 2, gz = (ez0 + ez1) / 2, gy = terrainAt(L.x1 + 16, gz);
+    S.add(L.x1 + 16, gy, gz, L.x1, y, gz, 4.5);
+    B.add(new THREE.BoxGeometry(16.5, 0.4, 9), new THREE.Matrix4().makeRotationZ(Math.atan2(y - gy, 16)).setPosition(L.x1 + 8, (gy + y) / 2 - 0.2, gz), deck, 'tiles', { outlineT: 0.04, edges: false });
+    void gx; }
+  // sunshades and deckchairs on the east deck, by the lake
+  const shade = ['#e4572e', '#f2c14e', '#2f8f9d', '#ffffff', '#d9779a'];
+  for (let i = 0; i < 14; i++) {
+    const x = px1 + 5 + (i % 4) * 8 + r() * 2, z = pz0 + 2 + Math.floor(i / 4) * 9 + r() * 2;
+    if (x > L.x1 - 4 || z > L.z1 - 12) continue;
+    K.cyl(x, y, z, 0.06, 2.4, '#3a3550', { outline: 0, seg: 5 });
+    B.add(new THREE.ConeGeometry(1.7, 0.7, 8), new THREE.Matrix4().makeTranslation(x, y + 2.55, z), shade[i % shade.length], 'plain', { outlineT: 0.04 });
+    for (const sd of [-1, 1]) K.box(x + sd * 1.2 - 0.4, y, z + 0.4, x + sd * 1.2 + 0.4, y + 0.35, z + 2.2, '#f2efe6', 'plain', { outlineT: 0.03 });
+  }
+  // the west deck: planters with trees, a kiosk with a striped awning
+  for (const [x, z] of [[L.x0 + 6, pz0 + 4], [L.x0 + 6, pz1 - 4], [L.x0 + 6, L.z1 - 16]]) { K.box(x - 1.6, y, z - 1.6, x + 1.6, y + 0.8, z + 1.6, '#b8743a', 'wood', { outlineT: 0.04 }); H.tree(x, z, { y: y + 0.8, s: 0.7, h: 3, color: '#6fbf6a', far: false }); }
+  { const kx = L.x0 + 4, kz = (pz1 + L.z1 - 10) / 2 + 2; K.box(kx, y, kz - 3, kx + 5, y + 2.8, kz + 3, '#f7f2e6', 'plain', { outlineT: 0.05 });
+    for (let k = 0; k < 4; k++) B.box(kx + 5, y + 2.4 - 0.02 * k, kz - 3 + k * 1.5, kx + 6.4, y + 2.5, kz - 1.5 + k * 1.5, k % 2 ? '#ffffff' : '#e4572e', 'plain', { outlineT: 0.02, edges: false }); }
+  // a lifeguard's high chair by the pool
+  K.box(px1 - 6, y, pz1 + 1.2, px1 - 4.8, y + 2.4, pz1 + 2.4, '#ffffff', 'plain', { outlineT: 0.04 });
+  W.npcs.push({ kind: 'stand', pts: [[px1 - 5.4, pz1 + 1.8, Math.PI, y + 2.4]], style: 'lake' });
+  // people: swimmers' friends on the deck, a few sunbathers
+  for (let i = 0; i < 8; i++) { const x = U.lerp(px0, px1, r()), z = r() < 0.5 ? pz0 - 3 : pz1 + 5; W.npcs.push({ kind: 'stand', pts: [[x, z, r() * 6, y]], style: 'lake' }); }
+  // the diving tower over the lake: 3, 5 and 10 m boards, stairs up the back
+  { const tx = L.x1 - 14, tz = L.z1 - 4, c = '#e8e2d4';
+    K.box(tx - 1.5, -2.5, tz - 1.5, tx + 1.5, y + 10, tz + 1.5, c, 'plain', { outlineT: 0.06 });
+    for (const [h, len, w] of [[3, 5, 1.6], [5, 6, 1.6], [10, 7, 2.2]]) {
+      const side = h === 5 ? -1 : 1;
+      K.box(tx - w / 2 + side * (h === 5 ? 2.5 : 0), y + h - 0.25, tz, tx + w / 2 + side * (h === 5 ? 2.5 : 0), y + h, tz + len, h === 10 ? '#2f8f9d' : '#ffffff', 'plain', { outlineT: 0.05 });
+      K.rail([[tx - w / 2 + side * (h === 5 ? 2.5 : 0), y + h + 1, tz], [tx - w / 2 + side * (h === 5 ? 2.5 : 0), y + h + 1, tz + len * 0.6]], { color: '#c9d2dc', postMax: 1, round: 0 });
+    }
+    // stairs: up the back in flights, a landing at each board
+    S.add(tx - 8, y, tz - 6, tx - 1.6, y + 5, tz - 6, 1.2);
+    K.box(tx - 1.6, y + 4.75, tz - 7.2, tx + 1.6, y + 5, tz - 1.5, '#ffffff', 'plain', { outlineT: 0.04 });
+    S.add(tx + 1.6, y + 5, tz - 4, tx + 8, y + 10, tz - 4, 1.2);
+    K.box(tx + 8, y + 9.75, tz - 5.2, tx + 10, y + 10, tz - 2.8, '#ffffff', 'plain', { outlineT: 0.04 });
+    K.box(tx + 1.5, y + 9.75, tz - 2.8, tx + 10, y + 10, tz + 0.4, '#ffffff', 'plain', { outlineT: 0.04 });
+    for (const [a, b] of [[[tx - 8, y + 1, tz - 7.1], [tx - 1.6, y + 6, tz - 7.1]], [[tx + 1.6, y + 6, tz - 2.9], [tx + 8, y + 11, tz - 2.9]]]) K.rail([a, b], { color: '#c9d2dc', postMax: 1.1, round: 0 });
+  }
+  // railings along the lake edge (a long grind), lamps and flags
+  K.rail([[L.x0 + 1, y + 1, L.z1 - 0.5], [L.x1 - 20, y + 1, L.z1 - 0.5]], { color: '#e9e4f5', postColor: '#3a3550', postMax: 1.1, round: 2 });
+  for (let x = L.x0 + 6; x < L.x1 - 4; x += 14) H.lamp(x, L.z0 + 13, { y, style: 'globe', h: 3.6, color: '#2f5f8a' });
+  for (let x = L.x0 + 10; x < L.x1 - 20; x += 18) { K.cyl(x, y, L.z1 - 9, 0.07, 6, '#ffffff', { outline: 0, seg: 5 }); B.box(x + 0.07, y + 4.8, L.z1 - 9.02, x + 1.7, y + 5.8, L.z1 - 8.98, shade[(x | 0) % 5 < 0 ? 0 : Math.abs(x | 0) % 5], 'plain', { outlineT: 0, edges: false }); }
+  W.lido = { x: (L.x0 + L.x1) / 2, z: (L.z0 + L.z1) / 2 };
+}
