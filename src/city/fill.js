@@ -212,6 +212,8 @@ function fillRoutes(H) {
       { const o = end === rd.pts[0] ? rd.pts[1] : rd.pts[rd.pts.length - 2], L = Math.hypot(o[0] - x, o[1] - z); if (Math.abs(x) > 580) { x += (o[0] - x) / L * 14; z += (o[1] - z) / L * 14; } }
       if (roads.some(([k2, r2]) => k2 !== k && distTo(x, z, r2.pts) < r2.width / 2 + rd.width)) continue;
       if (inCanal(x, z)) continue;
+      // (a street that ends at a place — a station, the observatory's terrace, the lido — needs no turning circle)
+      if (PLAN.stations.some(st => Math.hypot(st.at[0] - x, st.at[1] - z) < 45) || ['summit', 'lido'].some(k => Math.hypot(PLAN.places[k][0] - x, PLAN.places[k][1] - z) < 45)) continue;
       const R = rd.width * 0.95 + 4;
       H.blob(x, z, R + 3.5, R + 3.5, '#c8c1b4', 'walk', 0.075, 3);
       H.blob(x, z, R, R, '#5a5868', 'road', 0.105, 5);

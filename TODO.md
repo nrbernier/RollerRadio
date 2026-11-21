@@ -18,6 +18,64 @@ street end to end on a phone, then fix:
 - Cars: they drive the new streets; check they turn at junctions and never drive through a station or a house.
 - Then `tools/geom.py` and the physics/camera bot on the new map.
 
+## Compact city: everything that still looks wrong (review of 21 Nov 2026, from the air and at street level)
+Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly this order.
+
+### Streets and junctions
+- Junctions are overlapping ribbons: where two streets meet, sidewalks and asphalt from both stack up, lane dashes
+  run through the junction, and sidewalk corners stick out into the road (very visible at the old town's ring
+  street where the radial streets join, at the ring's south gate, and at downtown's ring corners). Wanted: one
+  junction piece per crossing (asphalt square, kerb radii, dashes stopping at the stop line).
+- Ground patches trimmed by the district outlines have zig-zag triangle edges (downtown's pale ground and its
+  sidewalk patches round the ring street, the market's sand ground). Give every district a clean edge (kerb,
+  verge, or a hedge) and stop trimming patches triangle by triangle.
+- The main street starts on a huge asphalt area at the observatory's terrace (with painted arrows): make the
+  terrace a proper end (a little square, steps, the main street's last bend into it).
+- Forest station: the cross street just stops under the viaduct. It needs a forecourt and a visible way up to the
+  platforms (stairs or ramps) — same check for every elevated station.
+- Old park trails (pale lines in the forest) start and end nowhere; reconnect them to the cross street, the pond,
+  the glasshouse, the crag and the cable car's top station, or remove them.
+- Old canal-quarter fill (benches, planters, paths from the old straight canal) is still placed on old lines
+  across the new canal quarter: the quarter's fill should be redone along the winding canal.
+- The arch spot's low ledge under the main street's stone bridge looks like loose white triangles from the quay.
+
+### Districts
+- Old town: still empty patches inside the wall where the blocks meet the curve of the wall and round the
+  station's two stairways; fill them with houses that follow the wall. The rows round the open places outside
+  the wall (terraceRow) are still tall town houses: make them village houses too. Big shop windows on the
+  medieval houses are too large (shopFront glass); make them small medieval shop fronts.
+- Market: a huge sand-coloured paved field with stalls scattered over it; it reads as empty. Give it a real
+  layout (stall rows along lanes, the hall, the clock tower square) at the compact size.
+- Docks: an enormous grey yard with containers scattered at random. Make proper container stacks in rows,
+  sheds, rail sidings, and fewer of them.
+- Vineyards: the rows read as flat green slabs and the terrace walls are broken into short pieces by the main
+  street. Rebuild as irregular terraces following the contours, with visible vines (phase 6).
+- Empty grass: the strip between the forest edge and downtown (under the metro's west side), the slopes between
+  the summit and the old town, and the strip between downtown's ring and the canal quarter (under the metro's
+  south side) are large plain lawns. Fill them: allotments, a park with paths, sports pitches, trees along the
+  viaduct.
+- Downtown: several blocks are empty (the cable car's corridor clears a diagonal through the middle); check which
+  are empty on purpose. The cable now runs from the Needle down to Canal station across all of downtown: decide
+  whether that is wanted.
+- Marina: the sailboats are flat slabs with very tall masts; seen from afar the masts read as a grey comb.
+
+### Water
+- The canal now opens into the harbour basin. Still check from the quays: the stretch of quay between the
+  embankment and the canal, the embankment's end in the lake, and the docks' quay wall west of x 222.
+- The lake's shoreline is drawn by the 8 m terrain grid where it crosses the water: slightly angular up close.
+  A smoother waterline (finer terrain along the shore, or a shore strip) would help everywhere.
+- The canal's water is darker than the lake's; fine, but a short blend where they meet would look softer.
+
+### Metro
+- Check every station from the street: stairs/ramps up, forecourts, nothing of a district built under or into
+  the viaduct (houses under the market's side of the line, the market hall's corner).
+- The tunnel mouths on the old town's hill: look at them from the lanes (portal blocks, the cut in the slope).
+
+### Bugs found and fixed in this review
+- The ferris wheel (and anything else that a builder both added to the scene and registered) was moved twice by
+  the move-as-a-block code: a second wheel stood by downtown. Fixed; instanced meshes now stay at the origin.
+- Turning circles were drawn where a street ends at a place (station, terrace, lido). Fixed.
+
 ## Compact city: still to place
 - Docks and lakeshore along the new shore (they still follow the old one; the lakeshore's pier things sit in
   the water)

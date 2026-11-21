@@ -222,7 +222,11 @@ function xfRun(H, g, ...fns) {
     ({ terrainAt, cityHeight, landH, inCanal, shoreZ, canalEndZ, districtAt, districtWeights, inHole } = XF_REAL);
   }
   // move what was registered: new lists and items, new or replaced objects
-  const seen = new WeakSet(), keep = (v) => { const c = xfCentre(v); if (!c) return true; Object.assign(XF, { g, keep: G.keep, margin: G.margin || 0 }); const ok = xfKeepPoint(c[0], c[1]); XF.g = null; return ok; };
+  // (models added to the scene first, and remembered, so a registry that holds one doesn't move it twice)
+  const seen = new WeakSet();
+  // (instanced meshes stay at the origin: their instances are placed in real coordinates while the game runs)
+  for (let i = nKids; i < W.group.children.length; i++) { const o = W.group.children[i]; seen.add(o); if (o.isInstancedMesh) continue; o.position.x += dx; o.position.z += dz; }
+  const keep = (v) => { const c = xfCentre(v); if (!c) return true; Object.assign(XF, { g, keep: G.keep, margin: G.margin || 0 }); const ok = xfKeepPoint(c[0], c[1]); XF.g = null; return ok; };
   for (const k of Object.keys(W)) {
     if (XF_SKIP.has(k) || typeof W[k] === 'function') continue;
     const v = W[k], b = before.get(k);
@@ -236,7 +240,6 @@ function xfRun(H, g, ...fns) {
   }
   // the harbour's water and the like: shifted, not trimmed
   for (let i = W.waters.length - 1; i >= 0 && W.waters[i]._xf === undefined; i--) { W.waters[i]._xf = g; if (!W.waters[i].lake && !W.waters[i].canal) xfShift(W.waters[i], dx, dz, seen); }
-  for (let i = nKids; i < W.group.children.length; i++) { const o = W.group.children[i]; o.position.x += dx; o.position.z += dz; }
   for (let i = nDecks; i < DECKS.length; i++) xfShift(DECKS[i], dx, dz, seen);
   for (let i = nHoles; i < TER.holes.length; i++) xfShift(TER.holes[i], dx, dz, seen);
 }
