@@ -79,23 +79,29 @@ function buildOldTown(H) {
     for (let s = 14; s < len; s += 36) { const x = ax + ux * s + uz * 3.6, z = az + uz * s - ux * 3.6; if (H.clearOf(x - 0.3, z - 0.3, x + 0.3, z + 0.3, 0)) H.lamp(x, z, { style: 'globe', h: 3.6, color: '#2a2a32' }); }
   }
   // courtyards: four wings round a yard, a gateway in, a gallery and stairs inside
-  for (let i = 0, n = 0; i < 400 && n < 9; i++) {
+  for (let i = 0, n = 0; i < 0 && n < 9; i++) {      // (no courtyard blocks in the compact old town's outskirts)
     const x = U.lerp(R[0] + 26, R[2] - 26, r()), z = U.lerp(R[1] + 24, R[3] - 24, r());
     if (oldWallIn(x, z, -26) || !H.clearOf(x - 17, z - 15, x + 17, z + 15, 2)) continue;
     const [lo, hi] = groundSpan(x - 17, z - 15, x + 17, z + 15); if (hi - lo > 7) continue;
     courtBlock(H, x, z, r); n++;
   }
   // short rows tucked into the gaps between lanes
-  for (let i = 0; i < 520; i++) {
+  for (let i = 0; i < 0; i++) {      // (no terrace rows outside the wall either)
     const alongX = r() < 0.5, n = 2 + Math.floor(r() * 3), len = n * 8.6, x = U.lerp(R[0] + 6, R[2] - 6 - (alongX ? len : 11), r()), z = U.lerp(R[1] + 6, R[3] - 6 - (alongX ? 11 : len), r());
     if (oldWallIn(x, z, -20) || !H.clearOf(x, z, x + (alongX ? len : 11.5), z + (alongX ? 11.5 : len), 2.4)) continue;
     terraceRow(H, alongX, alongX ? x : z, (alongX ? x : z) + len, alongX ? z : x, 1, r, { shop: 0.12 });
   }
   // and single houses in what is left
-  for (let i = 0; i < 260; i++) {
-    const x = U.lerp(R[0] + 6, R[2] - 6, r()), z = U.lerp(R[1] + 6, R[3] - 6, r()), w = 7 + r() * 4, d = 7 + r() * 4;
-    if (oldWallIn(x, z, -16) || !H.clearOf(x - w / 2, z - d / 2, x + w / 2, z + d / 2, 2.5)) continue;
-    oldHouse(H, x - w / 2, z - d / 2, x + w / 2, z + d / 2, r);
+  // outside the wall: small houses, each in its garden (fruit trees, a shed, a vegetable patch)
+  for (let i = 0; i < 700; i++) {
+    const x = U.lerp(R[0] + 6, R[2] - 6, r()), z = U.lerp(R[1] + 6, R[3] - 6, r()), w = 5.5 + r() * 2.5, d = 6 + r() * 2.5;
+    if (oldWallIn(x, z, -18) || !H.clearOf(x - w / 2 - 5, z - d / 2 - 5, x + w / 2 + 5, z + d / 2 + 5, 1)) continue;
+    oldHouse(H, x - w / 2, z - d / 2, x + w / 2, z + d / 2, r, { type: pick(r, ['gable', 'steep', 'gable', 'timber']), h: 3.6 + r() * 2.2 });
+    const gx = x + (r() < 0.5 ? -1 : 1) * (w / 2 + 3.5), gz = z + (r() - 0.5) * d;
+    if (r() < 0.5) H.blob(gx, gz, 2.6, 1.8, '#6a5a3a', 'gravel', 0.06, i);
+    else H.tree(gx, gz, { s: 0.6, h: 2.4, color: pick(r, ['#6f9a4a', '#8aa04a', '#5f8f45']), far: false });
+    if (r() < 0.35) { const sx = x + (r() - 0.5) * w, sz = z + (r() < 0.5 ? -1 : 1) * (d / 2 + 3); const y = terrainAt(sx, sz); K.box(sx - 1.2, y - 0.3, sz - 1, sx + 1.2, y + 2.1, sz + 1, '#8a6a4a', 'wood', { outlineT: 0.05 }); }
+    H.reserve([x - w / 2 - 5, z - d / 2 - 5, x + w / 2 + 5, z + d / 2 + 5]);
   }
   // roof level: ways up, then everything that ties the roofs together
   const list = W.roofsOld || [];
@@ -122,42 +128,44 @@ function buildWalledTown(H, r) {
     for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
     if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
-    B.add(g, null, '#a59a88', 'paving', { outlineT: 0, edges: false }); }
+    B.add(g, null, '#d8d0c4', 'cobble', { outlineT: 0, edges: false }); }
   // lanes: two main ones crossing near the square (gate to gate), two more each way, a little crooked
   const gx = (a) => [cx0 + Math.cos(a) * OW.rx, cz0 + Math.sin(a) * OW.rz];
-  const LX = [cx0 - 64, cx0, cx0 + 66], LZ = [cz0 - 52, cz0, cz0 + 54];       // the lanes' lines
+  const LX = [cx0 - 64, cx0, cx0 + 66], LZ = [cz0 - 52, cz0];       // the lanes' lines (none south of the main one: the station's stairways come up there)
   const lanes = [
     [gx(Math.PI), [cx0, cz0], gx(0)], [gx(-Math.PI / 2), [cx0, cz0], gx(Math.PI / 2)],
-    [[cx0 - 100, LZ[0]], [cx0 + 100, LZ[0]]], [[cx0 - 100, LZ[2]], [cx0 + 100, LZ[2]]],
+    [[cx0 - 100, LZ[0]], [cx0 + 100, LZ[0]]],
     [[LX[0], cz0 - 80], [LX[0], cz0 + 80]], [[LX[2], cz0 - 80], [LX[2], cz0 + 80]],
   ];
   const clip = (L) => { const out = []; let cur = []; for (let i = 0; i < L.length - 1; i++) { const [ax, az] = L[i], [bx, bz] = L[i + 1], n = Math.ceil(Math.hypot(bx - ax, bz - az) / 3); for (let k = 0; k <= n; k++) { const p = [U.lerp(ax, bx, k / n), U.lerp(az, bz, k / n)]; if (oldWallIn(p[0], p[1], 3)) cur.push(p); else if (cur.length) { out.push(cur); cur = []; } } } if (cur.length) out.push(cur); return out.filter(c => c.length > 1); };
   W.oldLanesIn = [];
-  lanes.forEach((L, i) => { for (const c of clip(L)) { H.path(c, i < 2 ? 6 : 4.2, '#bcb09c', 'paving'); H.line(c, i < 2 ? 3.2 : 2.3); W.oldLanesIn.push(c); } });
+  // (the lanes are the cobbles themselves: just a gutter down the middle, and kept clear)
+  lanes.forEach((L, i) => { for (const c of clip(L)) { H.path(c, 0.45, '#5f584e', 'plain'); H.line(c, i < 2 ? 2.4 : 1.6); W.oldLanesIn.push(c); } });
   // the square
   const sq = OW.square, sqR = [sq[0] - 24, sq[1] - 20, sq[0] + 24, sq[1] + 20];
   H.reserve(sqR);
   // blocks between the lanes' lines: houses all the way round each one, touching, fronts to the lane
-  const xs = [cx0 - OW.rx, LX[0], LX[1], LX[2], cx0 + OW.rx], zs = [cz0 - OW.rz, LZ[0], LZ[1], LZ[2], cz0 + OW.rz];
-  const half = (k, n) => (k === 0 || k === n - 1) ? 0 : (k === 2 ? 3.4 : 2.6);      // lane half widths (the main lanes are wider)
+  const xs = [cx0 - OW.rx, LX[0], LX[1], LX[2], cx0 + OW.rx], zs = [cz0 - OW.rz, LZ[0], LZ[1], cz0 + OW.rz];
+  const half = (k, n, main) => (k === 0 || k === n - 1) ? 0 : (k === main ? 2.5 : 1.7);      // lane half widths: 5 m main lanes, 3.4 m small ones
   const row = (alongX, a0, a1, c0, c1, front) => {
     // one row of houses from a0 to a1 (along x or z), between c0 and c1 across, no gaps
     let a = a0;
     while (a1 - a > 3.5) {
-      let w = 4.8 + r() * 3.4; if (a1 - (a + w) < 4.2) w = a1 - a;
+      let w = 4.2 + r() * 2.2; if (a1 - (a + w) < 3.8) w = a1 - a;
       const [x0, z0, x1, z1] = alongX ? [a, c0, a + w, c1] : [c0, a, c1, a + w];
       const ok = [[x0, z0], [x1, z0], [x0, z1], [x1, z1]].every(([x, z]) => oldWallIn(x, z, 2.6));      // (houses back onto the wall)
       if (ok && H.clearOf(x0 + 0.15, z0 + 0.15, x1 - 0.15, z1 - 0.15, 0)) {        // (neighbours touch)
         const q = oldQ((x0 + x1) / 2, (z0 + z1) / 2), types = q.types.filter(t => t !== 'tower' && t !== 'terrace');
-        oldHouse(H, x0, z0, x1, z1, r, { front, shop: 0.3, type: r() < 0.06 ? 'tower' : pick(r, types.length ? types : ['gable']), slopeX: !alongX ? false : true });
+        const tall = r() < 0.1;
+        oldHouse(H, x0, z0, x1, z1, r, { front, shop: 0.3, type: pick(r, types.length ? types : ['gable']), slopeX: !alongX ? false : true, h: tall ? 9.5 + r() * 2 : 5.8 + r() * 3, jetty: r() < 0.6 });
       }
       a += w;
     }
   };
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-    const bx0 = xs[i] + half(i, 5) + 0.3, bx1 = xs[i + 1] - half(i + 1, 5) - 0.3, bz0 = zs[j] + half(j, 5) + 0.3, bz1 = zs[j + 1] - half(j + 1, 5) - 0.3;
+  for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < zs.length - 1; j++) {
+    const bx0 = xs[i] + half(i, xs.length, 2) + 0.3, bx1 = xs[i + 1] - half(i + 1, xs.length, 2) - 0.3, bz0 = zs[j] + half(j, zs.length, 2) + 0.3, bz1 = zs[j + 1] - half(j + 1, zs.length, 2) - 0.3;
     if (bx1 - bx0 < 12 || bz1 - bz0 < 12) continue;
-    const d = 8.5 + r() * 2.5;
+    const d = 7.5 + r() * 2;
     row(true, bx0, bx1, bz0, bz0 + d, 'n'); row(true, bx0, bx1, bz1 - d, bz1, 's');
     row(false, bz0 + d, bz1 - d, bx0, bx0 + d, 'w'); row(false, bz0 + d, bz1 - d, bx1 - d, bx1, 'e');
     // the yard in the middle: a tree or a well
@@ -166,12 +174,12 @@ function buildWalledTown(H, r) {
   }
   // and along the inside of the wall, wherever the blocks left room: houses backing onto it
   for (let k = 0; k < 220; k++) {
-    const a = k / 220 * Math.PI * 2, d = 8 + r() * 2.5, w = 5.5 + r() * 2.5, f = 1 - (2.8 + d / 2) / Math.min(OW.rx, OW.rz);
+    const a = k / 220 * Math.PI * 2, d = 7.5 + r() * 2, w = 4.4 + r() * 2, f = 1 - (2.8 + d / 2) / Math.min(OW.rx, OW.rz);
     const cx = cx0 + Math.cos(a) * OW.rx * f, cz = cz0 + Math.sin(a) * OW.rz * f, ew = Math.abs(Math.cos(a) * OW.rz) > Math.abs(Math.sin(a) * OW.rx);
     const hx = ew ? d / 2 : w / 2, hz = ew ? w / 2 : d / 2, x0 = cx - hx, z0 = cz - hz, x1 = cx + hx, z1 = cz + hz;
     if (![[x0, z0], [x1, z0], [x0, z1], [x1, z1]].every(([x, z]) => oldWallIn(x, z, 2.6)) || !H.clearOf(x0 + 0.15, z0 + 0.15, x1 - 0.15, z1 - 0.15, 0)) continue;
     const q = oldQ(cx, cz), types = q.types.filter(t => t !== 'tower' && t !== 'terrace');
-    oldHouse(H, x0, z0, x1, z1, r, { front: ew ? (Math.cos(a) > 0 ? 'w' : 'e') : (Math.sin(a) > 0 ? 'n' : 's'), shop: 0.2, type: pick(r, types.length ? types : ['gable']), slopeX: !ew });
+    oldHouse(H, x0, z0, x1, z1, r, { front: ew ? (Math.cos(a) > 0 ? 'w' : 'e') : (Math.sin(a) > 0 ? 'n' : 's'), shop: 0.2, type: pick(r, types.length ? types : ['gable']), slopeX: !ew, h: 5.8 + r() * 3, jetty: r() < 0.5 });
   }
   // lamps on the lanes
   for (const c of W.oldLanesIn) for (let k = 4; k < c.length; k += 9) { const [x, z] = c[k]; if (H.clearOf(x + 2.2, z - 0.3, x + 2.8, z + 0.3, 0)) H.lamp(x + 2.5, z, { style: 'globe', h: 3.4, color: '#2a2a32' }); }
@@ -223,8 +231,15 @@ function buildWalledTown(H, r) {
     }
     const m = new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 10.5, z);
     B.add(new THREE.BoxGeometry(7, 6, 14.8), m, stone, 'brick', { outlineT: 0.1, edges: false });
+    // the passage: a dark vault overhead, an arch moulding on both faces
+    B.add(new THREE.BoxGeometry(6.6, 0.3, 7.4), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 7.4, z), '#3a3430', 'plain', { outlineT: 0, edges: false });
+    for (const sd of [-1, 1]) {
+      const nx = uz, nz = -ux;       // across the wall
+      B.add(new THREE.TorusGeometry(3.6, 0.35, 6, 16, Math.PI), new THREE.Matrix4().makeRotationY(Math.atan2(-uz, ux)).setPosition(x + nx * sd * 3.55, g + 3.9, z + nz * sd * 3.55), cap, 'plain', { outlineT: 0.04, edges: false });
+    }
     B.add(new THREE.ConeGeometry(8.4, 5, 4), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz) + Math.PI / 4).setPosition(x, g + 16, z), '#8a4a3a', 'roof', { outlineT: 0.08 });
-    F.add(new THREE.BoxGeometry(7, 14, 14.8), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 7, z), stone);
+    for (const sd of [-1, 1]) F.add(new THREE.BoxGeometry(7, 15, 3.6), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x + ux * sd * 5.6, g + 6, z + uz * sd * 5.6), stone);
+    F.add(new THREE.BoxGeometry(7, 6, 14.8), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 10.5, z), stone);     // (seen from afar, you still see through the gate)
     W.boxes.push({ x0: x - 4, y0: g + 7.5, z0: z - 4, x1: x + 4, y1: g + 13.5, z1: z + 4, tag: 'gate' });
   }
 }

@@ -103,9 +103,9 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   let type = o.type || pick(r, Q.types);
   if (type === 'tower' && (Math.max(w, d) > 8.5 || o.top !== undefined)) type = 'gable';
   const col = o.col || pick(r, Q.walls), rc = o.rc || pick(r, Q.roofs);
-  const h = type === 'tower' ? 14 + r() * 5 : type === 'terrace' ? 5.5 + r() * 3 : 6.5 + r() * 5.5;
+  const h = o.h ?? (type === 'tower' ? 14 + r() * 5 : type === 'terrace' ? 5.5 + r() * 3 : 6.5 + r() * 5.5);
   const flat = type === 'terrace' || type === 'tower';
-  const bb = H.bldg(x0, z0, x1, z1, h, col, { trim: flat ? false : Q.trim, outline: 0.12, kind: type === 'stone' || type === 'tower' ? 'brick' : 'house', top: o.top, roof: flat ? '#d9cdb4' : col });
+  const bb = H.bldg(x0, z0, x1, z1, h, col, { trim: flat ? false : Q.trim, outline: 0.12, kind: type === 'stone' || type === 'tower' ? 'brick' : 'oldhouse', top: o.top, roof: flat ? '#d9cdb4' : col });
   const c = { x0, z0, x1, z1, top: bb.top, lo: bb.lo, hi: bb.hi, rise: 0, flat, type, col, rc };
   if (flat) roofTerrace(H, c, r, { wall: type === 'tower' ? col : '#efe6d4', tower: type === 'tower', flag: Q.roofs[0] });
   else {
@@ -126,6 +126,14 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
       if (r() < 0.5) { const [px, pz] = frPt(fr, u + 1.1, 0.4); H.put(H.SH.CYL, px, gh + 0.2, pz, 0.22, 0.4, 0.22, '#b8643f', 'plain', 0.02); H.put(H.SH.ICO, px, gh + 0.6, pz, 0.34, 0.36, 0.34, pick(r, H.FLOWERS), 'flat', 0.03); }
     }
     if (!flat && bb.top - gh > 8.2 && r() < 0.45) { gallery(H, fr, gh + 6.3, r); if (r() < 0.5) gallery(H, fr, gh + 3.5, r, { inset: 1.2 }); }
+  }
+  // a jettied upper floor: the storeys above the ground floor stand out over the lane
+  if (o.jetty && o.front && !flat && bb.top - bb.hi > 5.5) {
+    const J = 0.7, y0 = bb.hi + 3.1, f = o.front;
+    const R = f === 'n' ? [x0, z0 - J, x1, z0] : f === 's' ? [x0, z1, x1, z1 + J] : f === 'w' ? [x0 - J, z0, x0, z1] : [x1, z0, x1 + J, z1];
+    B.box(R[0], y0, R[1], R[2], bb.top - 0.05, R[3], col, 'oldhouse', { outlineT: 0.06 });
+    B.box(R[0] - 0.05, y0 - 0.22, R[1] - 0.05, R[2] + 0.05, y0 + 0.02, R[3] + 0.05, '#4a3628', 'plain', { outlineT: 0, edges: false });
+    W.boxes.push({ x0: R[0], y0, z0: R[1], x1: R[2], y1: bb.top, z1: R[3], tag: 'jetty' });
   }
   H.reserve([x0, z0, x1, z1]);
   (o.list || (W.roofsOld = W.roofsOld || [])).push(c);

@@ -31,6 +31,9 @@ async def main():
                         logs.append('eval error: ' + str(e)[:500])
                 if 'wait' in st: await pg.wait_for_timeout(st['wait'])
                 if 'shot' in st: await pg.screenshot(path=OUT + st['shot'])
+                if 'view' in st:
+                    v = st['view']; url = await pg.evaluate(f'window.debugView({",".join(str(a) for a in v)})')
+                    open(OUT + st['name'], 'wb').write(base64.b64decode(url.split(',')[1]))
                 if 'top' in st:
                     x0, z0, x1, z1 = st["top"][:4]; px = st.get("px", 1000)
                     url = await pg.evaluate(f'window.debugTopDown({x0},{z0},{x1},{z1},{px})')

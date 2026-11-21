@@ -173,10 +173,11 @@ function buildCanal(K, S, F) {
     B.add(new THREE.BoxGeometry(thick, y1 - y0, L + 0.35), m, col, kind, { outlineT: ol, edges: false });
   };
   // walls + coping, in 8 m pieces (every second sample), each side
-  const dry = (k) => P[k][1] < shoreZ(P[k][0]) - 1;      // (the canal's walls and quays stop at the shore)
+  // everything stops on the harbour's quay line: there the canal opens into the basin
+  const dry = (k) => P[k][1] < PLAN.docksQuayZ, pier = dry;
   for (let i = 0; i < n - 1; i += 2) {
     const j = Math.min(n - 1, i + 2);
-    if (!dry(i) || !dry(j)) continue;
+    if (!pier(i) || !pier(j)) continue;
     for (const sd of [-1, 1]) {
       const o = C.half + 0.5, ax = P[i][0] + N[i][0] * o * sd, az = P[i][1] + N[i][1] * o * sd, bx = P[j][0] + N[j][0] * o * sd, bz = P[j][1] + N[j][1] * o * sd;
       obox(ax, az, bx, bz, 0, 1, C.bedY, C.quayY - 0.05, wall, 'brick', 0);
@@ -201,10 +202,17 @@ function buildCanal(K, S, F) {
     B.add(g, null, col, kind, { outlineT: 0, edges: false });
   };
   strip(C.half + 1.0, C.half + 15, C.quayY + 0.12, null, pave, 'walk');           // the quay apron, both sides
+  // the harbour basin's west side: a stone embankment from the quay line down into the lake (the beach beyond it)
+  { const x = PLAN.docksX[0], z0 = PLAN.docksQuayZ - 1, z1 = shoreZ(x) + 34;
+    K.box(x - 1.6, -6.5, z0, x + 1.6, 3.9, z1, wall, 'brick', { outlineT: 0.06 }); B.box(x - 1.9, 3.85, z0, x + 1.9, 4.15, z1 + 0.3, top, 'paving', { outlineT: 0.04, edges: false });
+    // and the quay from it to the canal's west wall
+    let k = n - 1; while (k > 0 && !dry(k)) k--;
+    const xw = Math.min(P[k][0] + N[k][0] * (C.half + 1), P[k][0] - N[k][0] * (C.half + 1)), zq = PLAN.docksQuayZ;
+    K.box(x, -6.5, zq - 1.6, xw, C.quayY - 0.05, zq + 1.6, wall, 'brick', { outlineT: 0.06 }); B.box(x, C.quayY - 0.05, zq - 1.9, xw, C.quayY + 0.2, zq + 1.9, top, 'paving', { outlineT: 0.04, edges: false }); }
   strip(-C.half - 1, C.half + 1, C.bedY, C.bedY, '#4a5a50', 'plain');             // the bed
   // water: one mesh (always drawn) + a deep-water zone (game.js checks inCanal inside its box)
   const wm = new THREE.MeshBasicMaterial({ color: 0x5f9fa0, map: W.mats.waterTex, transparent: true, opacity: 0.8, depthWrite: false });
-  { const g = strip(-C.half - 0.6, C.half + 0.6, C.waterY, C.waterY, null, null, true), m = new THREE.Mesh(g, wm); m.renderOrder = 3; W.group.add(m); }
+  { const g = strip(-C.half - 0.6, C.half + 0.6, C.waterY + 0.03, C.waterY + 0.03, null, null, true), m = new THREE.Mesh(g, wm); m.renderOrder = 4; W.group.add(m); }     // (drawn over the lake's sheet)
   { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
     W.waters.push({ x0: x0 - C.half - 12, z0: z0 - C.half, x1: x1 + C.half, z1: z1 + C.half, y: C.waterY, deep: true, canal: true }); }
   // the tunnel mouth (the path starts heading east): a stone portal across canal and quays, a dark arch, a keystone, a lamp each side
@@ -218,6 +226,9 @@ function buildCanal(K, S, F) {
     B.box(x - 0.2, top, cz - C.half - 16.3, x + 0.4, top + 0.6, cz + C.half + 16.3, '#d9cfb8', 'plain', { outlineT: 0.05 });
     for (const sd of [-1, 1]) { K.cyl(x + 1.2, C.quayY, cz + sd * (C.half + 5), 0.1, 3.2, '#2a2838', { outline: 0.03, seg: 6 }); B.box(x + 0.9, C.quayY + 3.2, cz + sd * (C.half + 5) - 0.3, x + 1.5, C.quayY + 3.7, cz + sd * (C.half + 5) + 0.3, '#ffe9b0', 'lamp', { outlineT: 0, edges: false }); }
   }
+  { let e = n - 1; while (e > 2 && !pier(e)) e--; e -= e % 2;
+    for (const sd of [-1, 1]) { const x = P[e][0] + N[e][0] * (C.half + 0.5) * sd, z = P[e][1] + N[e][1] * (C.half + 0.5) * sd;
+      K.cyl(x, C.quayY + 0.2, z, 0.12, 3.4, '#2a2838', { outline: 0.03, seg: 6 }); B.box(x - 0.35, C.quayY + 3.6, z - 0.35, x + 0.35, C.quayY + 4.2, z + 0.35, sd > 0 ? '#e85a3a' : '#7ac04a', 'lamp', { outlineT: 0.03, edges: false }); } }
   W.canalWaterMat = wm;
   W.canal = C;
 }

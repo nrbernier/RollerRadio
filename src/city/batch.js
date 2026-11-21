@@ -11,7 +11,7 @@ let _boxEdges = new Float32Array(0), _unitBox = null;
 const _bm = new THREE.Matrix4(), _bp = new Float32Array(108), _bn = new Float32Array(108), _bc1 = new THREE.Color(), _bc2 = new THREE.Color();
 const BUCKET_ALIAS = { flat: 'plain', metal: 'plain' };     // same look, one draw call
 class CellBatch extends StaticBatch {
-  constructor() { super(); this.cellLines = {}; this.split = { house: ['roof', 'house'], shed: ['roof', 'brick'], tower: ['roof', 'tower'], grid: ['roof', 'grid'], deco: ['roof', 'deco'] }; }
+  constructor() { super(); this.cellLines = {}; this.split = { house: ['roof', 'house'], oldhouse: ['roof', 'oldhouse'], shed: ['roof', 'brick'], tower: ['roof', 'tower'], grid: ['roof', 'grid'], deco: ['roof', 'deco'] }; }
   bucket(name, x, z) {
     name = BUCKET_ALIAS[name] || name;
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
@@ -289,6 +289,27 @@ function cityMaterials() {
   const houseGlow = canvasTex(512, 512, (x, w, h) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); HW.forEach((c, i) => { if (!c.lit) return; const [X, Y, W2, H2] = hwRect(i); x.fillStyle = c.col; x.fillRect(X, Y, W2, H2); x.fillStyle = '#000'; x.fillRect(X + W2 / 2 - 1, Y, 2, H2); x.fillRect(X, Y + H2 / 2 - 1, W2, 2); }); }, { repeat: true }).tex;
   houseTex.repeat.set(0.5, 0.5); houseGlow.repeat.set(0.5, 0.5);
   M.house = new THREE.MeshToonMaterial({ vertexColors: true, map: houseTex, emissiveMap: houseGlow, emissive: 0xffffff, emissiveIntensity: 0, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // the old town's houses: storeys of 3 m, small shuttered windows 3 m apart (12 m of wall per tile)
+  const OW_ = []; { const r = U.rng(47); for (let i = 0; i < 16; i++) OW_.push({ lit: r() < 0.5, col: r() < 0.5 ? '#ffd88a' : '#ffe8c0', sh: ['#3f6a5a', '#7a4a3a', '#4a5a7a', '#6a6a52', '#8a3a2a'][Math.floor(r() * 5)], box: r() < 0.3, skip: r() < 0.12 }); }
+  const owRect = (i) => { const c = i % 4, f = Math.floor(i / 4); return [c * 96 + 36, f * 96 + 30, 24, 38]; };
+  const oldTex = canvasTex(384, 384, (x, w, h) => {
+    const r = U.rng(49); x.fillStyle = '#f4ecdd'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(120,95,70,${r() * 0.07})`; x.fillRect(r() * w, r() * h, 2 + r() * 12, 1 + r() * 5); }
+    for (let f = 0; f < 4; f++) { x.fillStyle = 'rgba(90,70,50,.12)'; x.fillRect(0, f * 96 + 90, w, 3); }
+    OW_.forEach((c, i) => {
+      if (c.skip) return;
+      const [X, Y, W2, H2] = owRect(i);
+      x.fillStyle = '#e2d6c0'; x.fillRect(X - 3, Y - 3, W2 + 6, H2 + 7);
+      x.fillStyle = '#3a4452'; x.fillRect(X, Y, W2, H2);
+      x.fillStyle = 'rgba(200,220,235,.3)'; x.fillRect(X + 2, Y + 2, W2 / 2 - 3, H2 - 4);
+      x.fillStyle = '#e2d6c0'; x.fillRect(X + W2 / 2 - 1, Y, 2, H2);
+      x.fillStyle = c.sh; x.fillRect(X - 11, Y, 9, H2); x.fillRect(X + W2 + 2, Y, 9, H2);
+      if (c.box) { x.fillStyle = '#7a5a3a'; x.fillRect(X - 2, Y + H2 + 3, W2 + 4, 5); x.fillStyle = ['#e85a6a', '#f2c23a', '#ffffff'][i % 3]; for (let k = 0; k < 5; k++) x.fillRect(X + k * 5, Y + H2, 3, 3); }
+    });
+  }, { repeat: true }).tex;
+  const oldGlow = canvasTex(384, 384, (x, w, h) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); OW_.forEach((c, i) => { if (!c.lit || c.skip) return; const [X, Y, W2, H2] = owRect(i); x.fillStyle = c.col; x.fillRect(X, Y, W2, H2); }); }, { repeat: true }).tex;
+  oldTex.repeat.set(8 / 12, 8 / 12); oldGlow.repeat.set(8 / 12, 8 / 12);
+  M.oldhouse = M.house.clone(); M.oldhouse.map = oldTex; M.oldhouse.emissiveMap = oldGlow;
   M.lamp = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0xffffff });       // street lamps: colour scaled by the night amount
   const noise = canvasTex(256, 256, (x, w, h) => {
     const r = U.rng(5); x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
@@ -301,6 +322,17 @@ function cityMaterials() {
   M.hills = new THREE.MeshLambertMaterial({ vertexColors: true });
   // things lying on the ground are pulled towards the camera so they never flicker into the terrain
   const decal = (map, f = -2) => new THREE.MeshToonMaterial({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: f, polygonOffsetUnits: f * 2 });
+  // cobbles: small rounded stones of a few greys and ochres, dark joints (8 m of ground per tile)
+  const cobble = canvasTex(512, 512, (x, w, h) => {
+    const r = U.rng(97); x.fillStyle = '#8a8276'; x.fillRect(0, 0, w, h);
+    for (let row = 0; row < 40; row++) for (let c = 0; c < 40; c++) {
+      const cx = (c + (row % 2) * 0.5 + (r() - 0.5) * 0.25) * w / 40, cy = (row + (r() - 0.5) * 0.2) * h / 40, rx = w / 40 * (0.44 + r() * 0.08), ry = h / 40 * (0.42 + r() * 0.08);
+      const t = 168 + r() * 34, warm = r() * 14; x.fillStyle = `rgb(${t + warm},${t + warm * 0.6},${t - 8})`;
+      const rot = r() * 0.8, sq = 0.7 + r() * 0.25;      // squarish setts, not coins
+      for (const [ox, oy] of [[0, 0], [w, 0], [0, h], [-w, 0], [0, -h]]) { x.beginPath(); x.roundRect ? x.roundRect(cx + ox - rx, cy + oy - ry, rx * 2, ry * 2 * sq + ry * (1 - sq), rx * 0.6) : x.ellipse(cx + ox, cy + oy, rx, ry, rot, 0, 7); x.fill(); }
+    }
+  }, { repeat: true }).tex;
+  M.cobble = decal(cobble, -2);
   M.road = decal(base.asphalt.map, -3); M.walk = decal(base.paving.map, -2); M.gravel = decal(base.sand.map, -2); M.tiles = decal(base.tile.map, -2);
   M.paint = new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
   M.flat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: G.grad });

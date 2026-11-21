@@ -450,6 +450,17 @@ function isCovered(pos) { const M = Game.W.metro; for (let i = 0; i < M.N; i += 
 function start() { boot().catch(e => { console.error(e); const l = $('loading'); l.hidden = false; l.textContent = 'Something broke while building the city: ' + e.message; }); }
 start();
 
+// debug helper for tests: a perspective view from (px, py, pz) towards (tx, ty, tz); heights are above the ground there
+window.debugView = (px, py, pz, tx, ty, tz, w = 1280, h = 720, fov = 60) => {
+  const cam = new THREE.PerspectiveCamera(fov, w / h, 0.3, 3000);
+  cam.position.set(px, terrainAt(px, pz) + py, pz); cam.lookAt(tx, terrainAt(tx, tz) + ty, tz);
+  for (const g of Game.W.cells.values()) g.visible = true;
+  G.renderer.setPixelRatio(1); G.renderer.setSize(w, h, false);
+  G.renderer.render(G.scene, cam);
+  const url = G.renderer.domElement.toDataURL('image/png');
+  onResize();
+  return url;
+};
 // debug helper for tests: render a region from straight above
 window.debugTopDown = (x0, z0, x1, z1, px = 1600) => {
   const cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 1, 4000);

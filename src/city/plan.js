@@ -109,9 +109,9 @@ const PLAN = {
   ],
   // the lakeshore: beach line (wiggles), a small bay where the canal comes out
   shore: { z: 548, tilt: -0.06, bayX: 80, bayR: 70, bayDepth: 16 },
-  docksQuayZ: 502, docksX: [222, 660],
+  docksQuayZ: 502, docksX: [150, 660],        // (the harbour basin reaches west to take the canal's mouth)
   // the canal: comes out of a tunnel under a knoll at the west edge, winds east under the main street,
-  // turns south east of it and runs straight out into the lake (its water is the lake's)
+  // turns south east of it and opens into the harbour basin beside the docks (its water is the lake's)
   canal: { ctrl: [[-662, 300], [-560, 318], [-430, 344], [-300, 298], [-160, 322], [-20, 352], [90, 372], [168, 402], [202, 448], [212, 0]], half: 11, waterY: 0, bedY: -2.2, quayY: 4.6 },
   // streets that join the districts (each district lays its own small streets)
   // the streets that join the districts (each district lays its own small streets between them).
@@ -174,7 +174,7 @@ PLAN.vineyardShape = makeShape(PLAN.vineyards, 6);
 for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.loop);
 
 // the canal path ends a little behind the shore: the basin
-{ const C = PLAN.canal, e = C.ctrl[C.ctrl.length - 1]; e[1] = shoreZ(e[0]) + 24;
+{ const C = PLAN.canal, e = C.ctrl[C.ctrl.length - 1]; e[1] = PLAN.docksQuayZ + 36;      // (out through the harbour's quay line)
   C.path = makePath(C.ctrl, 4);
   // (old fields, for code not yet moved to the path)
   C.x0 = C.ctrl[0][0]; C.z = C.ctrl[0][1]; C.bendX = e[0];
@@ -269,8 +269,9 @@ function cityHeight(x, z) {
   const sz = shoreZ(x), dz = z - sz;
   if (dz > -50) {
     const beach = U.clamp((dz + 50) / 50, 0, 1);
-    h = U.lerp(h, 2.0, U.smooth(beach) * (inDocks > 0.5 ? 0 : 1));
-    if (dz > 0 && inDocks < 0.5) h = 2.0 - dz * 0.09 - Math.max(0, dz - 40) * 0.06;
+    const notDocks = 1 - U.smooth(U.clamp((inDocks - 0.25) / 0.5, 0, 1));      // (a gradual change, not a cliff)
+    h = U.lerp(h, 2.0, U.smooth(beach) * notDocks);
+    if (dz > 0) h = U.lerp(h, 2.0 - dz * 0.09 - Math.max(0, dz - 40) * 0.06, notDocks);
   }
   if (z > PLAN_REAL.docksQuayZ + 4 && x > PLAN_REAL.docksX[0] && x < PLAN_REAL.docksX[1]) h = Math.min(h, -6);
   return h;

@@ -130,7 +130,7 @@ function planMetro() {
       // two off each platform, each in an open well (a terrain hole on the grid's lines)
       const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c - 1e-6) : Math.floor((v - o) / c + 1e-6)) * c;
       st.exits = [];
-      const pairs = st.entrances === 2 ? [[-9, 1], [13, -1]] : [[-9, -1], [-9, 1], [13, -1], [13, 1]];     // (PLAN can ask for just two: one each side, staggered)
+      const pairs = st.entrances === 2 ? [[-9, 1], [13, 1]] : [[-9, -1], [-9, 1], [13, -1], [13, 1]];     // (PLAN can ask for just two: one each side, staggered)
       for (const [k, sd] of pairs) {
         const e = pts[(st.i + k + N) % N], nx = -e.dz * sd, nz = e.dx * sd;          // straight out sideways
         const ax = Math.abs(nx) > Math.abs(nz) ? 'x' : 'z';
