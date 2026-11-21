@@ -2985,17 +2985,17 @@ const PLAN = {
   // districts: smoothed outlines (control points) and the music recipe key
   districts: [
     { key: 'park', name: 'Forest', ctrl: [[-760, -800], [-254, -770], [-226, -470], [-258, -266], [-318, -30], [-392, 170], [-530, 236], [-760, 236]] },
-    { key: 'obs', name: 'Observatory', ctrl: circlePts(-53, -622, 96, 9, 0.08) },
+    { key: 'obs', name: 'Observatory', ctrl: circlePts(-56, -640, 105, 9, 0.08) },
     { key: 'oldtown', name: 'Old town', ctrl: [[35, -566], [212, -655], [515, -604], [588, -400], [548, -262], [388, -130], [229, -120], [53, -186], [0, -333]] },
-    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [180, 106], [18, 206], [-194, 142], [-242, -50]] },
+    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [206, 150], [60, 216], [-194, 150], [-242, -50]] },
     { key: 'market', name: 'Market', ctrl: [[254, -86], [530, -80], [596, 66], [494, 206], [325, 222], [214, 100], [214, -28]] },
     { key: 'canals', name: 'Canals', ctrl: [[-640, 252], [-141, 230], [212, 268], [222, 350], [150, 462], [40, 470], [-353, 455], [-640, 402]] },
-    { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 505], [290, 505], [226, 402]] },
+    { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 502], [290, 502], [226, 402]] },
     { key: 'lake', name: 'Lakeshore', ctrl: [[-640, 430], [-200, 470], [-14, 512], [60, 524], [60, 640], [-640, 640]] },
   ],
   // the lakeshore: beach line (wiggles), a small bay where the canal comes out
   shore: { z: 548, tilt: -0.06, bayX: 80, bayR: 70, bayDepth: 16 },
-  docksQuayZ: 505, docksX: [222, 660],
+  docksQuayZ: 502, docksX: [222, 660],
   // the canal: comes out of a tunnel under a knoll at the west edge, winds east under the main street,
   // turns south and ends in a basin behind the promenade (a lock gate, the lake beyond)
   canal: { ctrl: [[-662, 300], [-560, 318], [-430, 344], [-300, 298], [-160, 322], [-20, 352], [76, 386], [102, 446], [84, 0]], half: 11, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
@@ -3014,9 +3014,9 @@ const PLAN = {
   ],
   // hidden spots: local changes to the music, nothing to collect
   spots: [
-    { key: 'glasshouse', at: [-318, 86] },
-    { key: 'belltower',  at: [330, -430] },
-    { key: 'rooftop',    at: [-10, -30] },
+    { key: 'glasshouse', at: [-436, -584] },
+    { key: 'belltower',  at: [266, -168] },
+    { key: 'rooftop',    at: [136, 150] },
     { key: 'cellar',     at: [300, -96] },
     { key: 'arch',       at: [90, 400] },       // where the main street crosses the canal (set exactly below)
     { key: 'watertower', at: [262, 322] },
@@ -3024,16 +3024,18 @@ const PLAN = {
   ],
   // landmarks, where districts meet (placed by their builders; these are their anchors)
   places: {
-    summit: [-53, -622], crag: [-242, -500], vineyards: [-110, -310], glasshouse: [-318, 86], needle: [162, -128],
-    site: [-150, 172], central: [170, 150], recordShop: [300, -96], ferris: [-247, 493], lido: [-480, 505],
+    summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [166, -125],
+    site: [-154, 173], central: [170, 150], recordShop: [546, 218], ferris: [-247, 493], lido: [-480, 505],
     waterTower: [262, 322], lighthouse: [560, 626],
   },
   vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
-  pond: { x: -416, z: 127, r: 58 },
+  pond: { x: -416, z: 124, r: 95 },          // (the old forest's pond, moved with the forest)
   boulevardX: 104, avenueZ: 10,          // (old names) the main street's x near the lake, the cross street's z
 };
 for (const d of PLAN.districts) { d.shape = makeShape(d.ctrl); d.rect = d.shape.rect; }
 PLAN.byKey = Object.fromEntries(PLAN.districts.map(d => [d.key, d]));
+// the map's own functions read this (the old districts' builders see a different PLAN while they run: xform.js)
+const PLAN_REAL = Object.assign({}, PLAN);
 PLAN.vineyardShape = makeShape(PLAN.vineyards, 6);
 for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.loop);
 
@@ -3048,6 +3050,8 @@ for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.lo
   if (at) PLAN.spots.find(s => s.key === 'arch').at = at;
 }
 
+Object.assign(PLAN_REAL, PLAN);
+
 // smooth district membership: 1 well inside, fading to 0 about `soft` metres outside the outline
 function rectDist(r, x, z) {
   const dx = Math.max(r[0] - x, 0, x - r[2]), dz = Math.max(r[1] - z, 0, z - r[3]);
@@ -3058,7 +3062,7 @@ function rectDist(r, x, z) {
 function districtDist(d, x, z) { return shapeDist(d.shape, x, z); }
 function districtWeights(x, z, out = {}, soft = 70) {
   let sum = 0, best = null, bd = 1e9;
-  for (const d of PLAN.districts) {
+  for (const d of PLAN_REAL.districts) {
     const s = districtDist(d, x, z);
     if (s < bd) { bd = s; best = d.key; }
     const w = U.smooth(U.clamp(1 - (s + soft * 0.5) / soft, 0, 1));
@@ -3068,7 +3072,7 @@ function districtWeights(x, z, out = {}, soft = 70) {
   for (const k in out) out[k] /= sum;
   return out;
 }
-function districtAt(x, z) { let best = null, bd = 1e9; for (const d of PLAN.districts) { const s = districtDist(d, x, z); if (s < bd) { bd = s; best = d; } } return best; }
+function districtAt(x, z) { let best = null, bd = 1e9; for (const d of PLAN_REAL.districts) { const s = districtDist(d, x, z); if (s < bd) { bd = s; best = d; } } return best; }
 
 // ---------- the land ----------
 // monotone cubic through the north–south profile (z → height): about 70 m from the top of the city to the shore
@@ -3092,9 +3096,9 @@ function gauss(d, r) { return Math.exp(-(d * d) / (r * r)); }
 // a hill that starts gently at the city edge and levels off at `top` metres
 const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 200) * 0.04;
 // the canal's basin end (just behind the promenade)
-function canalEndZ() { const P = PLAN.canal.path.pts; return P[P.length - 1][1]; }
+function canalEndZ() { const P = PLAN_REAL.canal.path.pts; return P[P.length - 1][1]; }
 function shoreZ(x) {
-  const S = PLAN.shore;
+  const S = PLAN_REAL.shore;
   return S.z + x * S.tilt + Math.sin(x / 90) * 8 + Math.sin(x / 37 + 1.3) * 3 - gauss(x - S.bayX, S.bayR) * S.bayDepth;
 }
 // the raw land before carving
@@ -3103,10 +3107,10 @@ function landH(x, z) {
   // the forest ridge runs down the west side and joins the summit
   const rx = U.lerp(-470, -400, U.clamp((150 - z) / 900, 0, 1)), ridgeUp = U.clamp((220 - z) / 850, 0, 1);
   h += gauss(x - rx, 120) * (3 + 17 * ridgeUp);
-  h -= gauss(Math.hypot(x - PLAN.pond.x, z - PLAN.pond.z), 70) * 5;              // the pond hollow
-  h += gauss(Math.hypot(x + 330, z - 50), 70) * 5;                                // glasshouse knoll
+  h -= gauss(Math.hypot(x - PLAN_REAL.pond.x, z - PLAN_REAL.pond.z), 70) * 5;              // the pond hollow
+  h += gauss(Math.hypot(x + 436, z + 590), 70) * 5;                               // glasshouse knoll
   h += gauss(Math.hypot(x - 292, z + 392), 240) * 13;                             // the old town's hill
-  h += Math.min(11, gauss(Math.hypot(x + 53, z + 622), 155) * 15);                 // the summit
+  h += Math.min(11, gauss(Math.hypot(x + 56, z + 660), 155) * 15);                 // the summit
   h += gauss(Math.hypot(x + 130, z + 330), 120) * 9;                              // the vineyard spur (sunny side faces south)
   h += gauss(Math.hypot(x + 720, z - 300), 55) * 15;                              // the knoll the canal tunnels under
   // the edge of the world: hills all round (outside the city); they rise, then roll
@@ -3119,13 +3123,13 @@ function landH(x, z) {
 // flat places: docks, the canal quays, the lakeshore promenade
 function cityHeight(x, z) {
   let h = landH(x, z);
-  const C = PLAN.canal;
+  const C = PLAN_REAL.canal;
   // canal quarter and the canal's banks: a flat, slightly raised quay level
-  const dq = districtDist(PLAN.byKey.canals, x, z), dc = pathDist(C.path, x, z, 80).d;
+  const dq = districtDist(PLAN_REAL.byKey.canals, x, z), dc = pathDist(C.path, x, z, 80).d;
   const inCanals = Math.max(U.smooth(U.clamp(1 - dq / 50, 0, 1)), U.smooth(U.clamp(1 - (dc - C.half - 24) / 30, 0, 1)));
   h = U.lerp(h, C.quayY + Math.sin(x * 0.02) * 0.2, inCanals);
   // docks: flat hardstanding
-  const inDocks = U.smooth(U.clamp(1 - districtDist(PLAN.byKey.docks, x, z) / 40, 0, 1));
+  const inDocks = U.smooth(U.clamp(1 - districtDist(PLAN_REAL.byKey.docks, x, z) / 40, 0, 1));
   h = U.lerp(h, 3.8, inDocks);
   // lake: beach then the lake bed
   const sz = shoreZ(x), dz = z - sz;
@@ -3134,18 +3138,18 @@ function cityHeight(x, z) {
     h = U.lerp(h, 2.0, U.smooth(beach) * (inDocks > 0.5 ? 0 : 1));
     if (dz > 0 && inDocks < 0.5) h = 2.0 - dz * 0.09 - Math.max(0, dz - 40) * 0.06;
   }
-  if (z > PLAN.docksQuayZ + 4 && x > PLAN.docksX[0] && x < PLAN.docksX[1]) h = Math.min(h, -6);
+  if (z > PLAN_REAL.docksQuayZ + 4 && x > PLAN_REAL.docksX[0] && x < PLAN_REAL.docksX[1]) h = Math.min(h, -6);
   return h;
 }
 // is (x, z) open water in the canal? (the lake is anything past the shore)
-function inCanal(x, z) { return pathDist(PLAN.canal.path, x, z, 16).d < PLAN.canal.half; }
+function inCanal(x, z) { return pathDist(PLAN_REAL.canal.path, x, z, 16).d < PLAN_REAL.canal.half; }
 
 // ============================================================
 //  TERRAIN — the city's heightfield: one grid for drawing and collision
 //  Collision reads the same triangles the mesh draws. The canal winds, so the cells
 //  along it are left out of the mesh and a quay apron (world.js) covers their edges.
 // ============================================================
-const TER = { x0: -664, z0: -784, cell: 8, nx: 166, nz: 212 };
+const TER = { x0: -666, z0: -786, cell: 8, nx: 167, nz: 212 };    // (grid lines where the old grid had them: districts move in steps of 8 m)
 TER.x1 = TER.x0 + TER.nx * TER.cell; TER.z1 = TER.z0 + TER.nz * TER.cell;
 
 function buildHeights() {
@@ -3154,14 +3158,14 @@ function buildHeights() {
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) H[j * (nx + 1) + i] = cityHeight(x0 + i * cell, z0 + j * cell);
   TER.H = H;
   // the canal: vertices well inside the channel drop to the bed (those near the walls stay at quay height)
-  const C = PLAN.canal;
+  const C = PLAN_REAL.canal;
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
     if (pathDist(C.path, x, z, 24).d < C.half - cell) H[j * (nx + 1) + i] = C.bedY;
   }
 }
 // cells the terrain mesh leaves out along the canal (any part of them may be in the channel)
-function canalCell(cx, cz) { return pathDist(PLAN.canal.path, cx, cz, 32).d < PLAN.canal.half + TER.cell * 0.72; }
+function canalCell(cx, cz) { return pathDist(PLAN_REAL.canal.path, cx, cz, 32).d < PLAN_REAL.canal.half + TER.cell * 0.72; }
 // lower the ground along a corridor (centreline points [x, y, z]) to floorY(t) + off
 function carveCorridor(pts, half, off = -0.6) {
   const { nx, nz, x0, z0, cell, H } = TER;
@@ -6281,18 +6285,26 @@ function buildDistricts(K, S, F) {
   const H = districtKit(K, S, F); fillKit(H);
   // the canals and lakeshore first: their quays and promenades claim the ground the others avoid
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
-  prePlaces(H);
+  // the compact city: each old district's builders run in their own frame, moved as a block (xform.js)
+  xfInstall(H);
+  const X = (g, ...f) => { xfRun(H, g, ...f); lap(g); };
+  X('business', h => H.line([[VALLEY.x, VALLEY.z0], [VALLEY.x, VALLEY.z3]], VALLEY.rimHalf + 1));
+  X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
   buildCable(H); lap('cable car');
-  buildCanals(H); lap('canals');
-  buildLakeshore(H); lap('lakeshore');
-  buildBusiness(H); lap('business');
-  buildMarket(H); lap('market');
-  buildOldTown(H); lap('old town');
-  buildDocks(H); lap('docks');
-  buildPark(H); lap('park');
-  buildObservatory(H); lap('observatory');
-  buildValley(H); buildPlaces(H); lap('new places');
-  fillDistricts(H); lap('fill');
+  X('skate', fillSouthStrip);
+  X('canals', buildCanals, fillCanalQuarter);
+  X('lake', buildLakeshore, fillLakeshore, h => musicGarden(h, -500, 905, U.rng(2025)));
+  X('business', buildBusiness, buildValley, fillBusiness);
+  X('market', buildMarket, fillMarketPeople);
+  X('oldtown', buildOldTown, fillOldTown);
+  X('docks', buildDocks, fillDocks);
+  X('park', buildPark, buildCrag, fillPark, h => wild(h, U.rng(2026)));
+  X('obs', buildObservatory, fillObservatory);
+  X('site', buildSite); X('tower', buildTower);
+  X('vine', h => vineyards(h, U.rng(2027)));
+  X('mouth', h => canalMouth(h, U.rng(2028)));
+  X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
+  fillRoutes(H); lap('routes');
   return H;
 }
 
@@ -6595,7 +6607,6 @@ function buildPark(H) {
   const pst = (PLAN.stations.find(s => s.key === 'park') || { at: [1e9, 1e9] }).at;     // (no Park station on the compact map)
   for (let x = R[0] + 8; x < R[2] - 4; x += 15) for (let z = R[1] + 8; z < R[3] - 4; z += 15) {
     const tx = x + (r() - 0.5) * 12, tz = z + (r() - 0.5) * 12;
-    if (districtDist(PLAN.byKey.park, tx, tz) > 6 * r()) continue;      // the forest's ragged edge
     if (clear.some(([cx, cz, cr]) => Math.hypot(tx - cx, tz - cz) < cr)) continue;
     // glades: patches of open meadow
     const glade = Math.sin(tx * 0.013) * Math.sin(tz * 0.011) > 0.55;
@@ -6603,7 +6614,7 @@ function buildPark(H) {
     if (!H.clearOf(tx - 1, tz - 1, tx + 1, tz + 1, 1)) continue;
     const big = r() < 0.7, dark = r();
     const col = dark < 0.33 ? '#2f5f34' : dark < 0.66 ? '#3a6f3a' : '#47803f';
-    if (tz < -500 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
+    if (tz < -1000 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
     else H.tree(tx, tz, { s: big ? 1.9 + r() * 0.9 : 1.1 + r() * 0.4, h: big ? 6.4 : 4.4, r: 3.4, color: col, color2: dark < 0.5 ? '#36693a' : '#4f8a44', tall: big, trunk: '#5a4232' });
   }
   // (shafts of light through the canopy: see Fauna — they follow the sun)
@@ -6949,12 +6960,13 @@ function bizShop(H, pod, faces, sr) {
 // terrain edits that must happen before the ground is drawn
 const CELLAR = [878, 166, 902, 190];          // grid-aligned: the sunken record shop in the market
 const SKATE = [-620, 200, -470, 312];      // the skatepark in the strip south of the park: levelled
+const OBS_T = [96, -1180];                 // the observatory's terrace
 function prepDistricts() {
   TER.holes.push(CELLAR);
   PLAN.skateY = (cityHeight(SKATE[0], SKATE[1]) + cityHeight(SKATE[2], SKATE[3]) + cityHeight(SKATE[0], SKATE[3]) + cityHeight(SKATE[2], SKATE[1])) / 4;
   flattenRect(SKATE, PLAN.skateY, 18, 'set');
   // cut the observatory terrace into the hillside so it sits level
-  const tx = 96, tz = -1180, ty = cityHeight(tx, tz) + 0.3;
+  const [tx, tz] = OBS_T, ty = cityHeight(tx, tz) + 0.3;
   flattenRect([tx - 31, tz - 19, tx + 31, tz + 7], ty - 0.5, 14, 'min');
 }
 
@@ -8558,11 +8570,14 @@ function fillPark(H) {
   (W.pigeonSpots = W.pigeonSpots || []).push([-660, -510, 8]);
 }
 
-function fillOldTownMarket(H) {
-  const { K, W, B } = H, r = U.rng(1707);
-  // people chatting on the lanes and squares of the old town; more in the market
-  for (let i = 0; i < 40; i++) { const x = 470 + r() * 550, z = -1420 + r() * 1030; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
+function fillMarketPeople(H) {
+  const r = U.rng(1708);
   for (let i = 0; i < 40; i++) { const x = 480 + r() * 540, z = -310 + r() * 590; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 3), 'market'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
+}
+function fillOldTown(H) {
+  const { K, W, B } = H, r = U.rng(1707);
+  // people chatting on the lanes and squares of the old town
+  for (let i = 0; i < 40; i++) { const x = 470 + r() * 550, z = -1420 + r() * 1030; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   // flower beds and benches in the old town's gaps
   for (let i = 0; i < 300; i++) {
     const x = 470 + r() * 550, z = -1420 + r() * 1030;
@@ -8655,7 +8670,7 @@ function buildFerris(H, x, z) {
 //  of the ridge. The gondolas never stop (jump onto a roof from a station platform); the cables are
 //  long, sagging grinds — ride one all the way down to the lake.
 // ============================================================
-const CABLE = { A: [-880, 1050], B: [-575, -1285], spans: 10, lift: 34, off: 3.6, hang: 3.4, speed: 7, gap: 150 };
+const CABLE = { A: [-520, 470], B: [-430, -650], spans: 6, lift: 34, off: 3.6, hang: 3.4, speed: 7, gap: 150 };
 function buildCable(H) {
   const { K, W, B, F } = H, C = CABLE;
   const [ax, az] = C.A, [bx, bz] = C.B, L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
@@ -8900,15 +8915,19 @@ function vineyards(H, r) {
     const gap = 9 + r() * 5, a0 = x0 + r() * 14, a1 = x1 - r() * 14, ph = r() * 6, amp = 1.5 + r() * 2.5;
     const wz = (x) => z + Math.sin(x * 0.035 + ph) * amp + Math.sin(x * 0.11 + ph * 2) * 0.6;
     const pts = []; for (let x = a0; x <= a1; x += 7) pts.push([x, wz(x)]);
-    let ok = true; for (const [px, pz] of pts) if (!H.clearOf(px - 3.5, pz - 1, px + 3.5, pz + 1, 0)) { ok = false; break; }
-    if (ok) {
-      H.ledge(pts, { h: 0.9 + r() * 0.5, w: 0.7, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' });
+    // a wall runs as far as it can; a road or a house breaks it into pieces
+    const runs = []; let run = [];
+    for (const p of pts) { if (H.clearOf(p[0] - 3.5, p[1] - 1, p[0] + 3.5, p[1] + 1, 0)) run.push(p); else { if (run.length > 2) runs.push(run); run = []; } }
+    if (run.length > 2) runs.push(run);
+    for (const run of runs) {
+      const b0 = run[0][0], b1 = run[run.length - 1][0];
+      H.ledge(run, { h: 0.9 + r() * 0.5, w: 0.7, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' });
       const rows = Math.max(2, Math.floor((gap - 2) / 2.1));
       for (let k = 1; k <= rows; k++) {
-        let x = a0 + 1 + r() * 4;
-        while (x < a1 - 3) {
+        let x = b0 + 1 + r() * 4;
+        while (x < b1 - 3) {
           const len = 3 + r() * 6, xm = x + len / 2, vz = wz(xm) + k * 2.1, y = terrainAt(xm, vz);
-          if (r() > 0.08) {
+          if (r() > 0.08 && H.clearOf(xm - len / 2, vz - 0.5, xm + len / 2, vz + 0.5, 0)) {
             H.put(H.SH.BOX, xm, y + 0.35, vz, len, 0.7, 0.12, '#6a5040', 'wood', 0, Math.atan2(len, (wz(x + len) - wz(x))) - Math.PI / 2);
             H.put(H.SH.ICO, xm, y + 0.85, vz, len * 0.52, 0.42 + r() * 0.12, 0.45, pick(r, ['#5f8f3a', '#6f9a42', '#58843a', '#7a9a3a']), 'flat', 0.04);
           }
@@ -8916,8 +8935,8 @@ function vineyards(H, r) {
         }
       }
       // here and there a peach tree or a little stone hut among the rows
-      if (r() < 0.35) { const tx = U.lerp(a0, a1, r()), tz = wz(tx) + gap / 2; H.tree(tx, tz, { s: 0.6, h: 2.4, color: '#7a9a3a', far: false }); }
-      H.reserve([a0 - 1, z - amp - 1, a1 + 1, z + gap]);
+      if (r() < 0.35) { const tx = U.lerp(b0, b1, r()), tz = wz(tx) + gap / 2; H.tree(tx, tz, { s: 0.6, h: 2.4, color: '#7a9a3a', far: false }); }
+      H.reserve([b0 - 1, z - amp - 1, b1 + 1, z + gap]);
     }
     z += gap;
   }
@@ -9012,13 +9031,10 @@ function cragZip() {
   return { ux, uz, top: [b[0] + ux * (CRAG.w1 - 3), b[1] + uz * (CRAG.w1 - 3)], end: [b[0] + ux * 122, b[1] + uz * 122] };
 }
 // claim the ground first, so the districts build round the new places
-function prePlaces(H) {
-  const V = VALLEY;
-  H.line([[V.x, V.z0], [V.x, V.z3]], V.rimHalf + 1);
+function prePark(H) {
   for (let t = 0; t <= 1.0001; t += 0.02) { const [x, z] = cragAt(t), nat = cityHeight(x, z), top = U.lerp(CRAG.y0, CRAG.y1, t); H.block(x, z, U.lerp(CRAG.w0, CRAG.w1, t) + 8 + 0.3 * Math.max(0, top - nat)); }
   H.line(CRAG_LINK, 4);
   const zp = cragZip(); H.line([zp.top, zp.end], 7);
-  H.reserve(SITE); H.reserve(TOWER.block);
 }
 function buildPlaces(H) {
   buildCrag(H); buildSite(H); buildTower(H);
@@ -9291,6 +9307,238 @@ function buildTower(H) {
       K.cyl(a[0], deckY, a[2], 0.14, 1.6, red, { outline: 0.03, seg: 6 });
       break;
     } }
+}
+
+// ============================================================
+//  XFORM — the compact city reuses the old districts' builders, each moved as a block.
+//  A builder runs in its own frame (the coordinates it was written in). What it makes is
+//  shifted by its group's offset on the way out, and trimmed to its district's new outline.
+//  Questions it asks about the world (ground height, the canal, the shore, other places)
+//  are answered from the real map, shifted into its frame. Offsets are in steps of 8 m,
+//  so things laid on terrain grid lines stay on them.
+// ============================================================
+const XF_GROUPS = {
+  // key: [dx, dz], keep: district outline to trim to (null: none), margin: metres allowed past it
+  park:     { d: [464, 304],   keep: 'park', margin: 12 },          // the pond lands where the pond is
+  obs:      { d: [-152, 616],  keep: 'obs', margin: 60 },            // the observatory on the summit, its terrace looking down the main street
+  oldtown:  { d: [-408, 408],  keep: 'oldtown', margin: 12 },        // the bell tower's square at the south edge (phase 4 relays the old town)
+  market:   { d: [-344, 40],   keep: 'market', margin: 30 },
+  business: { d: [-56, 480],   keep: 'business', margin: 24 },       // the sunken street down the middle
+  site:     { d: [24, 224],    keep: null },
+  tower:    { d: [96, 304],    keep: null },                        // the Needle, where downtown, old town and market meet
+  canals:   { d: [0, -152],    keep: 'canals', margin: 8 },
+  docks:    { d: [-320, -696], keep: 'docks', margin: 20 },
+  lake:     { d: [0, -688],    keep: 'lake', margin: 30 },
+  skate:    { d: [288, -40],   keep: null },
+  vine:     { d: [-456, 888],  keep: null },
+  mouth:    { d: [-224, -696], keep: null },
+  carousel: { d: [0, -104],    keep: null },
+  garden:   { d: [200, -432],  keep: null },
+};
+
+// ---------- named places the old builders share: kept in the current frame ----------
+const _xpt = (p, dx, dz) => { p[0] += dx; p[1] += dz; };
+const _xrc = (r, dx, dz) => { r[0] += dx; r[1] += dz; r[2] += dx; r[3] += dz; };
+const XF_CONSTS = [
+  [() => VALLEY, 'business', (o, dx, dz) => { o.x += dx; o.z0 += dz; o.z1 += dz; o.z2 += dz; o.z3 += dz; for (let i = 0; i < o.bridges.length; i++) o.bridges[i] += dz; }],
+  [() => VALLEY_RAMP, 'business', (o, dx, dz) => { o[0] += dz; o[1] += dz; }],
+  [() => CRAG, 'park', (o, dx, dz) => { for (const p of o.spine) _xpt(p, dx, dz); }],
+  [() => CRAG_LINK, 'park', (o, dx, dz) => { for (const p of o) _xpt(p, dx, dz); }],
+  [() => SITE, 'site', _xrc],
+  [() => TOWER, 'tower', (o, dx, dz) => { o.x += dx; o.z += dz; _xrc(o.block, dx, dz); }],
+  [() => OLD_PADS, 'oldtown', (o, dx, dz) => { for (const p of o) _xpt(p, dx, dz); }],
+  [() => OLD_Q, 'oldtown', (o, dx, dz) => { for (const q of o) _xpt(q.at, dx, dz); }],
+  [() => MKT, 'market', (o, dx, dz) => { _xrc(o.hall, dx, dz); _xrc(o.field, dx, dz); _xpt(o.tower, dx, dz); for (let i = 0; i < o.cross.length; i++) o.cross[i] += dx; for (let i = 0; i < o.lanes.length; i++) o.lanes[i] += dz; for (const n of o.inns) _xrc(n, dx, dz); _xrc(o.dyers, dx, dz); }],
+  [() => CELLAR, 'market', _xrc],
+  [() => SKATE, 'skate', _xrc],
+  [() => OBS_T, 'obs', _xpt],
+].map(([get, home, shift]) => ({ get, home, shift, off: [0, 0] }));     // off: what has been added to the written values
+
+const XF = { g: null, dx: 0, dz: 0, keep: null, margin: 0 };
+function xfFrame(g) {
+  const F = g ? XF_GROUPS[g].d : [0, 0];
+  for (const c of XF_CONSTS) {
+    const H = XF_GROUPS[c.home].d, tx = H[0] - F[0], tz = H[1] - F[1];
+    if (tx !== c.off[0] || tz !== c.off[1]) { c.shift(c.get(), tx - c.off[0], tz - c.off[1]); c.off = [tx, tz]; }
+  }
+}
+xfFrame(null);        // at load: everything where it really is
+
+// the old plan's numbers the builders were written against
+const PLAN0 = {
+  districts: [
+    { key: 'park', name: 'Forest park', rect: [-1032, -1440, -276, 180] },
+    { key: 'obs', name: 'Observatory', rect: [-240, -1440, 420, -1044] },
+    { key: 'oldtown', name: 'Old town', rect: [456, -1440, 1032, -372] },
+    { key: 'business', name: 'Business', rect: [-240, -996, 396, 240] },
+    { key: 'market', name: 'Market', rect: [468, -324, 1032, 288] },
+    { key: 'canals', name: 'Canals', rect: [-1032, 240, 396, 792] },
+    { key: 'docks', name: 'Docks', rect: [468, 396, 1032, 1200] },
+    { key: 'lake', name: 'Lakeshore', rect: [-1032, 840, 252, 1236] },
+  ],
+  canal: { z: 474, half: 12, x0: -1072, bendX: 306, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
+  docksQuayZ: 1198, boulevardX: 432, avenueZ: 336, shoreZ: 1236,
+};
+PLAN0.byKey = Object.fromEntries(PLAN0.districts.map(d => [d.key, d]));
+const shoreZ0 = (x) => PLAN0.shoreZ + Math.sin(x / 170) * 14 + Math.sin(x / 61 + 1.3) * 5;
+PLAN0.canalEnd = shoreZ0(PLAN0.canal.bendX) - 48;
+const OLD_STATIONS = ['hilltop', 'market', 'docks', 'harbour', 'canal', 'central', 'park'];
+
+// ---------- running a builder in its frame ----------
+// (the real versions of the questions a builder asks)
+const XF_REAL = {};
+function xfKeepPoint(x, z) {
+  if (x < TER.x0 + 4 || x > TER.x0 + TER.nx * TER.cell - 4 || z < TER.z0 + 4 || z > TER.z0 + TER.nz * TER.cell - 4) return false;
+  if (XF.keep && shapeDist(PLAN_REAL.byKey[XF.keep].shape, x, z) > XF.margin) return false;
+  if (XF_REAL.inCanal(x, z)) return false;
+  return true;
+}
+// shift a registry value into the real map, in place (coordinates: x/z keys, [x, z], [x, y, z], [x0, z0, x1, z1])
+function xfShift(v, dx, dz, seen, depth = 0) {
+  if (!v || typeof v !== 'object' || depth > 6 || seen.has(v)) return;
+  seen.add(v);
+  if (v.isVector3) { v.x += dx; v.z += dz; return; }
+  if (v.isObject3D) { v.position.x += dx; v.position.z += dz; return; }
+  if (v.isMaterial || v.isTexture || v.isBufferGeometry || v.isColor) return;
+  if (Array.isArray(v)) {
+    if (v.length >= 2 && v.length <= 4 && v.every(n => typeof n === 'number')) {
+      if (v.length === 2) { v[0] += dx; v[1] += dz; } else if (v.length === 3) { v[0] += dx; v[2] += dz; } else { v[0] += dx; v[1] += dz; v[2] += dx; v[3] += dz; }
+      return;
+    }
+    for (const e of v) xfShift(e, dx, dz, seen, depth + 1);
+    return;
+  }
+  for (const k of Object.keys(v)) {
+    const e = v[k];
+    if (typeof e === 'number') { if (k === 'x' || k === 'x0' || k === 'x1' || k === 'cx' || k === 'ax' || k === 'bx') v[k] = e + dx; else if (k === 'z' || k === 'z0' || k === 'z1' || k === 'cz' || k === 'az' || k === 'bz') v[k] = e + dz; }
+    else if (e && typeof e === 'object') xfShift(e, dx, dz, seen, depth + 1);
+  }
+}
+// where a registry item stands (after shifting), for trimming
+function xfCentre(v) {
+  if (Array.isArray(v)) return typeof v[0] === 'number' ? (v.length === 3 ? [v[0], v[2]] : v.length === 4 ? [(v[0] + v[2]) / 2, (v[1] + v[3]) / 2] : [v[0], v[1]]) : null;
+  if (v.x0 !== undefined && v.x1 !== undefined) return [(v.x0 + v.x1) / 2, (v.z0 + v.z1) / 2];
+  if (v.x !== undefined && v.z !== undefined) return [v.x, v.z];
+  if (v.ax !== undefined) return [(v.ax + v.bx) / 2, (v.az + v.bz) / 2];
+  return null;
+}
+// lists whose items are trimmed with the district; the rest of W is only shifted
+const XF_TRIM = new Set(['boxes', 'camBoxes', 'ramps', 'treeList', 'lamps', 'benches', 'sounds', 'spots', 'pigeonSpots', 'gullSpots', 'fountains', 'dishes']);
+const XF_SKIP = new Set(['group', 'cells', 'metro', 'stations', 'roads', 'far', 'slabs', 'mats', 'grid', 'spawn', 'waters', 'canal', 'canalWaterMat', 'lakeMat', 'dynBoxes', 'addDyn']);
+
+// a geometry moved into place, keeping only the triangles whose centre is kept
+function xfClip(geo, M) {
+  const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(M), P = g.attributes.position.array, n = P.length / 9, keep = [];
+  for (let t = 0; t < n; t++) { const i = t * 9; if (xfKeepPoint((P[i] + P[i + 3] + P[i + 6]) / 3, (P[i + 2] + P[i + 5] + P[i + 8]) / 3)) keep.push(t); }
+  if (!keep.length) return null;
+  if (keep.length === n) return g;
+  const out = new THREE.BufferGeometry();
+  for (const [name, a] of Object.entries(g.attributes)) {
+    const s = a.itemSize, src = a.array, dst = new src.constructor(keep.length * 3 * s);
+    keep.forEach((t, k) => dst.set(src.subarray(t * 3 * s, (t + 1) * 3 * s), k * 3 * s));
+    out.setAttribute(name, new THREE.BufferAttribute(dst, s, a.normalized));
+  }
+  out.userData = Object.assign({}, geo.userData);
+  return out;
+}
+
+// install the wrappers once, on the kit (they do nothing outside a frame)
+function xfInstall(H) {
+  const { K, B, F, S, W } = H;
+  const T = new THREE.Matrix4(), _c = V3(), _b = new THREE.Box3();
+  const wrapAdd = (obj) => {
+    const add = obj.add.bind(obj), addShape = obj.addShape && obj.addShape.bind(obj);
+    obj.add = (geo, m, ...rest) => {
+      if (!XF.g) return add(geo, m, ...rest);
+      const M = T.makeTranslation(XF.dx, 0, XF.dz).clone(); if (m) M.multiply(m);
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      if (Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) > 36) {        // big pieces (ground patches, streets): trimmed triangle by triangle
+        const g = xfClip(geo, M); if (g) add(g, new THREE.Matrix4(), ...rest); return;
+      }
+      _b.copy(bb).getCenter(_c).applyMatrix4(M);
+      if (!xfKeepPoint(_c.x, _c.z)) return;
+      return add(geo, M, ...rest);
+    };
+    if (addShape) obj.addShape = (sh, m, ...rest) => {
+      if (!XF.g) return addShape(sh, m, ...rest);
+      const M = T.makeTranslation(XF.dx, 0, XF.dz).clone().multiply(m), e = M.elements;
+      if (!xfKeepPoint(e[12], e[14])) return;
+      return addShape(sh, M, ...rest);
+    };
+  };
+  wrapAdd(B); wrapAdd(F);
+  { const add = S.add.bind(S); S.add = (ax, ay, az, bx, by, bz, half) => {
+      if (!XF.g) return add(ax, ay, az, bx, by, bz, half);
+      if (!xfKeepPoint((ax + bx) / 2 + XF.dx, (az + bz) / 2 + XF.dz)) return;
+      return add(ax + XF.dx, ay, az + XF.dz, bx + XF.dx, by, bz + XF.dz, half);
+    }; }
+  { const rail = K.rail; K.rail = (pts, o) => {
+      if (!XF.g) return rail(pts, o);
+      const P = pts.map(p => Array.isArray(p) ? [p[0] + XF.dx, p[1], p[2] + XF.dz] : V3(p.x + XF.dx, p.y, p.z + XF.dz));
+      const mid = P[Math.floor(P.length / 2)], mx = Array.isArray(mid) ? mid[0] : mid.x, mz = Array.isArray(mid) ? mid[2] : mid.z;
+      if (!xfKeepPoint(mx, mz)) return;
+      return rail(P, o);
+    }; }
+  // the placement grids hold real coordinates
+  const sh = (fn) => (x0, z0, x1, z1, ...rest) => XF.g ? fn(x0 + XF.dx, z0 + XF.dz, x1 + XF.dx, z1 + XF.dz, ...rest) : fn(x0, z0, x1, z1, ...rest);
+  H.clearOf = sh(H.clearOf); H.clearPts = sh(H.clearPts);
+  { const f = H.block; H.block = (x, z, r) => XF.g ? f(x + XF.dx, z + XF.dz, r) : f(x, z, r); }
+  { const f = H.reserve; H.reserve = (r) => XF.g ? f([r[0] + XF.dx, r[1] + XF.dz, r[2] + XF.dx, r[3] + XF.dz]) : f(r); }
+  { const f = H.line; H.line = (P, hw) => XF.g ? f(P.map(p => [p[0] + XF.dx, p[1] + XF.dz]), hw) : f(P, hw); }
+}
+
+// run builders in a group's frame, then move what they registered into the real map
+function xfRun(H, g, ...fns) {
+  const G = XF_GROUPS[g], W = H.W, dx = G.d[0], dz = G.d[1];
+  // what's there before
+  const before = new Map(); for (const k of Object.keys(W)) before.set(k, Array.isArray(W[k]) ? W[k].length : W[k]);
+  const nKids = W.group.children.length, nDecks = DECKS.length, nHoles = TER.holes.length;
+  // the frame: queries answered from the real map, the old plan's numbers, shared places shifted
+  if (!XF_REAL.terrainAt) Object.assign(XF_REAL, { terrainAt, cityHeight, landH, inCanal, shoreZ, canalEndZ, districtAt, districtWeights, inHole });
+  const R = XF_REAL;
+  terrainAt = (x, z, out) => R.terrainAt(x + dx, z + dz, out);
+  cityHeight = (x, z) => R.cityHeight(x + dx, z + dz);
+  landH = (x, z) => R.landH(x + dx, z + dz);
+  inCanal = (x, z) => R.inCanal(x + dx, z + dz);
+  shoreZ = (x) => R.shoreZ(x + dx) - dz;
+  canalEndZ = () => PLAN0.canalEnd;
+  districtAt = (x, z) => R.districtAt(x + dx, z + dz);
+  districtWeights = (x, z, out, soft) => R.districtWeights(x + dx, z + dz, out, soft);
+  inHole = (x, z) => R.inHole(x + dx, z + dz);
+  const saved = { districts: PLAN.districts, byKey: PLAN.byKey, stations: PLAN.stations, spots: PLAN.spots, canal: PLAN.canal, pond: PLAN.pond, docksQuayZ: PLAN.docksQuayZ, boulevardX: PLAN.boulevardX, avenueZ: PLAN.avenueZ };
+  PLAN.districts = PLAN0.districts; PLAN.byKey = PLAN0.byKey; PLAN.canal = PLAN0.canal;
+  PLAN.docksQuayZ = PLAN0.docksQuayZ; PLAN.boulevardX = PLAN0.boulevardX; PLAN.avenueZ = PLAN0.avenueZ;
+  PLAN.stations = OLD_STATIONS.map(key => { const s = saved.stations.find(t => t.key === key); return { key, name: s ? s.name : key, at: s ? [s.at[0] - dx, s.at[1] - dz] : [1e6, 1e6] }; });
+  PLAN.spots = saved.spots.map(s => ({ key: s.key, at: [s.at[0] - dx, s.at[1] - dz] }));
+  PLAN.pond = Object.assign({}, saved.pond, { x: saved.pond.x - dx, z: saved.pond.z - dz });
+  xfFrame(g);
+  Object.assign(XF, { g, dx, dz, keep: G.keep, margin: G.margin || 0 });
+  try { for (const f of fns) f(H); }
+  finally {
+    Object.assign(XF, { g: null, dx: 0, dz: 0, keep: null, margin: 0 });
+    xfFrame(null);
+    Object.assign(PLAN, saved);
+    ({ terrainAt, cityHeight, landH, inCanal, shoreZ, canalEndZ, districtAt, districtWeights, inHole } = XF_REAL);
+  }
+  // move what was registered: new lists and items, new or replaced objects
+  const seen = new WeakSet(), keep = (v) => { const c = xfCentre(v); if (!c) return true; Object.assign(XF, { g, keep: G.keep, margin: G.margin || 0 }); const ok = xfKeepPoint(c[0], c[1]); XF.g = null; return ok; };
+  for (const k of Object.keys(W)) {
+    if (XF_SKIP.has(k) || typeof W[k] === 'function') continue;
+    const v = W[k], b = before.get(k);
+    if (Array.isArray(v)) {
+      const from = before.has(k) && Array.isArray(b) ? b : 0;
+      if (v.length <= from) continue;
+      const fresh = v.splice(from);
+      for (const e of fresh) xfShift(e, dx, dz, seen);
+      v.push(...(XF_TRIM.has(k) ? fresh.filter(keep) : fresh));
+    } else if (v && typeof v === 'object' && (!before.has(k) || b !== v)) xfShift(v, dx, dz, seen);
+  }
+  // the harbour's water and the like: shifted, not trimmed
+  for (let i = W.waters.length - 1; i >= 0 && W.waters[i]._xf === undefined; i--) { W.waters[i]._xf = g; if (!W.waters[i].lake && !W.waters[i].canal) xfShift(W.waters[i], dx, dz, seen); }
+  for (let i = nKids; i < W.group.children.length; i++) { const o = W.group.children[i]; o.position.x += dx; o.position.z += dz; }
+  for (let i = nDecks; i < DECKS.length; i++) xfShift(DECKS[i], dx, dz, seen);
+  for (let i = nHoles; i < TER.holes.length; i++) xfShift(TER.holes[i], dx, dz, seen);
 }
 
 // ============================================================

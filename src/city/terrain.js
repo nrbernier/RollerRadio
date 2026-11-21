@@ -3,7 +3,7 @@
 //  Collision reads the same triangles the mesh draws. The canal winds, so the cells
 //  along it are left out of the mesh and a quay apron (world.js) covers their edges.
 // ============================================================
-const TER = { x0: -664, z0: -784, cell: 8, nx: 166, nz: 212 };
+const TER = { x0: -666, z0: -786, cell: 8, nx: 167, nz: 212 };    // (grid lines where the old grid had them: districts move in steps of 8 m)
 TER.x1 = TER.x0 + TER.nx * TER.cell; TER.z1 = TER.z0 + TER.nz * TER.cell;
 
 function buildHeights() {
@@ -12,14 +12,14 @@ function buildHeights() {
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) H[j * (nx + 1) + i] = cityHeight(x0 + i * cell, z0 + j * cell);
   TER.H = H;
   // the canal: vertices well inside the channel drop to the bed (those near the walls stay at quay height)
-  const C = PLAN.canal;
+  const C = PLAN_REAL.canal;
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
     if (pathDist(C.path, x, z, 24).d < C.half - cell) H[j * (nx + 1) + i] = C.bedY;
   }
 }
 // cells the terrain mesh leaves out along the canal (any part of them may be in the channel)
-function canalCell(cx, cz) { return pathDist(PLAN.canal.path, cx, cz, 32).d < PLAN.canal.half + TER.cell * 0.72; }
+function canalCell(cx, cz) { return pathDist(PLAN_REAL.canal.path, cx, cz, 32).d < PLAN_REAL.canal.half + TER.cell * 0.72; }
 // lower the ground along a corridor (centreline points [x, y, z]) to floorY(t) + off
 function carveCorridor(pts, half, off = -0.6) {
   const { nx, nz, x0, z0, cell, H } = TER;

@@ -99,17 +99,17 @@ const PLAN = {
   // districts: smoothed outlines (control points) and the music recipe key
   districts: [
     { key: 'park', name: 'Forest', ctrl: [[-760, -800], [-254, -770], [-226, -470], [-258, -266], [-318, -30], [-392, 170], [-530, 236], [-760, 236]] },
-    { key: 'obs', name: 'Observatory', ctrl: circlePts(-53, -622, 96, 9, 0.08) },
+    { key: 'obs', name: 'Observatory', ctrl: circlePts(-56, -640, 105, 9, 0.08) },
     { key: 'oldtown', name: 'Old town', ctrl: [[35, -566], [212, -655], [515, -604], [588, -400], [548, -262], [388, -130], [229, -120], [53, -186], [0, -333]] },
-    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [180, 106], [18, 206], [-194, 142], [-242, -50]] },
+    { key: 'business', name: 'Downtown', ctrl: [[-177, -186], [106, -182], [205, -50], [206, 150], [60, 216], [-194, 150], [-242, -50]] },
     { key: 'market', name: 'Market', ctrl: [[254, -86], [530, -80], [596, 66], [494, 206], [325, 222], [214, 100], [214, -28]] },
     { key: 'canals', name: 'Canals', ctrl: [[-640, 252], [-141, 230], [212, 268], [222, 350], [150, 462], [40, 470], [-353, 455], [-640, 402]] },
-    { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 505], [290, 505], [226, 402]] },
+    { key: 'docks', name: 'Docks', ctrl: [[236, 286], [640, 272], [640, 502], [290, 502], [226, 402]] },
     { key: 'lake', name: 'Lakeshore', ctrl: [[-640, 430], [-200, 470], [-14, 512], [60, 524], [60, 640], [-640, 640]] },
   ],
   // the lakeshore: beach line (wiggles), a small bay where the canal comes out
   shore: { z: 548, tilt: -0.06, bayX: 80, bayR: 70, bayDepth: 16 },
-  docksQuayZ: 505, docksX: [222, 660],
+  docksQuayZ: 502, docksX: [222, 660],
   // the canal: comes out of a tunnel under a knoll at the west edge, winds east under the main street,
   // turns south and ends in a basin behind the promenade (a lock gate, the lake beyond)
   canal: { ctrl: [[-662, 300], [-560, 318], [-430, 344], [-300, 298], [-160, 322], [-20, 352], [76, 386], [102, 446], [84, 0]], half: 11, waterY: 1.4, bedY: -2.2, quayY: 4.6 },
@@ -128,9 +128,9 @@ const PLAN = {
   ],
   // hidden spots: local changes to the music, nothing to collect
   spots: [
-    { key: 'glasshouse', at: [-318, 86] },
-    { key: 'belltower',  at: [330, -430] },
-    { key: 'rooftop',    at: [-10, -30] },
+    { key: 'glasshouse', at: [-436, -584] },
+    { key: 'belltower',  at: [266, -168] },
+    { key: 'rooftop',    at: [136, 150] },
     { key: 'cellar',     at: [300, -96] },
     { key: 'arch',       at: [90, 400] },       // where the main street crosses the canal (set exactly below)
     { key: 'watertower', at: [262, 322] },
@@ -138,16 +138,18 @@ const PLAN = {
   ],
   // landmarks, where districts meet (placed by their builders; these are their anchors)
   places: {
-    summit: [-53, -622], crag: [-242, -500], vineyards: [-110, -310], glasshouse: [-318, 86], needle: [162, -128],
-    site: [-150, 172], central: [170, 150], recordShop: [300, -96], ferris: [-247, 493], lido: [-480, 505],
+    summit: [-56, -566], crag: [-360, -420], vineyards: [-110, -310], glasshouse: [-436, -584], needle: [166, -125],
+    site: [-154, 173], central: [170, 150], recordShop: [546, 218], ferris: [-247, 493], lido: [-480, 505],
     waterTower: [262, 322], lighthouse: [560, 626],
   },
   vineyards: [[-219, -416], [-150, -428], [-53, -400], [-8, -300], [-60, -232], [-120, -214], [-212, -240]],
-  pond: { x: -416, z: 127, r: 58 },
+  pond: { x: -416, z: 124, r: 95 },          // (the old forest's pond, moved with the forest)
   boulevardX: 104, avenueZ: 10,          // (old names) the main street's x near the lake, the cross street's z
 };
 for (const d of PLAN.districts) { d.shape = makeShape(d.ctrl); d.rect = d.shape.rect; }
 PLAN.byKey = Object.fromEntries(PLAN.districts.map(d => [d.key, d]));
+// the map's own functions read this (the old districts' builders see a different PLAN while they run: xform.js)
+const PLAN_REAL = Object.assign({}, PLAN);
 PLAN.vineyardShape = makeShape(PLAN.vineyards, 6);
 for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.loop);
 
@@ -162,6 +164,8 @@ for (const r of Object.values(PLAN.roads)) r.path = makePath(r.ctrl, 4, 32, r.lo
   if (at) PLAN.spots.find(s => s.key === 'arch').at = at;
 }
 
+Object.assign(PLAN_REAL, PLAN);
+
 // smooth district membership: 1 well inside, fading to 0 about `soft` metres outside the outline
 function rectDist(r, x, z) {
   const dx = Math.max(r[0] - x, 0, x - r[2]), dz = Math.max(r[1] - z, 0, z - r[3]);
@@ -172,7 +176,7 @@ function rectDist(r, x, z) {
 function districtDist(d, x, z) { return shapeDist(d.shape, x, z); }
 function districtWeights(x, z, out = {}, soft = 70) {
   let sum = 0, best = null, bd = 1e9;
-  for (const d of PLAN.districts) {
+  for (const d of PLAN_REAL.districts) {
     const s = districtDist(d, x, z);
     if (s < bd) { bd = s; best = d.key; }
     const w = U.smooth(U.clamp(1 - (s + soft * 0.5) / soft, 0, 1));
@@ -182,7 +186,7 @@ function districtWeights(x, z, out = {}, soft = 70) {
   for (const k in out) out[k] /= sum;
   return out;
 }
-function districtAt(x, z) { let best = null, bd = 1e9; for (const d of PLAN.districts) { const s = districtDist(d, x, z); if (s < bd) { bd = s; best = d; } } return best; }
+function districtAt(x, z) { let best = null, bd = 1e9; for (const d of PLAN_REAL.districts) { const s = districtDist(d, x, z); if (s < bd) { bd = s; best = d; } } return best; }
 
 // ---------- the land ----------
 // monotone cubic through the north–south profile (z → height): about 70 m from the top of the city to the shore
@@ -206,9 +210,9 @@ function gauss(d, r) { return Math.exp(-(d * d) / (r * r)); }
 // a hill that starts gently at the city edge and levels off at `top` metres
 const edgeRise = (e, top, w) => e <= 0 ? 0 : top * (1 - Math.exp(-(e / w) * (e / w))) + Math.min(e, 200) * 0.04;
 // the canal's basin end (just behind the promenade)
-function canalEndZ() { const P = PLAN.canal.path.pts; return P[P.length - 1][1]; }
+function canalEndZ() { const P = PLAN_REAL.canal.path.pts; return P[P.length - 1][1]; }
 function shoreZ(x) {
-  const S = PLAN.shore;
+  const S = PLAN_REAL.shore;
   return S.z + x * S.tilt + Math.sin(x / 90) * 8 + Math.sin(x / 37 + 1.3) * 3 - gauss(x - S.bayX, S.bayR) * S.bayDepth;
 }
 // the raw land before carving
@@ -217,10 +221,10 @@ function landH(x, z) {
   // the forest ridge runs down the west side and joins the summit
   const rx = U.lerp(-470, -400, U.clamp((150 - z) / 900, 0, 1)), ridgeUp = U.clamp((220 - z) / 850, 0, 1);
   h += gauss(x - rx, 120) * (3 + 17 * ridgeUp);
-  h -= gauss(Math.hypot(x - PLAN.pond.x, z - PLAN.pond.z), 70) * 5;              // the pond hollow
-  h += gauss(Math.hypot(x + 330, z - 50), 70) * 5;                                // glasshouse knoll
+  h -= gauss(Math.hypot(x - PLAN_REAL.pond.x, z - PLAN_REAL.pond.z), 70) * 5;              // the pond hollow
+  h += gauss(Math.hypot(x + 436, z + 590), 70) * 5;                               // glasshouse knoll
   h += gauss(Math.hypot(x - 292, z + 392), 240) * 13;                             // the old town's hill
-  h += Math.min(11, gauss(Math.hypot(x + 53, z + 622), 155) * 15);                 // the summit
+  h += Math.min(11, gauss(Math.hypot(x + 56, z + 660), 155) * 15);                 // the summit
   h += gauss(Math.hypot(x + 130, z + 330), 120) * 9;                              // the vineyard spur (sunny side faces south)
   h += gauss(Math.hypot(x + 720, z - 300), 55) * 15;                              // the knoll the canal tunnels under
   // the edge of the world: hills all round (outside the city); they rise, then roll
@@ -233,13 +237,13 @@ function landH(x, z) {
 // flat places: docks, the canal quays, the lakeshore promenade
 function cityHeight(x, z) {
   let h = landH(x, z);
-  const C = PLAN.canal;
+  const C = PLAN_REAL.canal;
   // canal quarter and the canal's banks: a flat, slightly raised quay level
-  const dq = districtDist(PLAN.byKey.canals, x, z), dc = pathDist(C.path, x, z, 80).d;
+  const dq = districtDist(PLAN_REAL.byKey.canals, x, z), dc = pathDist(C.path, x, z, 80).d;
   const inCanals = Math.max(U.smooth(U.clamp(1 - dq / 50, 0, 1)), U.smooth(U.clamp(1 - (dc - C.half - 24) / 30, 0, 1)));
   h = U.lerp(h, C.quayY + Math.sin(x * 0.02) * 0.2, inCanals);
   // docks: flat hardstanding
-  const inDocks = U.smooth(U.clamp(1 - districtDist(PLAN.byKey.docks, x, z) / 40, 0, 1));
+  const inDocks = U.smooth(U.clamp(1 - districtDist(PLAN_REAL.byKey.docks, x, z) / 40, 0, 1));
   h = U.lerp(h, 3.8, inDocks);
   // lake: beach then the lake bed
   const sz = shoreZ(x), dz = z - sz;
@@ -248,8 +252,8 @@ function cityHeight(x, z) {
     h = U.lerp(h, 2.0, U.smooth(beach) * (inDocks > 0.5 ? 0 : 1));
     if (dz > 0 && inDocks < 0.5) h = 2.0 - dz * 0.09 - Math.max(0, dz - 40) * 0.06;
   }
-  if (z > PLAN.docksQuayZ + 4 && x > PLAN.docksX[0] && x < PLAN.docksX[1]) h = Math.min(h, -6);
+  if (z > PLAN_REAL.docksQuayZ + 4 && x > PLAN_REAL.docksX[0] && x < PLAN_REAL.docksX[1]) h = Math.min(h, -6);
   return h;
 }
 // is (x, z) open water in the canal? (the lake is anything past the shore)
-function inCanal(x, z) { return pathDist(PLAN.canal.path, x, z, 16).d < PLAN.canal.half; }
+function inCanal(x, z) { return pathDist(PLAN_REAL.canal.path, x, z, 16).d < PLAN_REAL.canal.half; }

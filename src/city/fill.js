@@ -552,11 +552,14 @@ function fillPark(H) {
   (W.pigeonSpots = W.pigeonSpots || []).push([-660, -510, 8]);
 }
 
-function fillOldTownMarket(H) {
-  const { K, W, B } = H, r = U.rng(1707);
-  // people chatting on the lanes and squares of the old town; more in the market
-  for (let i = 0; i < 40; i++) { const x = 470 + r() * 550, z = -1420 + r() * 1030; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
+function fillMarketPeople(H) {
+  const r = U.rng(1708);
   for (let i = 0; i < 40; i++) { const x = 480 + r() * 540, z = -310 + r() * 590; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 3), 'market'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
+}
+function fillOldTown(H) {
+  const { K, W, B } = H, r = U.rng(1707);
+  // people chatting on the lanes and squares of the old town
+  for (let i = 0; i < 40; i++) { const x = 470 + r() * 550, z = -1420 + r() * 1030; if (H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.3)) { H.group(x, z, 2 + Math.floor(r() * 2), 'oldtown'); H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]); } }
   // flower beds and benches in the old town's gaps
   for (let i = 0; i < 300; i++) {
     const x = 470 + r() * 550, z = -1420 + r() * 1030;
@@ -649,7 +652,7 @@ function buildFerris(H, x, z) {
 //  of the ridge. The gondolas never stop (jump onto a roof from a station platform); the cables are
 //  long, sagging grinds — ride one all the way down to the lake.
 // ============================================================
-const CABLE = { A: [-880, 1050], B: [-575, -1285], spans: 10, lift: 34, off: 3.6, hang: 3.4, speed: 7, gap: 150 };
+const CABLE = { A: [-520, 470], B: [-430, -650], spans: 6, lift: 34, off: 3.6, hang: 3.4, speed: 7, gap: 150 };
 function buildCable(H) {
   const { K, W, B, F } = H, C = CABLE;
   const [ax, az] = C.A, [bx, bz] = C.B, L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
@@ -894,15 +897,19 @@ function vineyards(H, r) {
     const gap = 9 + r() * 5, a0 = x0 + r() * 14, a1 = x1 - r() * 14, ph = r() * 6, amp = 1.5 + r() * 2.5;
     const wz = (x) => z + Math.sin(x * 0.035 + ph) * amp + Math.sin(x * 0.11 + ph * 2) * 0.6;
     const pts = []; for (let x = a0; x <= a1; x += 7) pts.push([x, wz(x)]);
-    let ok = true; for (const [px, pz] of pts) if (!H.clearOf(px - 3.5, pz - 1, px + 3.5, pz + 1, 0)) { ok = false; break; }
-    if (ok) {
-      H.ledge(pts, { h: 0.9 + r() * 0.5, w: 0.7, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' });
+    // a wall runs as far as it can; a road or a house breaks it into pieces
+    const runs = []; let run = [];
+    for (const p of pts) { if (H.clearOf(p[0] - 3.5, p[1] - 1, p[0] + 3.5, p[1] + 1, 0)) run.push(p); else { if (run.length > 2) runs.push(run); run = []; } }
+    if (run.length > 2) runs.push(run);
+    for (const run of runs) {
+      const b0 = run[0][0], b1 = run[run.length - 1][0];
+      H.ledge(run, { h: 0.9 + r() * 0.5, w: 0.7, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' });
       const rows = Math.max(2, Math.floor((gap - 2) / 2.1));
       for (let k = 1; k <= rows; k++) {
-        let x = a0 + 1 + r() * 4;
-        while (x < a1 - 3) {
+        let x = b0 + 1 + r() * 4;
+        while (x < b1 - 3) {
           const len = 3 + r() * 6, xm = x + len / 2, vz = wz(xm) + k * 2.1, y = terrainAt(xm, vz);
-          if (r() > 0.08) {
+          if (r() > 0.08 && H.clearOf(xm - len / 2, vz - 0.5, xm + len / 2, vz + 0.5, 0)) {
             H.put(H.SH.BOX, xm, y + 0.35, vz, len, 0.7, 0.12, '#6a5040', 'wood', 0, Math.atan2(len, (wz(x + len) - wz(x))) - Math.PI / 2);
             H.put(H.SH.ICO, xm, y + 0.85, vz, len * 0.52, 0.42 + r() * 0.12, 0.45, pick(r, ['#5f8f3a', '#6f9a42', '#58843a', '#7a9a3a']), 'flat', 0.04);
           }
@@ -910,8 +917,8 @@ function vineyards(H, r) {
         }
       }
       // here and there a peach tree or a little stone hut among the rows
-      if (r() < 0.35) { const tx = U.lerp(a0, a1, r()), tz = wz(tx) + gap / 2; H.tree(tx, tz, { s: 0.6, h: 2.4, color: '#7a9a3a', far: false }); }
-      H.reserve([a0 - 1, z - amp - 1, a1 + 1, z + gap]);
+      if (r() < 0.35) { const tx = U.lerp(b0, b1, r()), tz = wz(tx) + gap / 2; H.tree(tx, tz, { s: 0.6, h: 2.4, color: '#7a9a3a', far: false }); }
+      H.reserve([b0 - 1, z - amp - 1, b1 + 1, z + gap]);
     }
     z += gap;
   }

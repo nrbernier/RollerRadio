@@ -9,13 +9,10 @@ function cragZip() {
   return { ux, uz, top: [b[0] + ux * (CRAG.w1 - 3), b[1] + uz * (CRAG.w1 - 3)], end: [b[0] + ux * 122, b[1] + uz * 122] };
 }
 // claim the ground first, so the districts build round the new places
-function prePlaces(H) {
-  const V = VALLEY;
-  H.line([[V.x, V.z0], [V.x, V.z3]], V.rimHalf + 1);
+function prePark(H) {
   for (let t = 0; t <= 1.0001; t += 0.02) { const [x, z] = cragAt(t), nat = cityHeight(x, z), top = U.lerp(CRAG.y0, CRAG.y1, t); H.block(x, z, U.lerp(CRAG.w0, CRAG.w1, t) + 8 + 0.3 * Math.max(0, top - nat)); }
   H.line(CRAG_LINK, 4);
   const zp = cragZip(); H.line([zp.top, zp.end], 7);
-  H.reserve(SITE); H.reserve(TOWER.block);
 }
 function buildPlaces(H) {
   buildCrag(H); buildSite(H); buildTower(H);

@@ -249,18 +249,26 @@ function buildDistricts(K, S, F) {
   const H = districtKit(K, S, F); fillKit(H);
   // the canals and lakeshore first: their quays and promenades claim the ground the others avoid
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
-  prePlaces(H);
+  // the compact city: each old district's builders run in their own frame, moved as a block (xform.js)
+  xfInstall(H);
+  const X = (g, ...f) => { xfRun(H, g, ...f); lap(g); };
+  X('business', h => H.line([[VALLEY.x, VALLEY.z0], [VALLEY.x, VALLEY.z3]], VALLEY.rimHalf + 1));
+  X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
   buildCable(H); lap('cable car');
-  buildCanals(H); lap('canals');
-  buildLakeshore(H); lap('lakeshore');
-  buildBusiness(H); lap('business');
-  buildMarket(H); lap('market');
-  buildOldTown(H); lap('old town');
-  buildDocks(H); lap('docks');
-  buildPark(H); lap('park');
-  buildObservatory(H); lap('observatory');
-  buildValley(H); buildPlaces(H); lap('new places');
-  fillDistricts(H); lap('fill');
+  X('skate', fillSouthStrip);
+  X('canals', buildCanals, fillCanalQuarter);
+  X('lake', buildLakeshore, fillLakeshore, h => musicGarden(h, -500, 905, U.rng(2025)));
+  X('business', buildBusiness, buildValley, fillBusiness);
+  X('market', buildMarket, fillMarketPeople);
+  X('oldtown', buildOldTown, fillOldTown);
+  X('docks', buildDocks, fillDocks);
+  X('park', buildPark, buildCrag, fillPark, h => wild(h, U.rng(2026)));
+  X('obs', buildObservatory, fillObservatory);
+  X('site', buildSite); X('tower', buildTower);
+  X('vine', h => vineyards(h, U.rng(2027)));
+  X('mouth', h => canalMouth(h, U.rng(2028)));
+  X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
+  fillRoutes(H); lap('routes');
   return H;
 }
 
@@ -563,7 +571,6 @@ function buildPark(H) {
   const pst = (PLAN.stations.find(s => s.key === 'park') || { at: [1e9, 1e9] }).at;     // (no Park station on the compact map)
   for (let x = R[0] + 8; x < R[2] - 4; x += 15) for (let z = R[1] + 8; z < R[3] - 4; z += 15) {
     const tx = x + (r() - 0.5) * 12, tz = z + (r() - 0.5) * 12;
-    if (districtDist(PLAN.byKey.park, tx, tz) > 6 * r()) continue;      // the forest's ragged edge
     if (clear.some(([cx, cz, cr]) => Math.hypot(tx - cx, tz - cz) < cr)) continue;
     // glades: patches of open meadow
     const glade = Math.sin(tx * 0.013) * Math.sin(tz * 0.011) > 0.55;
@@ -571,7 +578,7 @@ function buildPark(H) {
     if (!H.clearOf(tx - 1, tz - 1, tx + 1, tz + 1, 1)) continue;
     const big = r() < 0.7, dark = r();
     const col = dark < 0.33 ? '#2f5f34' : dark < 0.66 ? '#3a6f3a' : '#47803f';
-    if (tz < -500 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
+    if (tz < -1000 && r() < 0.5) H.pine(tx, tz, { s: 1.6 + r() * 0.8, color: '#2c5236' });
     else H.tree(tx, tz, { s: big ? 1.9 + r() * 0.9 : 1.1 + r() * 0.4, h: big ? 6.4 : 4.4, r: 3.4, color: col, color2: dark < 0.5 ? '#36693a' : '#4f8a44', tall: big, trunk: '#5a4232' });
   }
   // (shafts of light through the canopy: see Fauna — they follow the sun)
