@@ -6434,6 +6434,7 @@ function buildDistricts(K, S, F) {
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   // the compact city: each old district's builders run in their own frame, moved as a block (xform.js)
   xfInstall(H);
+  { const P = PLAN_REAL.pond, m = P.r + 8; H.reserve([P.x - m, P.z - m, P.x + m, P.z + m]); }      // the pond and its banks: nothing else goes there
   const X = (g, ...f) => { xfRun(H, g, ...f); lap(g); };
   X('business', h => H.line([[VALLEY.x, VALLEY.z0], [VALLEY.x, VALLEY.z3]], VALLEY.rimHalf + 1));
   X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
@@ -6441,7 +6442,8 @@ function buildDistricts(K, S, F) {
   X('skate', fillSouthStrip);
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
   X('canals', fillCanalQuarter);
-  X('lake', buildLakeshore, fillLakeshore, h => musicGarden(h, -500, 905, U.rng(2025)));
+  X('lake', buildLakeshore, fillLakeshore);
+  X('garden', h => musicGarden(h, -500, 905, U.rng(2025)));
   X('business', buildBusiness, buildValley, fillBusiness);
   X('market', buildMarket, fillMarketPeople);
   X('oldtown', buildOldTown, fillOldTown);
@@ -6719,11 +6721,17 @@ function buildPark(H) {
     }
   }
   // the pond: water, reeds, a boardwalk across
-  const pm = new THREE.Mesh(new THREE.CircleGeometry(pond.r, 40), new THREE.MeshBasicMaterial({ color: 0x3f6f5a, map: W.mats.waterTex, transparent: true, opacity: 0.85, depthWrite: false }));
+  const pm = new THREE.Mesh(new THREE.CircleGeometry(pond.r * 0.7, 72), new THREE.MeshBasicMaterial({ color: 0x3f6f5a, map: W.mats.waterTex, transparent: true, opacity: 0.85, depthWrite: false }));
   pm.rotation.x = -Math.PI / 2; pm.position.set(pond.x, pond.y, pond.z); pm.renderOrder = 3; W.group.add(pm);
-  const puv = pm.geometry.attributes.uv; for (let i = 0; i < puv.count; i++) puv.setXY(i, puv.getX(i) * 18, puv.getY(i) * 18); puv.needsUpdate = true;
+  const puv = pm.geometry.attributes.uv; for (let i = 0; i < puv.count; i++) puv.setXY(i, puv.getX(i) * 13, puv.getY(i) * 13); puv.needsUpdate = true;
   W.waters.push({ x0: pond.x - pond.r * 0.7, z0: pond.z - pond.r * 0.7, x1: pond.x + pond.r * 0.7, z1: pond.z + pond.r * 0.7, y: pond.y, deep: true, pond: true });
   W.pond = pond;
+  // a smooth sandy rim where the water meets the bank (the terrain's own contour is all corners)
+  { const pos = [], NA = 96, r0 = pond.r * 0.7, r1 = pond.r * 0.8, pt = (rr, a) => { const x = pond.x + Math.cos(a) * rr, z = pond.z + Math.sin(a) * rr; return [x, Math.max(terrainAt(x, z) + 0.5, pond.y + 0.12), z]; };
+    for (let k = 0; k < NA; k++) { const a0 = k / NA * Math.PI * 2, a1 = (k + 1) / NA * Math.PI * 2; for (let i = 0; i < 3; i++) { const ra = U.lerp(r0, r1, i / 3), rb = U.lerp(r0, r1, (i + 1) / 3), A = pt(ra, a0), Bq = pt(rb, a0), C = pt(rb, a1), D = pt(ra, a1); pos.push(...A, ...C, ...Bq, ...A, ...D, ...C); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
+    B.add(g, null, '#a89466', 'plain', { outlineT: 0, edges: false }); }
   const bw0 = [pond.x - pond.r - 6, pond.z + 10], bw1 = [pond.x + pond.r + 6, pond.z - 14];
   const by = pond.y + 0.7;
   S.add(bw0[0], terrainAt(bw0[0], bw0[1]) + 0.1, bw0[1], pond.x - pond.r + 18, by, U.lerp(bw0[1], bw1[1], 0.08), 1.6);
@@ -9631,8 +9639,8 @@ const XF_GROUPS = {
   skate:    { d: [288, -40],   keep: null },
   vine:     { d: [-456, 888],  keep: null },
   mouth:    { d: [-224, -696], keep: null },
-  carousel: { d: [0, -104],    keep: null },
-  garden:   { d: [200, -432],  keep: null },
+  carousel: { d: [-586, 174],  keep: null },      // by the ferris wheel on the lakeshore
+  garden:   { d: [344, -1437], keep: null },      // the music garden: on the summit's slope, below the observatory
 };
 
 // ---------- named places the old builders share: kept in the current frame ----------
@@ -10314,11 +10322,11 @@ const Life = (() => {
       boats.push({ g, route, len, s: (i * 0.37 % 1) * len, dir: i % 2 ? 1 : -1, v: 2.2, wait: 0, x: 0, z: 0, fx: 1, fz: 0, vx: 0, vz: 0, y: C.waterY + 0.75, hit: { tag: 'boat', vx: 0, vz: 0, boat: true } });
     }
     // sailboats on the lake, drifting
-    for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-900 + r() * 1700, 0, 1300 + r() * 500); Object.assign(g.userData, { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }); boats.push({ sail: g }); }
+    for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-560 + r() * 560, 0, 680 + r() * 160); Object.assign(g.userData, { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }); boats.push({ sail: g }); }
     // birds: flocks circling high, gulls gliding over the water, pigeons on the plazas that scatter
     const birdG = new THREE.BufferGeometry(); birdG.setAttribute('position', new THREE.Float32BufferAttribute([-0.6, 0, -0.2, 0, 0, 0.2, 0, 0.05, -0.1, 0, 0.05, -0.1, 0, 0, 0.2, 0.6, 0, -0.2], 3)); birdG.computeVertexNormals();
-    const flockDefs = [[-700, -400, 70, 12], [600, -900, 140, 9], [-300, 1150, 30, 14], [700, 800, 50, 10], [100, -300, 110, 8], [-850, -1100, 60, 10], [300, 600, 45, 9], [900, -300, 60, 8], [-500, 600, 40, 10]];
-    const gullDefs = [[-600, 1320, 22, 7], [-100, 1400, 30, 6], [700, 1250, 26, 8], [300, 1300, 18, 5], [850, 1000, 34, 5]];
+    const flockDefs = [[-600, -400, 70, 12], [300, -440, 110, 9], [-300, 620, 30, 14], [480, 380, 50, 10], [0, -40, 110, 8], [-560, -720, 60, 10], [100, 330, 45, 9], [560, -200, 60, 8], [-420, 120, 40, 10]];
+    const gullDefs = [[-520, 640, 22, 7], [-200, 660, 30, 6], [460, 540, 26, 8], [300, 560, 18, 5], [80, 600, 34, 5]];
     const perches = (W.gullSpots || []);
     let nb = 0; for (const f of flockDefs) nb += f[3]; for (const f of gullDefs) nb += f[3]; for (const p of (W.pigeonSpots || [])) nb += p[2]; for (const p of perches) nb += p[2];
     birdIM = new THREE.InstancedMesh(birdG, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: true }), nb);
@@ -10350,8 +10358,8 @@ const Life = (() => {
     const swimSpots = [];
     const pond = PLAN.pond;
     if (W.pond) for (let i = 0; i < 16; i++) { const a = r() * 6.28, d = r() * pond.r * 0.6; swimSpots.push({ x: pond.x + Math.cos(a) * d, z: pond.z + Math.sin(a) * d, y: W.pond.y, ok: (x, z) => Math.hypot(x - pond.x, z - pond.z) < pond.r * 0.78, col: pick(r, ['#6a5a3a', '#6a5a3a', '#f2efe6', '#3a5a3a']), sc: 1 }); }
-    for (let i = 0; i < 26; i++) { const x = C.x0 + 60 + r() * (C.bendX - C.x0 - 100), z = C.z + (r() - 0.5) * C.half * 1.2; swimSpots.push({ x, z, y: C.waterY, ok: (x, z) => inCanal(x, z) && Math.abs(z - C.z) < C.half - 2 || (Math.abs(x - C.bendX) < C.half - 2 && z > C.z), col: pick(r, ['#6a5a3a', '#7a6a4a', '#f2efe6']), sc: 1 }); }
-    for (let i = 0; i < 14; i++) { const x = -1000 + r() * 1200, z = shoreZ(x) + 14 + r() * 40; swimSpots.push({ x, z, y: 0.05, ok: (x, z) => z > shoreZ(x) + 8 && z < shoreZ(x) + 80 && x > -1050 && x < 260, col: '#ffffff', sc: 1.9 }); }
+    for (let i = 0; i < 26; i++) { const CP = C.path.pts, k = 8 + Math.floor(r() * (CP.length - 16)), [x, z] = [CP[k][0] + (r() - 0.5) * C.half, CP[k][1] + (r() - 0.5) * C.half]; swimSpots.push({ x, z, y: C.waterY, ok: (x, z) => inCanal(x, z) && pathDist(C.path, x, z, 30).d < C.half - 2, col: pick(r, ['#6a5a3a', '#7a6a4a', '#f2efe6']), sc: 1 }); }
+    for (let i = 0; i < 14; i++) { const x = -620 + r() * 640, z = shoreZ(x) + 14 + r() * 40; swimSpots.push({ x, z, y: 0.05, ok: (x, z) => z > shoreZ(x) + 8 && z < shoreZ(x) + 80 && x > -640 && x < 60, col: '#ffffff', sc: 1.9 }); }
     duckIM = new THREE.InstancedMesh(duckG, toon('#ffffff', { noCache: true }), swimSpots.length); duckIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); duckIM.frustumCulled = false; W.group.add(duckIM);
     swimSpots.forEach((d, i) => { duckIM.setColorAt(i, _c.set(d.col)); ducks.push(Object.assign(d, { i, yaw: r() * 6, sp: 0.3 + r() * 0.3, turn: 0, flee: 0, t: r() * 9 })); });
     if (duckIM.instanceColor) duckIM.instanceColor.needsUpdate = true;
@@ -10705,13 +10713,13 @@ const Fauna = (() => {
       [new THREE.BoxGeometry(0.2, 0.2, 0.42), T4(0, 0.6, 0.24), '#ffffff'],
       [new THREE.BoxGeometry(0.05, 0.16, 0.08), T4(-0.1, 0.76, 0.1, 0, 0, 0.4), '#ffffff'], [new THREE.BoxGeometry(0.05, 0.16, 0.08), T4(0.1, 0.76, 0.1, 0, 0, -0.4), '#ffffff'],
     ]);
-    const herds = [[-860, -560], [-700, -60], [-560, -1300], [-440, -1000], [-150, -1250], [300, -1420], [-950, -1250]];
+    const herds = [[-640, -700], [-560, -440], [-690, -160], [-600, 40], [-380, -700], [-300, -230], [-180, -760]];      // in the forest
     for (const [hx, hz] of herds) { const n = 2 + Math.floor(r() * 3); for (let i = 0; i < n; i++) deer.push({ hx, hz, x: hx + (r() - 0.5) * 20, z: hz + (r() - 0.5) * 20, yaw: r() * 6, st: 'graze', t: r() * 5, sp: 0, head: 0, col: pick(r, ['#9a6a42', '#8a5a3a', '#a87a4a']), sc: 0.8 + r() * 0.35 }); }
     IM.deerB = mkIM(body, deer.length); IM.deerN = mkIM(neck, deer.length);
     deer.forEach((d, i) => { IM.deerB.setColorAt(i, _c.set(d.col)); IM.deerN.setColorAt(i, _c); });
     // ---- rabbits ----
     const rab = mergeParts([[new THREE.SphereGeometry(0.16, 6, 5), new THREE.Matrix4().makeScale(1, 0.85, 1.3).setPosition(0, 0.15, 0), '#ffffff'], [new THREE.SphereGeometry(0.1, 5, 4), T4(0, 0.28, 0.17), '#ffffff'], [new THREE.BoxGeometry(0.04, 0.16, 0.05), T4(-0.04, 0.42, 0.14, -0.2, 0, 0), '#ffffff'], [new THREE.BoxGeometry(0.04, 0.16, 0.05), T4(0.04, 0.42, 0.14, -0.2, 0, 0), '#ffffff'], [new THREE.SphereGeometry(0.06, 4, 3), T4(0, 0.2, -0.2), '#ffffff']]);
-    const meadows = [[150, -1300, 200], [-400, 1000, 300], [-850, 260, 120], [-680, -460, 50], [700, -1380, 120]];
+    const meadows = [[-600, -300, 70], [-520, 190, 50], [-660, -620, 50], [-150, -560, 50], [470, -250, 50]];       // forest glades, the pond's lawn, the summit, the old town's gardens
     for (let i = 0; i < 46; i++) { const [mx, mz, mr] = meadows[i % meadows.length], a = r() * 6.28, dd = Math.sqrt(r()) * mr; rabbits.push({ hx: mx + Math.cos(a) * dd, hz: mz + Math.sin(a) * dd, x: 0, z: 0, yaw: r() * 6, hop: 0, flee: 0, t: r() * 9, col: pick(r, ['#8a7a6a', '#a89a8a', '#6a5a4a', '#e8e2d4']) }); }
     for (const b of rabbits) { b.x = b.hx; b.z = b.hz; }
     IM.rab = mkIM(rab, rabbits.length); rabbits.forEach((b, i) => IM.rab.setColorAt(i, _c.set(b.col)));
@@ -10734,7 +10742,7 @@ const Fauna = (() => {
     }
     // ---- fireflies: points that glow at night over the clearings, the pond and the lawn ----
     const nF = 360, fp = new Float32Array(nF * 3), fc = new Float32Array(nF * 3), base = [];
-    const fz = [[P.x, P.z, P.r + 30], [-760, -100, 40], [-900, -888, 46], [-660, -510, 60], [-400, 980, 260], [-560, -1300, 50], [-850, 260, 120]];
+    const fz = [[P.x, P.z, P.r + 30], [-640, -120, 40], [-560, -700, 46], [-600, -420, 60], [-300, 480, 140], [-200, -720, 50], [-560, 180, 70]];
     for (let i = 0; i < nF; i++) { const [cx, cz, cr] = fz[i % fz.length], a = r() * 6.28, dd = Math.sqrt(r()) * cr, x = cx + Math.cos(a) * dd, z = cz + Math.sin(a) * dd; base.push([x, terrainAt(x, z) + 0.6 + r() * 2.2, z, r() * 9, 0.3 + r() * 0.7]); }
     const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(fp, 3)); fg.setAttribute('color', new THREE.BufferAttribute(fc, 3));
     const dot = canvasTex(32, 32, (x, w, h) => { const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }).tex;
@@ -10776,12 +10784,12 @@ const Fauna = (() => {
     const kg = new THREE.BufferGeometry();
     kg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.9, 0, -0.6, 0, 0, 0, -1.1, 0, 0, 0.9, 0, 0, -1.1, 0, 0.6, 0, 0, 0, -1.1, 0, -0.08, -2.6, 0, 0.08, -2.6, 0], 3)); kg.computeVertexNormals();
     IM.kite = mkIM(kg, 4, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: true }));
-    const kitePos = [[-780, 'lake'], [-360, 'lake'], [-60, 'lake'], [160, 'lake']];
+    const kitePos = [[-600, 'lake'], [-420, 'lake'], [-150, 'lake'], [10, 'lake']];
     kitePos.forEach(([kx], i) => { const kz = shoreZ(kx) - 20, y = terrainAt(kx, kz); kites.push({ hx: kx, hz: kz, hy: y + 1.1, ph: r() * 6, col: ['#e4572e', '#f2c14e', '#2f8f9d', '#d9779a'][i] }); IM.kite.setColorAt(i, _c.set(kites[i].col)); W.npcs.push({ kind: 'stand', pts: [[kx, kz, 0, y]], style: 'lake', kids: true }); });
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(kites.length * 6), 3));
     kiteLines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x3a3550, transparent: true, opacity: 0.6 })); kiteLines.frustumCulled = false; W.group.add(kiteLines);
     // ---- a fisherman at the end of the pier; now and then a fish ----
-    const fx = -480 + 2.0, fzP = 1585 - 9;
+    const fx = -360 + 2.0, fzP = Math.round(shoreZ(-360) + 110) - 9;      // (the pier's end: see buildLakeshore)
     W.npcs.push({ kind: 'stand', pts: [[fx - 0.6, fzP, Math.PI / 2, 2.7]], style: 'lake' });
     W.fisher = { x: fx - 0.6, z: fzP };
     const rod = solid([[new THREE.CylinderGeometry(0.02, 0.03, 3.2, 4), T4(0, 0, 0), '#3a3550']], 0.0);
@@ -10795,11 +10803,11 @@ const Fauna = (() => {
     // ---- a balloon that gets away in the market ----
     const bm = solid([[new THREE.SphereGeometry(0.35, 10, 8), new THREE.Matrix4().makeScale(1, 1.15, 1), '#e4572e'], [new THREE.CylinderGeometry(0.006, 0.006, 1.2, 3), T4(0, -0.95, 0), '#3a3550']], 0.03);
     bm.visible = false; W.group.add(bm);
-    balloon = { m: bm, x: 760, z: -150, t: 0, next: 15, on: false };
+    balloon = { m: bm, x: 400, z: 60, t: 0, next: 15, on: false };
     // ---- a hat blowing down the lakeshore promenade, and its owner running after it ----
     const hm = solid([[new THREE.CylinderGeometry(0.17, 0.19, 0.16, 10), T4(0, 0.1, 0), '#3a3550'], [new THREE.CylinderGeometry(0.3, 0.3, 0.02, 12), T4(0, 0.02, 0), '#3a3550'], [new THREE.CylinderGeometry(0.175, 0.175, 0.04, 10), T4(0, 0.08, 0), '#c4523a']], 0.03);
     W.group.add(hm);
-    hat = { m: hm, x0: -900, x1: -560, s: 0, st: 'blow', t: 0 };
+    hat = { m: hm, x0: -470, x1: -200, s: 0, st: 'blow', t: 0 };
     W.hatChase = hat;
     // ---- the carousel: a turning deck you can ride, horses rising and falling ----
     const cr = W.carousel;
@@ -10850,7 +10858,7 @@ const Fauna = (() => {
       else if (d.st === 'graze') { d.sp = U.damp(d.sp, Math.sin(d.t * 0.3) > 0.6 ? 0.4 : 0, 2, dt); if (Math.random() < dt * 0.1) d.yaw += (Math.random() - 0.5) * 1.5; const hd = Math.hypot(d.x - d.hx, d.z - d.hz); if (hd > 45) d.yaw = Math.atan2(d.hx - d.x, d.hz - d.z); }
       else { d.sp = U.damp(d.sp, 0, 4, dt); d.yaw = U.lerp(d.yaw, Math.atan2(-dx, -dz), 0.03); }
       const nx = d.x + Math.sin(d.yaw) * d.sp * dt, nz = d.z + Math.cos(d.yaw) * d.sp * dt;
-      if (!inCanal(nx, nz) && Math.abs(nx) < 1080) { d.x = nx; d.z = nz; } else d.yaw += Math.PI;
+      if (!inCanal(nx, nz) && nx > -770 && nx < 640) { d.x = nx; d.z = nz; } else d.yaw += Math.PI;
       const y = terrainAt(d.x, d.z) + (d.st === 'flee' ? Math.abs(Math.sin(d.t * 7)) * 0.5 : 0);
       d.head = U.damp(d.head, d.st === 'graze' && d.sp < 0.2 ? 1 : 0, 3, dt);
       _q.setFromAxisAngle(Y, d.yaw); _m.compose(_v.set(d.x, y, d.z), _q, _s.setScalar(d.sc)); IM.deerB.setMatrixAt(i, _m);

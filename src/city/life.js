@@ -275,11 +275,11 @@ const Life = (() => {
       boats.push({ g, route, len, s: (i * 0.37 % 1) * len, dir: i % 2 ? 1 : -1, v: 2.2, wait: 0, x: 0, z: 0, fx: 1, fz: 0, vx: 0, vz: 0, y: C.waterY + 0.75, hit: { tag: 'boat', vx: 0, vz: 0, boat: true } });
     }
     // sailboats on the lake, drifting
-    for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-900 + r() * 1700, 0, 1300 + r() * 500); Object.assign(g.userData, { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }); boats.push({ sail: g }); }
+    for (let i = 0; i < 9; i++) { const g = sailMesh(r()); g.position.set(-560 + r() * 560, 0, 680 + r() * 160); Object.assign(g.userData, { a: r() * 6, sp: 0.05 + r() * 0.08, cx: g.position.x, cz: g.position.z, r: 30 + r() * 80 }); boats.push({ sail: g }); }
     // birds: flocks circling high, gulls gliding over the water, pigeons on the plazas that scatter
     const birdG = new THREE.BufferGeometry(); birdG.setAttribute('position', new THREE.Float32BufferAttribute([-0.6, 0, -0.2, 0, 0, 0.2, 0, 0.05, -0.1, 0, 0.05, -0.1, 0, 0, 0.2, 0.6, 0, -0.2], 3)); birdG.computeVertexNormals();
-    const flockDefs = [[-700, -400, 70, 12], [600, -900, 140, 9], [-300, 1150, 30, 14], [700, 800, 50, 10], [100, -300, 110, 8], [-850, -1100, 60, 10], [300, 600, 45, 9], [900, -300, 60, 8], [-500, 600, 40, 10]];
-    const gullDefs = [[-600, 1320, 22, 7], [-100, 1400, 30, 6], [700, 1250, 26, 8], [300, 1300, 18, 5], [850, 1000, 34, 5]];
+    const flockDefs = [[-600, -400, 70, 12], [300, -440, 110, 9], [-300, 620, 30, 14], [480, 380, 50, 10], [0, -40, 110, 8], [-560, -720, 60, 10], [100, 330, 45, 9], [560, -200, 60, 8], [-420, 120, 40, 10]];
+    const gullDefs = [[-520, 640, 22, 7], [-200, 660, 30, 6], [460, 540, 26, 8], [300, 560, 18, 5], [80, 600, 34, 5]];
     const perches = (W.gullSpots || []);
     let nb = 0; for (const f of flockDefs) nb += f[3]; for (const f of gullDefs) nb += f[3]; for (const p of (W.pigeonSpots || [])) nb += p[2]; for (const p of perches) nb += p[2];
     birdIM = new THREE.InstancedMesh(birdG, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: true }), nb);
@@ -311,8 +311,8 @@ const Life = (() => {
     const swimSpots = [];
     const pond = PLAN.pond;
     if (W.pond) for (let i = 0; i < 16; i++) { const a = r() * 6.28, d = r() * pond.r * 0.6; swimSpots.push({ x: pond.x + Math.cos(a) * d, z: pond.z + Math.sin(a) * d, y: W.pond.y, ok: (x, z) => Math.hypot(x - pond.x, z - pond.z) < pond.r * 0.78, col: pick(r, ['#6a5a3a', '#6a5a3a', '#f2efe6', '#3a5a3a']), sc: 1 }); }
-    for (let i = 0; i < 26; i++) { const x = C.x0 + 60 + r() * (C.bendX - C.x0 - 100), z = C.z + (r() - 0.5) * C.half * 1.2; swimSpots.push({ x, z, y: C.waterY, ok: (x, z) => inCanal(x, z) && Math.abs(z - C.z) < C.half - 2 || (Math.abs(x - C.bendX) < C.half - 2 && z > C.z), col: pick(r, ['#6a5a3a', '#7a6a4a', '#f2efe6']), sc: 1 }); }
-    for (let i = 0; i < 14; i++) { const x = -1000 + r() * 1200, z = shoreZ(x) + 14 + r() * 40; swimSpots.push({ x, z, y: 0.05, ok: (x, z) => z > shoreZ(x) + 8 && z < shoreZ(x) + 80 && x > -1050 && x < 260, col: '#ffffff', sc: 1.9 }); }
+    for (let i = 0; i < 26; i++) { const CP = C.path.pts, k = 8 + Math.floor(r() * (CP.length - 16)), [x, z] = [CP[k][0] + (r() - 0.5) * C.half, CP[k][1] + (r() - 0.5) * C.half]; swimSpots.push({ x, z, y: C.waterY, ok: (x, z) => inCanal(x, z) && pathDist(C.path, x, z, 30).d < C.half - 2, col: pick(r, ['#6a5a3a', '#7a6a4a', '#f2efe6']), sc: 1 }); }
+    for (let i = 0; i < 14; i++) { const x = -620 + r() * 640, z = shoreZ(x) + 14 + r() * 40; swimSpots.push({ x, z, y: 0.05, ok: (x, z) => z > shoreZ(x) + 8 && z < shoreZ(x) + 80 && x > -640 && x < 60, col: '#ffffff', sc: 1.9 }); }
     duckIM = new THREE.InstancedMesh(duckG, toon('#ffffff', { noCache: true }), swimSpots.length); duckIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); duckIM.frustumCulled = false; W.group.add(duckIM);
     swimSpots.forEach((d, i) => { duckIM.setColorAt(i, _c.set(d.col)); ducks.push(Object.assign(d, { i, yaw: r() * 6, sp: 0.3 + r() * 0.3, turn: 0, flee: 0, t: r() * 9 })); });
     if (duckIM.instanceColor) duckIM.instanceColor.needsUpdate = true;

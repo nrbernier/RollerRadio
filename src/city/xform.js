@@ -22,8 +22,8 @@ const XF_GROUPS = {
   skate:    { d: [288, -40],   keep: null },
   vine:     { d: [-456, 888],  keep: null },
   mouth:    { d: [-224, -696], keep: null },
-  carousel: { d: [0, -104],    keep: null },
-  garden:   { d: [200, -432],  keep: null },
+  carousel: { d: [-586, 174],  keep: null },      // by the ferris wheel on the lakeshore
+  garden:   { d: [344, -1437], keep: null },      // the music garden: on the summit's slope, below the observatory
 };
 
 // ---------- named places the old builders share: kept in the current frame ----------

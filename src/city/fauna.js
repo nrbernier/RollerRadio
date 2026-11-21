@@ -26,13 +26,13 @@ const Fauna = (() => {
       [new THREE.BoxGeometry(0.2, 0.2, 0.42), T4(0, 0.6, 0.24), '#ffffff'],
       [new THREE.BoxGeometry(0.05, 0.16, 0.08), T4(-0.1, 0.76, 0.1, 0, 0, 0.4), '#ffffff'], [new THREE.BoxGeometry(0.05, 0.16, 0.08), T4(0.1, 0.76, 0.1, 0, 0, -0.4), '#ffffff'],
     ]);
-    const herds = [[-860, -560], [-700, -60], [-560, -1300], [-440, -1000], [-150, -1250], [300, -1420], [-950, -1250]];
+    const herds = [[-640, -700], [-560, -440], [-690, -160], [-600, 40], [-380, -700], [-300, -230], [-180, -760]];      // in the forest
     for (const [hx, hz] of herds) { const n = 2 + Math.floor(r() * 3); for (let i = 0; i < n; i++) deer.push({ hx, hz, x: hx + (r() - 0.5) * 20, z: hz + (r() - 0.5) * 20, yaw: r() * 6, st: 'graze', t: r() * 5, sp: 0, head: 0, col: pick(r, ['#9a6a42', '#8a5a3a', '#a87a4a']), sc: 0.8 + r() * 0.35 }); }
     IM.deerB = mkIM(body, deer.length); IM.deerN = mkIM(neck, deer.length);
     deer.forEach((d, i) => { IM.deerB.setColorAt(i, _c.set(d.col)); IM.deerN.setColorAt(i, _c); });
     // ---- rabbits ----
     const rab = mergeParts([[new THREE.SphereGeometry(0.16, 6, 5), new THREE.Matrix4().makeScale(1, 0.85, 1.3).setPosition(0, 0.15, 0), '#ffffff'], [new THREE.SphereGeometry(0.1, 5, 4), T4(0, 0.28, 0.17), '#ffffff'], [new THREE.BoxGeometry(0.04, 0.16, 0.05), T4(-0.04, 0.42, 0.14, -0.2, 0, 0), '#ffffff'], [new THREE.BoxGeometry(0.04, 0.16, 0.05), T4(0.04, 0.42, 0.14, -0.2, 0, 0), '#ffffff'], [new THREE.SphereGeometry(0.06, 4, 3), T4(0, 0.2, -0.2), '#ffffff']]);
-    const meadows = [[150, -1300, 200], [-400, 1000, 300], [-850, 260, 120], [-680, -460, 50], [700, -1380, 120]];
+    const meadows = [[-600, -300, 70], [-520, 190, 50], [-660, -620, 50], [-150, -560, 50], [470, -250, 50]];       // forest glades, the pond's lawn, the summit, the old town's gardens
     for (let i = 0; i < 46; i++) { const [mx, mz, mr] = meadows[i % meadows.length], a = r() * 6.28, dd = Math.sqrt(r()) * mr; rabbits.push({ hx: mx + Math.cos(a) * dd, hz: mz + Math.sin(a) * dd, x: 0, z: 0, yaw: r() * 6, hop: 0, flee: 0, t: r() * 9, col: pick(r, ['#8a7a6a', '#a89a8a', '#6a5a4a', '#e8e2d4']) }); }
     for (const b of rabbits) { b.x = b.hx; b.z = b.hz; }
     IM.rab = mkIM(rab, rabbits.length); rabbits.forEach((b, i) => IM.rab.setColorAt(i, _c.set(b.col)));
@@ -55,7 +55,7 @@ const Fauna = (() => {
     }
     // ---- fireflies: points that glow at night over the clearings, the pond and the lawn ----
     const nF = 360, fp = new Float32Array(nF * 3), fc = new Float32Array(nF * 3), base = [];
-    const fz = [[P.x, P.z, P.r + 30], [-760, -100, 40], [-900, -888, 46], [-660, -510, 60], [-400, 980, 260], [-560, -1300, 50], [-850, 260, 120]];
+    const fz = [[P.x, P.z, P.r + 30], [-640, -120, 40], [-560, -700, 46], [-600, -420, 60], [-300, 480, 140], [-200, -720, 50], [-560, 180, 70]];
     for (let i = 0; i < nF; i++) { const [cx, cz, cr] = fz[i % fz.length], a = r() * 6.28, dd = Math.sqrt(r()) * cr, x = cx + Math.cos(a) * dd, z = cz + Math.sin(a) * dd; base.push([x, terrainAt(x, z) + 0.6 + r() * 2.2, z, r() * 9, 0.3 + r() * 0.7]); }
     const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(fp, 3)); fg.setAttribute('color', new THREE.BufferAttribute(fc, 3));
     const dot = canvasTex(32, 32, (x, w, h) => { const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }).tex;
@@ -97,12 +97,12 @@ const Fauna = (() => {
     const kg = new THREE.BufferGeometry();
     kg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.9, 0, -0.6, 0, 0, 0, -1.1, 0, 0, 0.9, 0, 0, -1.1, 0, 0.6, 0, 0, 0, -1.1, 0, -0.08, -2.6, 0, 0.08, -2.6, 0], 3)); kg.computeVertexNormals();
     IM.kite = mkIM(kg, 4, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: true }));
-    const kitePos = [[-780, 'lake'], [-360, 'lake'], [-60, 'lake'], [160, 'lake']];
+    const kitePos = [[-600, 'lake'], [-420, 'lake'], [-150, 'lake'], [10, 'lake']];
     kitePos.forEach(([kx], i) => { const kz = shoreZ(kx) - 20, y = terrainAt(kx, kz); kites.push({ hx: kx, hz: kz, hy: y + 1.1, ph: r() * 6, col: ['#e4572e', '#f2c14e', '#2f8f9d', '#d9779a'][i] }); IM.kite.setColorAt(i, _c.set(kites[i].col)); W.npcs.push({ kind: 'stand', pts: [[kx, kz, 0, y]], style: 'lake', kids: true }); });
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(kites.length * 6), 3));
     kiteLines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x3a3550, transparent: true, opacity: 0.6 })); kiteLines.frustumCulled = false; W.group.add(kiteLines);
     // ---- a fisherman at the end of the pier; now and then a fish ----
-    const fx = -480 + 2.0, fzP = 1585 - 9;
+    const fx = -360 + 2.0, fzP = Math.round(shoreZ(-360) + 110) - 9;      // (the pier's end: see buildLakeshore)
     W.npcs.push({ kind: 'stand', pts: [[fx - 0.6, fzP, Math.PI / 2, 2.7]], style: 'lake' });
     W.fisher = { x: fx - 0.6, z: fzP };
     const rod = solid([[new THREE.CylinderGeometry(0.02, 0.03, 3.2, 4), T4(0, 0, 0), '#3a3550']], 0.0);
@@ -116,11 +116,11 @@ const Fauna = (() => {
     // ---- a balloon that gets away in the market ----
     const bm = solid([[new THREE.SphereGeometry(0.35, 10, 8), new THREE.Matrix4().makeScale(1, 1.15, 1), '#e4572e'], [new THREE.CylinderGeometry(0.006, 0.006, 1.2, 3), T4(0, -0.95, 0), '#3a3550']], 0.03);
     bm.visible = false; W.group.add(bm);
-    balloon = { m: bm, x: 760, z: -150, t: 0, next: 15, on: false };
+    balloon = { m: bm, x: 400, z: 60, t: 0, next: 15, on: false };
     // ---- a hat blowing down the lakeshore promenade, and its owner running after it ----
     const hm = solid([[new THREE.CylinderGeometry(0.17, 0.19, 0.16, 10), T4(0, 0.1, 0), '#3a3550'], [new THREE.CylinderGeometry(0.3, 0.3, 0.02, 12), T4(0, 0.02, 0), '#3a3550'], [new THREE.CylinderGeometry(0.175, 0.175, 0.04, 10), T4(0, 0.08, 0), '#c4523a']], 0.03);
     W.group.add(hm);
-    hat = { m: hm, x0: -900, x1: -560, s: 0, st: 'blow', t: 0 };
+    hat = { m: hm, x0: -470, x1: -200, s: 0, st: 'blow', t: 0 };
     W.hatChase = hat;
     // ---- the carousel: a turning deck you can ride, horses rising and falling ----
     const cr = W.carousel;
@@ -171,7 +171,7 @@ const Fauna = (() => {
       else if (d.st === 'graze') { d.sp = U.damp(d.sp, Math.sin(d.t * 0.3) > 0.6 ? 0.4 : 0, 2, dt); if (Math.random() < dt * 0.1) d.yaw += (Math.random() - 0.5) * 1.5; const hd = Math.hypot(d.x - d.hx, d.z - d.hz); if (hd > 45) d.yaw = Math.atan2(d.hx - d.x, d.hz - d.z); }
       else { d.sp = U.damp(d.sp, 0, 4, dt); d.yaw = U.lerp(d.yaw, Math.atan2(-dx, -dz), 0.03); }
       const nx = d.x + Math.sin(d.yaw) * d.sp * dt, nz = d.z + Math.cos(d.yaw) * d.sp * dt;
-      if (!inCanal(nx, nz) && Math.abs(nx) < 1080) { d.x = nx; d.z = nz; } else d.yaw += Math.PI;
+      if (!inCanal(nx, nz) && nx > -770 && nx < 640) { d.x = nx; d.z = nz; } else d.yaw += Math.PI;
       const y = terrainAt(d.x, d.z) + (d.st === 'flee' ? Math.abs(Math.sin(d.t * 7)) * 0.5 : 0);
       d.head = U.damp(d.head, d.st === 'graze' && d.sp < 0.2 ? 1 : 0, 3, dt);
       _q.setFromAxisAngle(Y, d.yaw); _m.compose(_v.set(d.x, y, d.z), _q, _s.setScalar(d.sc)); IM.deerB.setMatrixAt(i, _m);

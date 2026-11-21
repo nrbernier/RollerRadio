@@ -251,6 +251,7 @@ function buildDistricts(K, S, F) {
   const laps = location.hash === '#laps', t0 = performance.now(), lap = (n) => laps && console.log('[districts] ' + n + ' ' + Math.round(performance.now() - t0) + 'ms');
   // the compact city: each old district's builders run in their own frame, moved as a block (xform.js)
   xfInstall(H);
+  { const P = PLAN_REAL.pond, m = P.r + 8; H.reserve([P.x - m, P.z - m, P.x + m, P.z + m]); }      // the pond and its banks: nothing else goes there
   const X = (g, ...f) => { xfRun(H, g, ...f); lap(g); };
   X('business', h => H.line([[VALLEY.x, VALLEY.z0], [VALLEY.x, VALLEY.z3]], VALLEY.rimHalf + 1));
   X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
@@ -258,7 +259,8 @@ function buildDistricts(K, S, F) {
   X('skate', fillSouthStrip);
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
   X('canals', fillCanalQuarter);
-  X('lake', buildLakeshore, fillLakeshore, h => musicGarden(h, -500, 905, U.rng(2025)));
+  X('lake', buildLakeshore, fillLakeshore);
+  X('garden', h => musicGarden(h, -500, 905, U.rng(2025)));
   X('business', buildBusiness, buildValley, fillBusiness);
   X('market', buildMarket, fillMarketPeople);
   X('oldtown', buildOldTown, fillOldTown);
@@ -536,11 +538,17 @@ function buildPark(H) {
     }
   }
   // the pond: water, reeds, a boardwalk across
-  const pm = new THREE.Mesh(new THREE.CircleGeometry(pond.r, 40), new THREE.MeshBasicMaterial({ color: 0x3f6f5a, map: W.mats.waterTex, transparent: true, opacity: 0.85, depthWrite: false }));
+  const pm = new THREE.Mesh(new THREE.CircleGeometry(pond.r * 0.7, 72), new THREE.MeshBasicMaterial({ color: 0x3f6f5a, map: W.mats.waterTex, transparent: true, opacity: 0.85, depthWrite: false }));
   pm.rotation.x = -Math.PI / 2; pm.position.set(pond.x, pond.y, pond.z); pm.renderOrder = 3; W.group.add(pm);
-  const puv = pm.geometry.attributes.uv; for (let i = 0; i < puv.count; i++) puv.setXY(i, puv.getX(i) * 18, puv.getY(i) * 18); puv.needsUpdate = true;
+  const puv = pm.geometry.attributes.uv; for (let i = 0; i < puv.count; i++) puv.setXY(i, puv.getX(i) * 13, puv.getY(i) * 13); puv.needsUpdate = true;
   W.waters.push({ x0: pond.x - pond.r * 0.7, z0: pond.z - pond.r * 0.7, x1: pond.x + pond.r * 0.7, z1: pond.z + pond.r * 0.7, y: pond.y, deep: true, pond: true });
   W.pond = pond;
+  // a smooth sandy rim where the water meets the bank (the terrain's own contour is all corners)
+  { const pos = [], NA = 96, r0 = pond.r * 0.7, r1 = pond.r * 0.8, pt = (rr, a) => { const x = pond.x + Math.cos(a) * rr, z = pond.z + Math.sin(a) * rr; return [x, Math.max(terrainAt(x, z) + 0.5, pond.y + 0.12), z]; };
+    for (let k = 0; k < NA; k++) { const a0 = k / NA * Math.PI * 2, a1 = (k + 1) / NA * Math.PI * 2; for (let i = 0; i < 3; i++) { const ra = U.lerp(r0, r1, i / 3), rb = U.lerp(r0, r1, (i + 1) / 3), A = pt(ra, a0), Bq = pt(rb, a0), C = pt(rb, a1), D = pt(ra, a1); pos.push(...A, ...C, ...Bq, ...A, ...D, ...C); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
+    B.add(g, null, '#a89466', 'plain', { outlineT: 0, edges: false }); }
   const bw0 = [pond.x - pond.r - 6, pond.z + 10], bw1 = [pond.x + pond.r + 6, pond.z - 14];
   const by = pond.y + 0.7;
   S.add(bw0[0], terrainAt(bw0[0], bw0[1]) + 0.1, bw0[1], pond.x - pond.r + 18, by, U.lerp(bw0[1], bw1[1], 0.08), 1.6);
