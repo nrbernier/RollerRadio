@@ -6532,6 +6532,16 @@ function buildDistricts(K, S, F) {
   X('oldtown', buildOldTown, fillOldTown);
   X('docks', buildDocks, fillDocks);
   buildContainerTrail(H);          // (real coordinates)
+  // the forest's western strip (out to the map's edge) was bare grass: woods, thinning out by the pond
+  { const r = U.rng(5150);
+    for (let i = 0; i < 2600; i++) {
+      const x = U.lerp(-662, -560, r()), z = U.lerp(-780, 150, r());
+      if (Math.hypot(x - PLAN_REAL.pond.x, z - PLAN_REAL.pond.z) < PLAN_REAL.pond.r + 20) continue;
+      if (z > 40 && r() < 0.6) continue;
+      if (!H.clearOf(x - 2, z - 2, x + 2, z + 2, 0.5)) continue;
+      H.tree(x, z, { s: 0.8 + r() * 0.6, color: pick(r, ['#3f7a3a', '#4a8a42', '#356a34', '#5a9a4a']) });
+      H.reserve([x - 1.5, z - 1.5, x + 1.5, z + 1.5]);
+    } }
   X('park', buildPark, buildCrag, fillPark, h => wild(h, U.rng(2026)));
   X('obs', buildObservatory, fillObservatory);
   X('site', buildSite); X('tower', buildTower);

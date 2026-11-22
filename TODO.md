@@ -34,10 +34,6 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   terrace a proper end (a little square, steps, the main street's last bend into it).
 - Forest station: the cross street just stops under the viaduct. It needs a forecourt and a visible way up to the
   platforms (stairs or ramps) — same check for every elevated station.
-- Old park trails (pale lines in the forest) start and end nowhere; reconnect them to the cross street, the pond,
-  the glasshouse, the crag and the cable car's top station, or remove them.
-- Old canal-quarter fill (benches, planters, paths from the old straight canal) is still placed on old lines
-  across the new canal quarter: the quarter's fill should be redone along the winding canal.
 - The arch spot's low ledge under the main street's stone bridge looks like loose white triangles from the quay.
 
 ### Districts
@@ -47,8 +43,6 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   medieval houses are too large (shopFront glass); make them small medieval shop fronts.
 - Between the old town and the market (south-east of the wall) the market's houses are tall flat-roofed town
   houses with modern-looking windows: next to the medieval town they look out of place.
-- Market: a huge sand-coloured paved field with stalls scattered over it; it reads as empty. Give it a real
-  layout (stall rows along lanes, the hall, the clock tower square) at the compact size.
 - Music garden: now on the summit's slope below the observatory; its gravel patch is very pale.
 - Empty grass: the strip between the forest edge and downtown (under the metro's west side), the slopes between
   the summit and the old town, and the strip between downtown's ring and the canal quarter (under the metro's
@@ -98,6 +92,11 @@ Still to fix:
 - Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
   loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
+- Market: denser stalls (back to back) and stone paving done; the hall's surroundings still plain.
+- Canal quarter: three rows of houses now follow the winding canal; a few white paving scraps remain on the north
+  quay west of the stone bridge; the allotment strips north of the canal still lie on old straight lines.
+- Forest: the western strip is wooded now (its trees are smaller than the main forest's); the trails connect the
+  glasshouse, the crag, the station and the pond.
 - Water tower plaza: the two dark planter blocks look like bunkers.
 
 ### Checks (tools/geom.py, after the fixes below)
