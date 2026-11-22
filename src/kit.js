@@ -231,6 +231,18 @@ function worldMaterials(night) {
     for (let j = 0; j < 8; j++) for (let i = 0; i < 4; i++) { x.fillStyle = `rgba(${120 + r() * 40},${60 + r() * 30},${50 + r() * 20},.35)`; x.fillRect(i * 64 + (j % 2) * 32 + 3, j * 32 + 3, 58, 26); }
     for (let i = 0; i < 300; i++) { x.fillStyle = 'rgba(20,40,20,.08)'; x.fillRect(r() * w, r() * h, 3, 3); }
   });
+  // stone: rough ashlar, courses of uneven blocks in greys and ochres, dark mortar (old walls, towers, gates)
+  const stoneT = T((x, w, h) => {
+    const r = U.rng(29); x.fillStyle = '#6e665c'; x.fillRect(0, 0, w, h);
+    for (let j = 0, y = 0; y < h; j++) { const ch = 22 + Math.floor(r() * 3) * 6; let xx = -Math.floor(r() * 40);
+      while (xx < w) { const bw = 34 + r() * 44, t = 196 + r() * 46, warm = r() * 18;
+        x.fillStyle = `rgb(${Math.min(255, t + warm)},${Math.min(255, t + warm * 0.55)},${t - 6})`; x.fillRect(xx + 2, y + 2, bw - 4, ch - 4);
+        x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(xx + 2, y + 2, bw - 4, 3);
+        x.fillStyle = 'rgba(0,0,0,.10)'; x.fillRect(xx + 2, y + ch - 5, bw - 4, 3);
+        xx += bw; }
+      y += ch; }
+    for (let i = 0; i < 500; i++) { x.fillStyle = `rgba(30,30,20,${r() * 0.1})`; x.fillRect(r() * w, r() * h, 2 + r() * 3, 2); }
+  });
   const asphalt = T((x, w, h) => {
     const r = U.rng(17); x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(0,0,0,${r() * 0.12})`; x.fillRect(r() * w, r() * h, 2, 2); }
@@ -240,7 +252,7 @@ function worldMaterials(night) {
   const M = (map, extra = {}) => new THREE.MeshToonMaterial(Object.assign({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }, extra));
   G.worldMats = {
     wall: M(tWin), roof: M(tRoof), plain: M(null), grass: M(grass), leaf: M(leaf), paving: M(paving), wood: M(wood), sand: M(sand),
-    tile: M(tile), brick: M(brick), asphalt: M(asphalt),
+    tile: M(tile), brick: M(brick), stone: M(stoneT), asphalt: M(asphalt),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
     glass: new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
     water: new THREE.MeshBasicMaterial({ vertexColors: true, map: water, transparent: true, opacity: 0.72, depthWrite: false }),

@@ -2281,6 +2281,18 @@ function worldMaterials(night) {
     for (let j = 0; j < 8; j++) for (let i = 0; i < 4; i++) { x.fillStyle = `rgba(${120 + r() * 40},${60 + r() * 30},${50 + r() * 20},.35)`; x.fillRect(i * 64 + (j % 2) * 32 + 3, j * 32 + 3, 58, 26); }
     for (let i = 0; i < 300; i++) { x.fillStyle = 'rgba(20,40,20,.08)'; x.fillRect(r() * w, r() * h, 3, 3); }
   });
+  // stone: rough ashlar, courses of uneven blocks in greys and ochres, dark mortar (old walls, towers, gates)
+  const stoneT = T((x, w, h) => {
+    const r = U.rng(29); x.fillStyle = '#6e665c'; x.fillRect(0, 0, w, h);
+    for (let j = 0, y = 0; y < h; j++) { const ch = 22 + Math.floor(r() * 3) * 6; let xx = -Math.floor(r() * 40);
+      while (xx < w) { const bw = 34 + r() * 44, t = 196 + r() * 46, warm = r() * 18;
+        x.fillStyle = `rgb(${Math.min(255, t + warm)},${Math.min(255, t + warm * 0.55)},${t - 6})`; x.fillRect(xx + 2, y + 2, bw - 4, ch - 4);
+        x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(xx + 2, y + 2, bw - 4, 3);
+        x.fillStyle = 'rgba(0,0,0,.10)'; x.fillRect(xx + 2, y + ch - 5, bw - 4, 3);
+        xx += bw; }
+      y += ch; }
+    for (let i = 0; i < 500; i++) { x.fillStyle = `rgba(30,30,20,${r() * 0.1})`; x.fillRect(r() * w, r() * h, 2 + r() * 3, 2); }
+  });
   const asphalt = T((x, w, h) => {
     const r = U.rng(17); x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(0,0,0,${r() * 0.12})`; x.fillRect(r() * w, r() * h, 2, 2); }
@@ -2290,7 +2302,7 @@ function worldMaterials(night) {
   const M = (map, extra = {}) => new THREE.MeshToonMaterial(Object.assign({ vertexColors: true, map, gradientMap: G.grad, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }, extra));
   G.worldMats = {
     wall: M(tWin), roof: M(tRoof), plain: M(null), grass: M(grass), leaf: M(leaf), paving: M(paving), wood: M(wood), sand: M(sand),
-    tile: M(tile), brick: M(brick), asphalt: M(asphalt),
+    tile: M(tile), brick: M(brick), stone: M(stoneT), asphalt: M(asphalt),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
     glass: new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
     water: new THREE.MeshBasicMaterial({ vertexColors: true, map: water, transparent: true, opacity: 0.72, depthWrite: false }),
@@ -4930,9 +4942,16 @@ class CamRig {
     // occlusion: pull the camera in front of walls
     const dir = _c3.subVectors(want, tgt); const len = dir.length(); dir.divideScalar(len);
     let tmin = len;
-    for (const b of this.W.near(Math.min(tgt.x, want.x) - 0.5, Math.min(tgt.z, want.z) - 0.5, Math.max(tgt.x, want.x) + 0.5, Math.max(tgt.z, want.z) + 0.5, this._q || (this._q = []))) {
+    // three sight-lines (the middle one and one half a metre to each side), so in a narrow lane the camera
+    // can't end up grazing a side wall and see through it
+    const sx = -dir.z, sz = dir.x, sl = Math.hypot(sx, sz) || 1;
+    for (const b of this.W.near(Math.min(tgt.x, want.x) - 1, Math.min(tgt.z, want.z) - 1, Math.max(tgt.x, want.x) + 1, Math.max(tgt.z, want.z) + 1, this._q || (this._q = []))) {
       if (b.nocam || b.hazard) continue;
-      const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
+      for (const o of [0, -0.55, 0.55]) {
+        const org = o ? _c5.set(tgt.x + sx / sl * o, tgt.y, tgt.z + sz / sl * o) : tgt;
+        if (o && b.x0 < org.x && org.x < b.x1 && b.z0 < org.z && org.z < b.z1 && b.y0 < org.y && org.y < b.y1) continue;      // (that side is already inside a wall)
+        const t = rayBox(org, dir, b, len); if (t !== null && t < tmin) tmin = t;
+      }
     }
     const cbs = this.W.camGrid ? this.W.camGrid.query(Math.min(tgt.x, want.x) - 0.5, Math.min(tgt.z, want.z) - 0.5, Math.max(tgt.x, want.x) + 0.5, Math.max(tgt.z, want.z) + 0.5, this._cq || (this._cq = [])) : (this.W.camBoxes || []);
     for (const b of cbs) {
@@ -4962,7 +4981,7 @@ class CamRig {
     if (Math.abs(this.cam.fov - fov) > 0.05) { this.cam.fov = U.damp(this.cam.fov, fov, 6, dt); this.cam.updateProjectionMatrix(); }
   }
 }
-const _c1 = V3(), _c2 = V3(), _c3 = V3(), _c4 = V3();
+const _c1 = V3(), _c2 = V3(), _c3 = V3(), _c4 = V3(), _c5 = V3();
 function rayBox(o, d, b, maxT) {
   let tmin = 0, tmax = maxT;
   for (const [oo, dd, lo, hi] of [[o.x, d.x, b.x0, b.x1], [o.y, d.y, b.y0, b.y1], [o.z, d.z, b.z0, b.z1]]) {

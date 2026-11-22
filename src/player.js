@@ -532,9 +532,16 @@ class CamRig {
     // occlusion: pull the camera in front of walls
     const dir = _c3.subVectors(want, tgt); const len = dir.length(); dir.divideScalar(len);
     let tmin = len;
-    for (const b of this.W.near(Math.min(tgt.x, want.x) - 0.5, Math.min(tgt.z, want.z) - 0.5, Math.max(tgt.x, want.x) + 0.5, Math.max(tgt.z, want.z) + 0.5, this._q || (this._q = []))) {
+    // three sight-lines (the middle one and one half a metre to each side), so in a narrow lane the camera
+    // can't end up grazing a side wall and see through it
+    const sx = -dir.z, sz = dir.x, sl = Math.hypot(sx, sz) || 1;
+    for (const b of this.W.near(Math.min(tgt.x, want.x) - 1, Math.min(tgt.z, want.z) - 1, Math.max(tgt.x, want.x) + 1, Math.max(tgt.z, want.z) + 1, this._q || (this._q = []))) {
       if (b.nocam || b.hazard) continue;
-      const t = rayBox(tgt, dir, b, len); if (t !== null && t < tmin) tmin = t;
+      for (const o of [0, -0.55, 0.55]) {
+        const org = o ? _c5.set(tgt.x + sx / sl * o, tgt.y, tgt.z + sz / sl * o) : tgt;
+        if (o && b.x0 < org.x && org.x < b.x1 && b.z0 < org.z && org.z < b.z1 && b.y0 < org.y && org.y < b.y1) continue;      // (that side is already inside a wall)
+        const t = rayBox(org, dir, b, len); if (t !== null && t < tmin) tmin = t;
+      }
     }
     const cbs = this.W.camGrid ? this.W.camGrid.query(Math.min(tgt.x, want.x) - 0.5, Math.min(tgt.z, want.z) - 0.5, Math.max(tgt.x, want.x) + 0.5, Math.max(tgt.z, want.z) + 0.5, this._cq || (this._cq = [])) : (this.W.camBoxes || []);
     for (const b of cbs) {
@@ -564,7 +571,7 @@ class CamRig {
     if (Math.abs(this.cam.fov - fov) > 0.05) { this.cam.fov = U.damp(this.cam.fov, fov, 6, dt); this.cam.updateProjectionMatrix(); }
   }
 }
-const _c1 = V3(), _c2 = V3(), _c3 = V3(), _c4 = V3();
+const _c1 = V3(), _c2 = V3(), _c3 = V3(), _c4 = V3(), _c5 = V3();
 function rayBox(o, d, b, maxT) {
   let tmin = 0, tmax = maxT;
   for (const [oo, dd, lo, hi] of [[o.x, d.x, b.x0, b.x1], [o.y, d.y, b.y0, b.y1], [o.z, d.z, b.z0, b.z1]]) {

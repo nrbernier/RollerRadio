@@ -137,7 +137,9 @@ function planMetro() {
         // (west of the line a street runs close by: those exits pass under it in a corridor first)
         const pre = nx < -0.5 ? 15 : 0;
         const x0 = e.x + nx * (STN.hw + pre), z0 = e.z + nz * (STN.hw + pre), y0 = st.y + 1.2;
-        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / 0.45, 12, 38); }
+        // (a town station's stairs are steep, so its entrances stay small)
+        const slope = st.entrances === 2 ? 0.72 : 0.45;
+        let run = 22; for (let it = 0; it < 3; it++) { const g = terrainAt(x0 + nx * (run + 6), z0 + nz * (run + 6)); run = U.clamp((g - y0) / slope, 8, 38); }
         const L = 3 + run + 3, x1 = x0 + nx * L, z1 = z0 + nz * L, w = 2.4, gTop = terrainAt(x1, z1);
         // the well opens a few metres out from the hall (the first steps run under a slab)
         const o0x = x0 + nx * 7, o0z = z0 + nz * 7;
@@ -148,7 +150,7 @@ function planMetro() {
         else { if (nz > 0) hole[1] = Math.max(hole[1], sn(z0 + 1, TER.z0, TER.cell, 1)); else hole[3] = Math.min(hole[3], sn(z0 - 1, TER.z0, TER.cell, 0)); }
         let top = -1e9; for (let x = hole[0]; x <= hole[2]; x += TER.cell) for (let z = hole[1]; z <= hole[3]; z += TER.cell) top = Math.max(top, terrainAt(x, z));
         TER.holes.push(hole);
-        st.exits.push({ k, sd, nx, nz, ax, x0, z0, y0, run, L, w, x1, z1, gTop, hole, top, pre });
+        st.exits.push({ k, sd, nx, nz, ax, x0, z0, y0, run, L, w, x1, z1, gTop, hole, top, pre, open: st.entrances === 2 ? 7.5 : 0 });
       }
     }
   }
@@ -440,17 +442,40 @@ function undergroundHall(K, S, M, st, p, ramps, hn, PH) {
     for (let x = hole[0]; x < hole[2]; x += 2) for (let z = hole[1]; z < hole[3]; z += 2) {
       const cx = x + 1, cz = z + 1, along = (cx - x0) * nx + (cz - z0) * nz, across = Math.abs((cx - x0) * sx + (cz - z0) * sz);
       if (across < w + 0.2 && along > -1 && along < e.L + 0.6) continue;
-      K.box(x, p.y - 2, z, x + 2, top + 0.15, z + 2, '#cbbfa6', 'paving', { outlineT: 0.04 });
+      if (e.open) K.box(x, p.y - 2, z, x + 2, top + 0.12, z + 2, '#d8d0c4', 'cobble', { outlineT: 0, edges: false });      // (in town: the cobbles carry on)
+      else K.box(x, p.y - 2, z, x + 2, top + 0.15, z + 2, '#cbbfa6', 'paving', { outlineT: 0.04 });
     }
     // side walls of the stairway (inside the well and in the covered stretch), a slab over the covered part
     for (const sd2 of [-1, 1]) { const [ax, az] = at(-e.pre), [bx, bz] = at(e.L + 0.5), ox = sx * sd2 * (w + 0.3), oz = sz * sd2 * (w + 0.3);
       // (under the street the walls stop at the ceiling; in the open well they rise to a parapet)
       const dO = Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0))), [mx, mz] = at(dO);
       K.box(Math.min(ax, mx) + ox - 0.3, p.y - 2, Math.min(az, mz) + oz - 0.3, Math.max(ax, mx) + ox + 0.3, p.y + CY + 0.2, Math.max(az, mz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
+      if (e.open) {      // covered up to the last few metres: walls to the lid, a low parapet round the opening only
+        const [kx, kz] = at(e.L - e.open);
+        K.box(Math.min(mx, kx) + ox - 0.3, p.y - 2, Math.min(mz, kz) + oz - 0.3, Math.max(mx, kx) + ox + 0.3, top + 0.1, Math.max(mz, kz) + oz + 0.3, '#b9ae9a', 'stone', { outlineT: 0.04 });
+        K.box(Math.min(kx, bx) + ox - 0.3, p.y - 2, Math.min(kz, bz) + oz - 0.3, Math.max(kx, bx) + ox + 0.3, yTop + 0.9, Math.max(kz, bz) + oz + 0.3, '#b9ae9a', 'stone', { outlineT: 0.04 });
+      } else
       K.box(Math.min(mx, bx) + ox - 0.3, p.y - 2, Math.min(mz, bz) + oz - 0.3, Math.max(mx, bx) + ox + 0.3, yTop + 1.0, Math.max(mz, bz) + oz + 0.3, '#e6dcc4', 'plain', { outlineT: 0.04 });
       const rp = [[bx + ox * 0.95 - nx * (e.L - 6), yTop + 1.1, bz + oz * 0.95 - nz * (e.L - 6)], [bx + ox * 0.95, yTop + 1.1, bz + oz * 0.95]]; K.rail(rp, { color: '#e9e4f5', postColor: '#3a3550', round: 0 }); }
     { const [ax, az] = at(-e.pre - 0.4), [bx, bz] = at(Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0)))); const gy = terrainAt((ax + bx) / 2, (az + bz) / 2);
       B.box(Math.min(ax, bx) - Math.abs(sx) * (w + 0.6), p.y + CY, Math.min(az, bz) - Math.abs(sz) * (w + 0.6), Math.max(ax, bx) + Math.abs(sx) * (w + 0.6), Math.max(p.y + CY + 0.4, gy - 0.05), Math.max(az, bz) + Math.abs(sz) * (w + 0.6), '#d8d0c0', 'paving', { outlineT: 0, edges: false }); }
+    if (e.open) {
+      // a town entrance: the stairway is roofed over with cobbles at street level, only its top end is open; a
+      // stone frame with a little red sign over the opening, a short post with the lit disc
+      const dO = Math.max(1, (e.ax === 'x' ? Math.abs((nx > 0 ? hole[0] : hole[2]) - x0) : Math.abs((nz > 0 ? hole[1] : hole[3]) - z0)));
+      const [ax, az] = at(dO - 0.5), [kx, kz] = at(e.L - e.open);
+      K.box(Math.min(ax, kx) - Math.abs(sx) * (w + 0.6), top - 0.3, Math.min(az, kz) - Math.abs(sz) * (w + 0.6), Math.max(ax, kx) + Math.abs(sx) * (w + 0.6), top + 0.12, Math.max(az, kz) + Math.abs(sz) * (w + 0.6), '#d8d0c4', 'cobble', { outlineT: 0, edges: false });
+      (W.indoor = W.indoor || []).push([Math.min(ax, kx) - Math.abs(sx) * w, Math.min(az, kz) - Math.abs(sz) * w, Math.max(ax, kx) + Math.abs(sx) * w, Math.max(az, kz) + Math.abs(sz) * w, top - 0.3]);
+      const ty = yTop, [fx, fz] = at(e.L - e.open + 0.3);
+      for (const sd2 of [-1, 1]) K.box(fx + sx * sd2 * (w + 0.3) - 0.35, ty, fz + sz * sd2 * (w + 0.3) - 0.35, fx + sx * sd2 * (w + 0.3) + 0.35, ty + 3.2, fz + sz * sd2 * (w + 0.3) + 0.35, '#b9ae9a', 'stone', { outlineT: 0.05 });
+      B.box(fx - Math.abs(sx) * (w + 0.65) - Math.abs(nx) * 0.35, ty + 3.2, fz - Math.abs(sz) * (w + 0.65) - Math.abs(nz) * 0.35, fx + Math.abs(sx) * (w + 0.65) + Math.abs(nx) * 0.35, ty + 3.7, fz + Math.abs(sz) * (w + 0.65) + Math.abs(nz) * 0.35, '#b9ae9a', 'stone', { outlineT: 0.05, edges: false });
+      B.box(fx - Math.abs(sx) * 1.4 - Math.abs(nx) * 0.42, ty + 2.55, fz - Math.abs(sz) * 1.4 - Math.abs(nz) * 0.42, fx + Math.abs(sx) * 1.4 + Math.abs(nx) * 0.42, ty + 3.15, fz + Math.abs(sz) * 1.4 + Math.abs(nz) * 0.42, '#e4572e', 'plain', { outlineT: 0.03, edges: false });
+      const [mx, mz] = at(e.L + 1.5), px = mx + sx * (w + 1.4), pz = mz + sz * (w + 1.4);
+      K.cyl(px, ty, pz, 0.12, 3.4, '#2a2838', { outline: 0.03, seg: 6 }); K.sphere(px, ty + 3.9, pz, 0.6, '#e4572e', { outline: 0.05 });
+      B.box(px - 0.32, ty + 3.8, pz - 0.32, px + 0.32, ty + 4.0, pz + 0.32, '#fff2c8', 'lamp', { outlineT: 0, edges: false });
+      W.boxes.push({ x0: px - 0.2, y0: ty, z0: pz - 0.2, x1: px + 0.2, y1: ty + 3.6, z1: pz + 0.2, tag: 'lamp' });
+      continue;
+    }
     // street entrance, made to be seen from across the square: a red roof on four posts over the top of the
     // stairs, a tall totem with a lit red disc, and a pale apron of paving round the well
     { const ty = yTop, c0 = e.L - 9, c1 = e.L + 1.5, wr = w + 1.1;

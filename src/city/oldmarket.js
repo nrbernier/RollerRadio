@@ -120,13 +120,26 @@ function buildOldTown(H) {
 // short houses packed wall to wall in rows round irregular blocks ----------
 const OLDWALL = { c: [300, -440], rx: 114, rz: 86, gates: [0, Math.PI / 2, Math.PI, -Math.PI / 2], square: [330, -444] };
 function oldWallIn(x, z, m = 0) { const W = OLDWALL; return ((x - W.c[0]) / (W.rx - m)) ** 2 + ((z - W.c[1]) / (W.rz - m)) ** 2 < 1; }
+// stairs up the inside of the wall to its walk: a straight flight along the inner face (angles on the ring)
+const OLD_STAIRS = [Math.PI / 8, -Math.PI / 8, -Math.PI * 7 / 8];
+function oldStair(a) {
+  const W0 = OLDWALL, [cx0, cz0] = W0.c, x = cx0 + Math.cos(a) * W0.rx, z = cz0 + Math.sin(a) * W0.rz;
+  let tx = -Math.sin(a) * W0.rx, tz = Math.cos(a) * W0.rz; const tl = Math.hypot(tx, tz); tx /= tl; tz /= tl;
+  let nx = Math.cos(a) / W0.rx, nz = Math.sin(a) / W0.rz; const nl = Math.hypot(nx, nz); nx /= nl; nz /= nl;      // outward
+  const off = 1.6 + 1.5, L = 17, top = [x - nx * off, z - nz * off], bot = [top[0] + tx * L, top[1] + tz * L];
+  return { top, bot, tx, tz, nx, nz, L, w: 3, wallTop: terrainAt(x, z) + 7.5 + 0.25 };
+}
 function buildWalledTown(H, r) {
   const { K, W, B, F, S } = H, OW = OLDWALL, [cx0, cz0] = OW.c;
   // the station's stairways come up in here: keep them clear
   for (const st of (W.metro ? W.metro.stations : [])) for (const e of (st.exits || [])) H.reserve([e.hole[0] - 2, e.hole[1] - 2, e.hole[2] + 2, e.hole[3] + 2]);
+  for (const a of OLD_STAIRS) { const S0 = oldStair(a); H.reserve([Math.min(S0.top[0], S0.bot[0]) - 2.5, Math.min(S0.top[1], S0.bot[1]) - 2.5, Math.max(S0.top[0], S0.bot[0]) + 2.5, Math.max(S0.top[1], S0.bot[1]) + 2.5]); }
   // cobbles: one paved oval over the whole town inside the wall, following the ground
+  // (the open tops of the station's stairways: no cobbles over them)
+  const opens = []; for (const st of (W.metro ? W.metro.stations : [])) for (const e of (st.exits || [])) if (e.open) opens.push(e);
+  const openAt = (x, z) => opens.some(e => { const dx = x - e.x0, dz = z - e.z0, al = dx * e.nx + dz * e.nz, ac = Math.abs(-dx * e.nz + dz * e.nx); return al > e.L - e.open - 0.8 && al < e.L + 1.2 && ac < e.w + 0.8; });
   { const pos = [], NR = 26, NA = 128, pt = (i, k) => { const f = i / NR, a = k / NA * Math.PI * 2, x = cx0 + Math.cos(a) * (OW.rx - 0.5) * f, z = cz0 + Math.sin(a) * (OW.rz - 0.5) * f; return [x, terrainAt(x, z) + 0.1, z]; };
-    for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); if ([a, b, c, d].some(p => inHole(p[0], p[2])) || inHole((a[0] + c[0]) / 2, (a[2] + c[2]) / 2)) continue; pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
+    for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); if (inHole((a[0] + c[0]) / 2, (a[2] + c[2]) / 2) || [a, b, c, d].some(p => openAt(p[0], p[2]))) continue; pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
     if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
     B.add(g, null, '#d8d0c4', 'cobble', { outlineT: 0, edges: false }); }
@@ -217,7 +230,7 @@ function buildWalledTown(H, r) {
     }); }
   for (const c of W.oldLanesIn) for (let k = 4; k < c.length; k += 9) { const [x, z] = c[k]; if (H.clearOf(x + 2.2, z - 0.3, x + 2.8, z + 0.3, 0)) H.lamp(x + 2.5, z, { style: 'globe', h: 3.4, color: '#2a2a32' }); }
   // ---- the wall: a stone ring with a walk on top and battlements, round towers, gate towers over the main lanes ----
-  const N = 128, P = [], stone = '#b3a68e', cap = '#cbbfa6';
+  const N = 128, P = [], stone = '#c2b8a6', cap = '#d4cab6';
   for (let k = 0; k < N; k++) { const a = k / N * Math.PI * 2; P.push({ a, x: cx0 + Math.cos(a) * OW.rx, z: cz0 + Math.sin(a) * OW.rz }); }
   const near = (a, list, da) => list.some(b => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < da);
   const towers = [Math.PI / 4, Math.PI * 3 / 4, -Math.PI / 4, -Math.PI * 3 / 4, Math.PI / 8 * 3, -Math.PI / 8 * 3, Math.PI / 8 * 5, -Math.PI / 8 * 5];
@@ -229,51 +242,79 @@ function buildWalledTown(H, r) {
     const A = P[k], Bp = P[(k + 1) % N], am = (A.a + Bp.a + (k === N - 1 ? Math.PI * 2 : 0)) / 2;
     if (near(am, OW.gates, 0.075)) { flushWalk(); continue; }       // the gateway
     const ya = top(A.x, A.z), yb = top(Bp.x, Bp.z), yt = (ya + yb) / 2, y0 = Math.min(terrainAt(A.x, A.z), terrainAt(Bp.x, Bp.z)) - 1.5;
-    ob(A.x, A.z, Bp.x, Bp.z, 3.2, y0, yt, stone, 'brick', 0.08);
+    ob(A.x, A.z, Bp.x, Bp.z, 3.2, y0, yt, stone, 'stone', 0.08);
     ob(A.x, A.z, Bp.x, Bp.z, 3.6, yt - 0.05, yt + 0.25, cap, 'paving', 0.04);
     S.add(A.x, yt + 0.25, A.z, Bp.x, yt + 0.25, Bp.z, 1.5);
-    F.add(new THREE.BoxGeometry(3.2, yt - y0, Math.hypot(Bp.x - A.x, Bp.z - A.z) + 0.25), new THREE.Matrix4().makeRotationY(Math.atan2(Bp.x - A.x, Bp.z - A.z)).setPosition((A.x + Bp.x) / 2, (y0 + yt) / 2, (A.z + Bp.z) / 2), stone);
+    F.add(new THREE.BoxGeometry(2.8, yt - y0 - 0.3, Math.hypot(Bp.x - A.x, Bp.z - A.z) + 0.25), new THREE.Matrix4().makeRotationY(Math.atan2(Bp.x - A.x, Bp.z - A.z)).setPosition((A.x + Bp.x) / 2, (y0 + yt) / 2, (A.z + Bp.z) / 2), stone);
     // the sides are solid (in short pieces, so the boxes hug the curve)
-    for (let t = 0; t < 1; t += 0.5) { const x = U.lerp(A.x, Bp.x, t + 0.25), z = U.lerp(A.z, Bp.z, t + 0.25); W.boxes.push({ x0: x - 1.6, y0, z0: z - 1.6, x1: x + 1.6, y1: yt, z1: z + 1.6, tag: 'wall', nocam: true }); }
+    for (let t = 0; t < 1; t += 0.5) { const x = U.lerp(A.x, Bp.x, t + 0.25), z = U.lerp(A.z, Bp.z, t + 0.25); W.boxes.push({ x0: x - 1.6, y0, z0: z - 1.6, x1: x + 1.6, y1: yt, z1: z + 1.6, tag: 'wall' }); }
     // battlements on the outer edge, the walk's rail on the inner one
     const nx = Math.cos(am) / OW.rx, nz = Math.sin(am) / OW.rz, nl = Math.hypot(nx, nz), ux = nx / nl, uz = nz / nl;
-    for (const t of [0.25, 0.75]) { const x = U.lerp(A.x, Bp.x, t) + ux * 1.45, z = U.lerp(A.z, Bp.z, t) + uz * 1.45; H.put(H.SH.BOX, x, yt + 0.95, z, 0.7, 1.4, 1.4, stone, 'plain', 0.04, Math.atan2(Bp.x - A.x, Bp.z - A.z)); }
-    if (near(am, towers, 0.07)) { flushWalk(); continue; }
+    for (const t of [0.25, 0.75]) { const x = U.lerp(A.x, Bp.x, t) + ux * 1.45, z = U.lerp(A.z, Bp.z, t) + uz * 1.45; H.put(H.SH.BOX, x, yt + 0.95, z, 0.7, 1.4, 1.4, stone, 'stone', 0.04, Math.atan2(Bp.x - A.x, Bp.z - A.z)); }
+    if (near(am, towers, 0.07) || near(am, OLD_STAIRS, 0.045)) { flushWalk(); continue; }      // (gaps in the walk's rail: at towers, and where a stair comes up)
     walk.push([A.x - ux * 1.3, yt + 1.25, A.z - uz * 1.3]);
   }
   flushWalk();
   // round towers
   for (const a of towers) {
     const x = cx0 + Math.cos(a) * OW.rx, z = cz0 + Math.sin(a) * OW.rz, g = terrainAt(x, z), h = 12;
-    K.cyl(x, g - 1.5, z, 4.6, h + 1.5, stone, { outline: 0.1, seg: 14, kind: 'brick' });
+    K.cyl(x, g - 1.5, z, 4.6, h + 1.5, stone, { outline: 0.1, seg: 14, kind: 'stone' });
     K.cyl(x, g + h, z, 5.0, 0.6, cap, { outline: 0.05, seg: 14 });
     B.add(new THREE.ConeGeometry(5.4, 5, 12), new THREE.Matrix4().makeTranslation(x, g + h + 3.1, z), '#8a4a3a', 'roof', { outlineT: 0.08 });
     F.add(new THREE.CylinderGeometry(4.6, 4.6, h, 10), new THREE.Matrix4().makeTranslation(x, g + h / 2, z), stone); F.add(new THREE.ConeGeometry(5.2, 5, 10), new THREE.Matrix4().makeTranslation(x, g + h + 3, z), '#8a4a3a');
     W.boxes.push({ x0: x - 3.8, y0: g - 1.5, z0: z - 3.8, x1: x + 3.8, y1: g + h, z1: z + 3.8, tag: 'tower' });
     H.reserve([x - 6, z - 6, x + 6, z + 6]);
   }
-  // gate towers: two piers either side of the lane and a room over the arch
+  // gatehouses: two square stone towers either side of the lane, joined over a round arch; crenellated tops
+  // (collision matches what you see: the towers, the span over the arch)
   for (const a of OW.gates) {
-    const x = cx0 + Math.cos(a) * OW.rx, z = cz0 + Math.sin(a) * OW.rz, g = terrainAt(x, z), yaw = Math.atan2(-Math.sin(a) * OW.rz, Math.cos(a) * OW.rx) ;
-    const tx = -Math.sin(a) * OW.rx, tz = Math.cos(a) * OW.rz, tl = Math.hypot(tx, tz), ux = tx / tl, uz = tz / tl;       // along the wall
+    const x = cx0 + Math.cos(a) * OW.rx, z = cz0 + Math.sin(a) * OW.rz, g = terrainAt(x, z);
+    let ux = -Math.sin(a) * OW.rx, uz = Math.cos(a) * OW.rz; const tl = Math.hypot(ux, uz); ux /= tl; uz /= tl;       // along the wall
+    const nx = uz, nz = -ux, rot = Math.atan2(-uz, ux);            // across; the rotation that lays a box's x along the wall
+    const gapHalf = 0.075 * tl, pw = 2.7, dep = 4.2, th = 13.5, s0 = pw, s1 = gapHalf + 1.4, sm = (s0 + s1) / 2, sl = s1 - s0;
+    const obox = (cs, cn, la, ln, y0, y1, col, kind, ol = 0.08) => {    // a box centred cs along / cn across, sizes la x ln
+      B.add(new THREE.BoxGeometry(la, y1 - y0, ln), new THREE.Matrix4().makeRotationY(rot).setPosition(x + ux * cs + nx * cn, (y0 + y1) / 2, z + uz * cs + nz * cn), col, kind, { outlineT: ol, edges: false });
+      const xs = [], zs = []; for (const [p, q] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { xs.push(x + ux * (cs + p * la / 2) + nx * (cn + q * ln / 2)); zs.push(z + uz * (cs + p * la / 2) + nz * (cn + q * ln / 2)); }
+      return [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
+    };
     for (const sd of [-1, 1]) {
-      const px = x + ux * sd * 5.6, pz = z + uz * sd * 5.6;
-      const m = new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(px, g + 6, pz);
-      B.add(new THREE.BoxGeometry(7, 15, 3.6), m, stone, 'brick', { outlineT: 0.1, edges: false });
-      W.boxes.push({ x0: px - 2.4, y0: g - 1.5, z0: pz - 2.4, x1: px + 2.4, y1: g + 13.5, z1: pz + 2.4, tag: 'gate' });
+      const bb = obox(sd * sm, 0, sl, dep * 2, g - 1.5, g + th, stone, 'stone');
+      W.boxes.push({ x0: bb[0], y0: g - 1.5, z0: bb[1], x1: bb[2], y1: g + th, z1: bb[3], tag: 'gate' });
+      obox(sd * sm, 0, sl + 0.5, dep * 2 + 0.5, g + th, g + th + 0.4, cap, 'paving', 0.04);
+      // merlons round the top
+      for (let k = 0; k < 4; k++) for (const q of [-1, 1]) { obox(sd * sm + (k - 1.5) * sl / 4, q * (dep - 0.3), sl / 8, 0.6, g + th + 0.4, g + th + 1.6, stone, 'stone', 0.03); }
+      // arrow slits
+      for (const q of [-1, 1]) for (const hh of [4, 9]) obox(sd * sm, q * (dep + 0.02), 0.35, 0.06, g + hh, g + hh + 1.6, '#2a2622', 'plain', 0);
     }
-    const m = new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 10.5, z);
-    B.add(new THREE.BoxGeometry(7, 6, 14.8), m, stone, 'brick', { outlineT: 0.1, edges: false });
-    // the passage: a dark vault overhead, an arch moulding on both faces
-    B.add(new THREE.BoxGeometry(6.6, 0.3, 7.4), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 7.4, z), '#3a3430', 'plain', { outlineT: 0, edges: false });
-    for (const sd of [-1, 1]) {
-      const nx = uz, nz = -ux;       // across the wall
-      B.add(new THREE.TorusGeometry(3.6, 0.35, 6, 16, Math.PI), new THREE.Matrix4().makeRotationY(Math.atan2(-uz, ux)).setPosition(x + nx * sd * 3.55, g + 3.9, z + nz * sd * 3.55), cap, 'plain', { outlineT: 0.04, edges: false });
+    // the span over the passage: a round arch (built in slices), a room above it, crenellations on both faces
+    const crown = g + 4.4 + pw, top = g + th - 1.5;
+    for (let k = 0; k < 10; k++) { const s0k = -pw + k * pw / 5, smk = s0k + pw / 10, ah = g + 4.4 + Math.sqrt(Math.max(0, pw * pw - smk * smk)); obox(smk, 0, pw / 5 + 0.02, dep * 2, ah, top, stone, 'stone', k === 0 || k === 9 ? 0.06 : 0); }
+    obox(0, 0, pw * 2 + 0.6, dep * 2 + 0.5, top, top + 0.4, cap, 'paving', 0.04);
+    for (let k = 0; k < 3; k++) for (const q of [-1, 1]) obox((k - 1) * pw * 0.7, q * (dep - 0.3), 0.8, 0.6, top + 0.4, top + 1.5, stone, 'stone', 0.03);
+    { const bb = obox(0, 0, pw * 2, dep * 2, crown - 0.4, top, stone, 'stone', 0); W.boxes.push({ x0: bb[0], y0: crown - 0.4, z0: bb[1], x1: bb[2], y1: top + 0.4, z1: bb[3], tag: 'gate' }); }
+    // the arch's voussoirs on both faces (a lighter ring), a raised portcullis showing at the top, the coat of arms
+    for (const q of [-1, 1]) {
+      B.add(new THREE.TorusGeometry(pw + 0.25, 0.32, 6, 18, Math.PI), new THREE.Matrix4().makeRotationY(rot).setPosition(x + nx * q * (dep + 0.05), g + 4.4, z + nz * q * (dep + 0.05)), cap, 'plain', { outlineT: 0.04, edges: false });
+      obox(0, q * (dep + 0.08), 1.4, 0.1, top - 2.6, top - 0.8, '#c4523a', 'plain', 0.03);
     }
-    B.add(new THREE.ConeGeometry(8.4, 5, 4), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz) + Math.PI / 4).setPosition(x, g + 16, z), '#8a4a3a', 'roof', { outlineT: 0.08 });
-    for (const sd of [-1, 1]) F.add(new THREE.BoxGeometry(7, 15, 3.6), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x + ux * sd * 5.6, g + 6, z + uz * sd * 5.6), stone);
-    F.add(new THREE.BoxGeometry(7, 6, 14.8), new THREE.Matrix4().makeRotationY(Math.atan2(ux, uz)).setPosition(x, g + 10.5, z), stone);     // (seen from afar, you still see through the gate)
-    W.boxes.push({ x0: x - 4, y0: g + 7.5, z0: z - 4, x1: x + 4, y1: g + 13.5, z1: z + 4, tag: 'gate' });
+    for (let k = -2; k <= 2; k++) obox(k * pw / 2.6, 0, 0.14, 0.14, crown - 0.9, crown + 0.6, '#2a2622', 'plain', 0);
+    // far model: the two towers and the span, the passage left open
+    for (const sd of [-1, 1]) F.add(new THREE.BoxGeometry(sl - 0.4, th + 1.2, dep * 2 - 0.4), new THREE.Matrix4().makeRotationY(rot).setPosition(x + ux * sd * sm, g + th / 2 - 0.75, z + uz * sd * sm), stone);
+    F.add(new THREE.BoxGeometry(pw * 2 - 0.4, top - crown - 0.3, dep * 2 - 0.4), new THREE.Matrix4().makeRotationY(rot).setPosition(x, (crown + top) / 2, z), stone);
+    H.lamp(x + ux * (pw + 0.6) + nx * (dep + 0.9), z + uz * (pw + 0.6) + nz * (dep + 0.9), { style: 'globe', h: 3.4, color: '#2a2a32' });
+  }
+  // stairs up the inside of the wall: stone steps, a rail on the open side (a grind down)
+  for (const a of OLD_STAIRS) {
+    const S0 = oldStair(a), { top: T0, bot: B0, tx, tz, nx, nz, L, w } = S0, g = terrainAt(B0[0], B0[1]), yT = S0.wallTop, n = Math.ceil((yT - g) / 0.45);
+    for (let k = 0; k < n; k++) {
+      const t0 = k / n, t1 = (k + 1) / n, x0 = U.lerp(B0[0], T0[0], t0), z0 = U.lerp(B0[1], T0[1], t0), x1 = U.lerp(B0[0], T0[0], t1), z1 = U.lerp(B0[1], T0[1], t1), ys = U.lerp(g, yT, t1);
+      const len = Math.hypot(x1 - x0, z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      B.add(new THREE.BoxGeometry(len + 0.02, ys - g + 0.5, w), new THREE.Matrix4().makeRotationY(Math.atan2(-tz, tx)).setPosition(mx, (ys + g - 0.5) / 2, mz), stone, 'stone', { outlineT: k === n - 1 ? 0.06 : 0.02, edges: false });
+    }
+    S.add(B0[0], g, B0[1], T0[0], yT, T0[1], w / 2 - 0.1);
+    // the landing joins the wall walk; the rail runs along the town side
+    const rx = -nx * (w / 2 - 0.15), rz = -nz * (w / 2 - 0.15);
+    K.rail([[B0[0] + rx, g + 1, B0[1] + rz], [T0[0] + rx, yT + 1, T0[1] + rz]], { color: '#e9e4f5', postColor: '#6a6458', postMax: 1.0, round: 0 });
   }
 }
 
