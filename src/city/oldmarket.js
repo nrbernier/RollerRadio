@@ -126,7 +126,7 @@ function buildWalledTown(H, r) {
   for (const st of (W.metro ? W.metro.stations : [])) for (const e of (st.exits || [])) H.reserve([e.hole[0] - 2, e.hole[1] - 2, e.hole[2] + 2, e.hole[3] + 2]);
   // cobbles: one paved oval over the whole town inside the wall, following the ground
   { const pos = [], NR = 26, NA = 128, pt = (i, k) => { const f = i / NR, a = k / NA * Math.PI * 2, x = cx0 + Math.cos(a) * (OW.rx - 0.5) * f, z = cz0 + Math.sin(a) * (OW.rz - 0.5) * f; return [x, terrainAt(x, z) + 0.1, z]; };
-    for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
+    for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); if ([a, b, c, d].some(p => inHole(p[0], p[2])) || inHole((a[0] + c[0]) / 2, (a[2] + c[2]) / 2)) continue; pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
     if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
     B.add(g, null, '#d8d0c4', 'cobble', { outlineT: 0, edges: false }); }

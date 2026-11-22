@@ -183,7 +183,8 @@ function districtKit(K, S, F) {
     const sx0 = Math.floor((r[0] - TER.x0) / st) * st + TER.x0, sz0 = Math.floor((r[1] - TER.z0) / st) * st + TER.z0;
     for (let x = sx0; x < r[2]; x += st) for (let z = sz0; z < r[3]; z += st) {
       const a = Math.max(x, r[0]), b = Math.min(x + st, r[2]), c = Math.max(z, r[1]), d = Math.min(z + st, r[3]);
-      if (b - a < 0.05 || d - c < 0.05 || inHole((a + b) / 2, (c + d) / 2) || inCanal((a + b) / 2, (c + d) / 2)) continue;
+      const mx0 = (a + b) / 2, mz0 = (c + d) / 2;      // (CELLAR is kept in the current frame: the record shop's opening)
+      if (b - a < 0.05 || d - c < 0.05 || inHole((a + b) / 2, (c + d) / 2) || (mx0 > CELLAR[0] && mx0 < CELLAR[2] && mz0 > CELLAR[1] && mz0 < CELLAR[3]) || inCanal((a + b) / 2, (c + d) / 2)) continue;
       const P = (px, pz) => [px, terrainAt(px, pz) + lift, pz];
       // match the terrain's triangle split inside each grid cell
       const m = [(a + b) / 2, (c + d) / 2];

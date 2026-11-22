@@ -357,6 +357,7 @@ function groundLayer(B, poly, color, kind, st = 6, lift = 0.04) {
   const pos = [], uv = [], P = (x, z) => [x, terrainAt(x, z) + lift, z];
   for (let z = z0; z < z1; z += st) for (let x = x0; x < x1; x += st) {
     if (!inPoly(x + st / 2, z + st / 2)) continue;
+    if (inHole(x, z) || inHole(x + st, z) || inHole(x, z + st) || inHole(x + st, z + st) || inHole(x + st / 2, z + st / 2)) continue;      // (openings in the ground stay open)
     const a = P(x, z), b = P(x + st, z), c = P(x, z + st), d = P(x + st, z + st);
     pos.push(...a, ...c, ...b, ...b, ...c, ...d); for (const q of [a, c, b, b, c, d]) uv.push(q[0] / 6, q[2] / 6);
   }
@@ -373,6 +374,7 @@ function paveDowntown(B) {
   const P = (x, z) => [x, terrainAt(x, z) + 0.05, z];
   for (let z = z0; z < z1; z += st) for (let x = x0; x < x1; x += st) {
     if (!ok(x, z) || !ok(x + st, z) || !ok(x, z + st) || !ok(x + st, z + st)) continue;
+    if (inHole(x + st / 2, z + st / 2)) continue;
     const a = P(x, z), b = P(x + st, z), c = P(x, z + st), d = P(x + st, z + st);
     pos.push(...a, ...c, ...b, ...b, ...c, ...d);
     for (const q of [a, c, b, b, c, d]) uv.push(q[0] / 6, q[2] / 6);
