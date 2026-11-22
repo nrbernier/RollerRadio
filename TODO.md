@@ -100,8 +100,8 @@ Also done after feedback (22 Nov, morning):
   the walls; quay paving never under the grass; paved forecourts under the elevated stations; the mountains
   across the lake taper away at both ends.
 Still to fix:
-- Docks: the middle of the yard (between the road and the east trail) is empty; warehouses with sawtooth roofs
-  (rideable) would fill it. Check in play that the trail's gaps are all jumpable.
+- Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
+  loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
 - Water tower plaza: the two dark planter blocks look like bunkers.
 

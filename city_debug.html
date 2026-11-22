@@ -7548,7 +7548,9 @@ function buildContainerTrail(H) {
   const { K, W, B, F } = H, r = U.rng(9191), L = 12.2, Wd = 2.5, Hc = 2.6;
   const ccols = ['#c4523a', '#2f5f8a', '#e8b84a', '#3e8f86', '#8a5a9e', '#d97a3a', '#f2efe6', '#4a7a3a'];
   // (the docks' own reservations include warehouses that were trimmed away: the trails check what's really there)
-  const free = (x0, z0, x1, z1) => {
+  const placed = [];
+  const free = (x0, z0, x1, z1, m = 0) => {
+    if (placed.some(p => x1 + m > p[0] && x0 - m < p[2] && z1 + m > p[1] && z0 - m < p[3])) return false;
     if (x0 < 282 || x1 > 638 || z0 < 268 || z1 > PLAN.docksQuayZ - 6) return false;
     if (Math.hypot(Math.max(x0 - 262, 0, 262 - x1), Math.max(z0 - 322, 0, 322 - z1)) < 12) return false;     // the water tower
     for (const rd of Object.values(PLAN.roads)) for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [(x0 + x1) / 2, (z0 + z1) / 2]]) if (pathDist(rd.path, x, z, 40).d < rd.width / 2 + 6) return false;
@@ -7564,7 +7566,7 @@ function buildContainerTrail(H) {
     }
     const ty = y + h * Hc;
     F.box(x0, y - 0.4, z0, x1, ty, z1, '#8a6a5a', 0.2);
-    H.reserve([x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5]);
+    H.reserve([x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5]); placed.push([x0, z0, x1, z1]);
     if (r() < 0.3) H.sound((x0 + x1) / 2, ty, (z0 + z1) / 2, 5, 'container');
     return ty;
   };
@@ -7620,6 +7622,37 @@ function buildContainerTrail(H) {
     K.rail([[gx0 - 1.2, top + 1.45, gz + 3.3], [gx1 + 1.2, top + 1.45, gz + 3.3]], { hidden: true, voice: 'pipe' });
     K.box(613, top - 3, gz - 2, 619, top, gz + 2, '#3a3550', 'plain', { outlineT: 0.05 });      // the trolley
     F.box(gx0 - 1.5, top, gz - 3.6, gx1 + 1.5, top + 1.4, gz + 3.6, '#e8b84a', 0.2); }
+  // sawtooth warehouses: brick sheds whose roofs are rows of slopes and drops (ride across: up, off, up, off)
+  const shed = (x0, z0, x1, z1, tooth) => {
+    if (!free(x0, z0, x1, z1, 2)) return;
+    const y = Math.min(terrainAt(x0, z0), terrainAt(x1, z1), terrainAt(x0, z1), terrainAt(x1, z0)), top = y + 6.5, th = 2.6;
+    K.box(x0, y - 0.4, z0, x1, top, z1, pick(r, ['#9a5a44', '#8a6a52', '#a8644a']), 'brick', { outlineT: 0.1 });
+    for (let x = x0; x < x1 - 0.5; x += tooth) {
+      const xe = Math.min(x1, x + tooth);
+      K.ramp(x, z0, xe - 0.4, z1, 'x', top, top + th, '#c9c4b8', false, top);
+      B.box(xe - 0.4, top, z0 + 0.4, xe, top + th, z1 - 0.4, '#7fa8c0', 'plain', { outlineT: 0.04, edges: false });      // the north-light glazing
+      W.boxes.push({ x0: xe - 0.4, y0: top, z0, x1: xe, y1: top + th, z1, tag: 'shed' });
+      K.rail([[xe - 0.2, top + th + 0.02, z0 + 0.3], [xe - 0.2, top + th + 0.02, z1 - 0.3]], { hidden: true, voice: 'pipe' });     // each crest a grind
+    }
+    // big doors on the long sides, a loading ramp at one end (the way up)
+    for (const z of [z0 - 0.06, z1 - 0.04]) for (let x = x0 + 6; x < x1 - 8; x += 14) B.box(x, y, z, x + 5, y + 4.6, z + 0.1, '#3a4452', 'plain', { outlineT: 0.02, edges: false });
+    K.ramp(x0 - 12, z0 + 2, x0, z0 + 8, 'x', terrainAt(x0 - 12, z0 + 5), top, '#b8b2a6', false, terrainAt(x0 - 12, z0 + 5));
+    F.box(x0, y, z0, x1, top + th, z1, '#9a5a44', 0.2);
+    placed.push([x0 - 12, z0, x1, z1]); H.reserve([x0 - 12, z0, x1, z1]);
+  };
+  shed(530, 352, 590, 382, 7.5);
+  shed(306, 366, 366, 394, 7.5);
+  shed(540, 396, 596, 428, 7);
+  // loose containers about the yard: singles and pairs, lying either way, now and then one on top of another
+  for (let i = 0, n = 0; i < 300 && n < 22; i++) {
+    const along = r() < 0.5, x = U.lerp(290, 632, r()), z = U.lerp(272, PLAN.docksQuayZ - 12, r());
+    const w = along ? L : Wd, d = along ? Wd : L, x0 = x - w / 2, z0 = z - d / 2, x1 = x + w / 2, z1 = z + d / 2;
+    if (!free(x0, z0, x1, z1, 3)) continue;
+    const h = r() < 0.7 ? 1 : 2;
+    const ty = stack(x0, z0, x1, z1, h, along ? 'x' : 'z');
+    if (r() < 0.25) { const off = (r() - 0.5) * 3; if (along) stack(x0 + off + 1, z0, x1 + off - 1, z1, 0, 'x'); }
+    void ty; n++;
+  }
   // bollards and pallets about the yard
   for (let i = 0; i < 26; i++) { const x = U.lerp(300, 630, r()), z = U.lerp(280, 470, r()); if (!H.clearOf(x - 1, z - 1, x + 1, z + 1, 0.5)) continue; const y = terrainAt(x, z); K.box(x - 0.6, y, z - 0.6, x + 0.6, y + 0.15 + 0.15 * Math.floor(r() * 4), z + 0.6, '#a27a4a', 'wood', { outlineT: 0.03 }); }
 }
