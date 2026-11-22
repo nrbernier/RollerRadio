@@ -101,6 +101,9 @@ function districtKit(K, S, F) {
   const TRUNK = prepShape(new THREE.CylinderGeometry(0.7, 1, 1, 6)), ICOF = prepShape(new THREE.IcosahedronGeometry(1, 0));
   const _tq = new THREE.Quaternion(), _te = new THREE.Euler(), _tm = new THREE.Matrix4(), _tv = V3(), _ts = V3();
   H.tree = (x, z, o = {}) => {
+    // (no tree in the old town's wall: its crown would poke through)
+    { const rx = x + (XF.g ? XF.dx : 0), rz = z + (XF.g ? XF.dz : 0), W0 = OLDWALL, e = Math.hypot((rx - W0.c[0]) / W0.rx, (rz - W0.c[1]) / W0.rz);
+      if (Math.abs(e - 1) < 7 / W0.rz) return; }
     const s = o.s ?? 1, h = (o.h ?? 4) * s, r = (o.r ?? 2.6) * s, y = o.y ?? terrainAt(x, z), col = o.color || '#3f8a4a', rot = (x * 13.1 + z * 7.7) % 6.28;
     _tm.compose(_tv.set(x, y - 0.3 + (h + 0.6) / 2, z), _tq.identity(), _ts.set(0.4 * s, h + 0.6, 0.4 * s));
     B.addShape(TRUNK, _tm, o.trunk || '#6b4a35', 'plain', 0.05 * s);
@@ -271,6 +274,14 @@ function buildDistricts(K, S, F) {
   X('oldtown', buildOldTown, fillOldTown);
   X('docks', buildDocks, fillDocks);
   buildContainerTrail(H);          // (real coordinates)
+  // the lawn in the metro loop's corner (where the skatepark used to be): a small park of scattered trees
+  { const r = U.rng(6262);
+    for (let i = 0; i < 500; i++) {
+      const x = U.lerp(-340, -200, r()), z = U.lerp(130, 250, r());
+      if (!H.clearOf(x - 3, z - 3, x + 3, z + 3, 1)) continue;
+      if (r() < 0.45) continue;
+      H.tree(x, z, { s: 0.8 + r() * 0.5, color: pick(r, ['#4f8f4a', '#5a9a4a', '#6fa85a']) }); H.reserve([x - 2, z - 2, x + 2, z + 2]);
+    } }
   // the forest's western strip (out to the map's edge) was bare grass: woods, thinning out by the pond
   { const r = U.rng(5150);
     for (let i = 0; i < 2600; i++) {

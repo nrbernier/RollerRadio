@@ -440,7 +440,7 @@ function buildMarket(H) {
   marketTower(H, MKT.tower[0], MKT.tower[1]);
   // the great market: rows of stalls all round the hall, each part of the field with its own trade
   const GM = MKT.field;
-  H.patch(GM, '#dcc59c', 'tiles', 0.065);
+  H.patch(GM, '#bfa57e', 'tiles', 0.065);
   const rows = [[-120, 'cloth'], [-108, 'cloth'], [-96, 'spice'], [4, 'fruit'], [16, 'fruit'], [28, 'flower'], [40, 'flower']].map(([z, k]) => [z, k, GM[0] + 6, GM[2] - 4]);
   for (const z of [-70, -58, -46, -34, -22]) rows.push([z, 'spice', GM[0] + 6, hx0 - 8], [z, 'cloth', hx1 + 10, GM[2] - 4]);
   // ---- things to ride, one kind per trade ----
