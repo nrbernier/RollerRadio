@@ -674,8 +674,9 @@ function buildObservatory(H) {
   B.add(new THREE.BoxGeometry(12, 0.6, Math.hypot(16.5, ty - gy)), new THREE.Matrix4().makeRotationX(Math.atan2(ty - gy, 16.5)).setPosition(tx, (ty + gy) / 2 - 0.35, tz + 13.75), '#cbbd9f', 'paving', { outlineT: 0.06, edges: false });
   for (const bx of [-18, -6, 6, 18]) H.bench(tx + bx, tz + 2, true, { y: ty + 0.02, view: true });
   for (const bx of [-24, 24]) { K.cyl(tx + bx, ty, tz + 3, 0.12, 1.1, '#3a3550', { outline: 0.02, seg: 6 }); B.add(new THREE.CylinderGeometry(0.18, 0.28, 1.2, 8), new THREE.Matrix4().makeRotationX(-0.9).setPosition(tx + bx, ty + 1.35, tz + 3.3), '#c9a24a', 'plain', { outlineT: 0.03, edges: false }); H.sound(tx + bx, ty + 1, tz + 3, 2, 'telescope'); }
-  W.spawn.set(tx, ty, tz - 6); W.spawnYaw = 0;
-  W.terrace = { x: tx, y: ty, z: tz };
+  { const dx = XF.g ? XF.dx : 0, dz = XF.g ? XF.dz : 0;       // (W.spawn already exists, so it is not moved with the group)
+    W.spawn.set(tx + dx, ty, tz - 6 + dz); W.spawnYaw = 0; }
+  W.terrace = { x: tx, y: ty, z: tz };          // (a new object: moved with the group)
   // meadow: flowers (tiny coloured cones) and a few pines; paths down the hill
   for (let i = 0; i < 700; i++) {
     const a = r() * Math.PI * 2, d = 40 + r() * 260, x = ox + Math.cos(a) * d, z = oz + Math.sin(a) * d * 0.8;

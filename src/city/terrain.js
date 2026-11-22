@@ -170,8 +170,9 @@ function hillY(x, z) {
 }
 function outerHills(mat) {
   // vertices line up with the terrain grid (every 6th), so the seam at the edge is clean
-  const step = 48, X0 = TER.x0 - step * 40, X1 = TER.x1 + step * 40, Z0 = TER.z0 - step * 44, Z1 = TER.z0 + step * 100;
-  const nx = (X1 - X0) / step, nz = (Z1 - Z0) / step, pos = [], cols = [], idx = [], col = new THREE.Color(), c2 = new THREE.Color();
+  // (whole steps from the west edge: the map's width need not be a multiple of the step)
+  const step = 48, X0 = TER.x0 - step * 40, nx = Math.ceil((TER.x1 + step * 40 - X0) / step), X1 = X0 + nx * step, Z0 = TER.z0 - step * 44, Z1 = TER.z0 + step * 100;
+  const nz = (Z1 - Z0) / step, pos = [], cols = [], idx = [], col = new THREE.Color(), c2 = new THREE.Color();
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = X0 + i * step, z = Z0 + j * step;
     const inside = x > TER.x0 + 1 && x < TER.x1 - 1 && z > TER.z0 + 1;

@@ -194,15 +194,13 @@ function xfRun(H, g, ...fns) {
   // the frame: queries answered from the real map, the old plan's numbers, shared places shifted
   if (!XF_REAL.terrainAt) Object.assign(XF_REAL, { terrainAt, cityHeight, landH, inCanal, shoreZ, canalEndZ, districtAt, districtWeights, inHole });
   const R = XF_REAL;
-  terrainAt = (x, z, out) => R.terrainAt(x + dx, z + dz, out);
-  cityHeight = (x, z) => R.cityHeight(x + dx, z + dz);
-  landH = (x, z) => R.landH(x + dx, z + dz);
-  inCanal = (x, z) => R.inCanal(x + dx, z + dz);
-  shoreZ = (x) => R.shoreZ(x + dx) - dz;
+  // (the real functions call each other by these same names: a call made from inside one is already real)
+  let depth = 0;
+  const real2 = (f, sx) => (x, z, a, b) => { if (depth) return f(x, z, a, b); depth++; try { return f(x + dx, sx ? z : z + dz, a, b); } finally { depth--; } };
+  terrainAt = real2(R.terrainAt); cityHeight = real2(R.cityHeight); landH = real2(R.landH); inCanal = real2(R.inCanal);
+  shoreZ = (x) => { if (depth) return R.shoreZ(x); depth++; try { return R.shoreZ(x + dx) - dz; } finally { depth--; } };
   canalEndZ = () => PLAN0.canalEnd;
-  districtAt = (x, z) => R.districtAt(x + dx, z + dz);
-  districtWeights = (x, z, out, soft) => R.districtWeights(x + dx, z + dz, out, soft);
-  inHole = (x, z) => R.inHole(x + dx, z + dz);
+  districtAt = real2(R.districtAt); districtWeights = real2(R.districtWeights); inHole = real2(R.inHole);
   const real = !!G.real;
   const saved = { districts: PLAN.districts, byKey: PLAN.byKey, stations: PLAN.stations, spots: PLAN.spots, canal: PLAN.canal, pond: PLAN.pond, docksQuayZ: PLAN.docksQuayZ, boulevardX: PLAN.boulevardX, avenueZ: PLAN.avenueZ };
   if (!real) {
