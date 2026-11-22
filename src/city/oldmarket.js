@@ -627,6 +627,25 @@ function buildMarket(H) {
   roofWays(H, roofs, r, { stair: 0.5, color: '#c9a878', rail: '#2f6f9d' });
   roofLinks(H, roofs, r, { skip: 0.1, lanterns: 0.5, maxGap: 15 });
   const alleys = lanesZ.map(z => [[MX0, z], [MX1, z]]).concat([[[604, -88], [896, -88]], [[604, -2], [896, -2]], [[604, -114], [896, -114]], [[604, 10], [896, 10]]]);
+  // ROOF ROUTES: here and there along the field's north and south edges, a staircase of awnings (each a bounce)
+  // climbing to the eaves of the houses that line the market, so a run can go on over their roofs
+  { const topAt = (x, z) => { let t = -1e9; for (let b = W.boxes.length - 1, n = 0; b >= 0 && n < 60000; b--, n++) { const q = W.boxes[b]; if (x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1 && q.y1 > t) t = q.y1; } return t; };
+    for (const sd of [-1, 1]) for (let x = GM[0] + 24 + r() * 20; x < GM[2] - 20; x += 60 + r() * 30) {
+      const edge = sd < 0 ? GM[1] : GM[3]; let zf = null, eave = 0;
+      if (x > MKT.hall[0] - 14 && x < MKT.hall[2] + 14) continue;      // (not into the hall)
+      for (let d = -6; d < 50; d += 1) { const z = edge + sd * d, g = terrainAt(x, z), t = topAt(x, z); if (t > g + 6 && t < g + 18) { zf = z; eave = t; break; } }
+      if (zf === null) continue;
+      const g0 = terrainAt(x, zf - sd * 3), n = Math.max(2, Math.min(4, Math.floor((eave - g0 - 2) / 2.2)));
+      for (let k = 0; k < n; k++) {
+        const z = zf - sd * (2.2 + (n - 1 - k) * 3.4), y = eave - 0.9 - (n - 1 - k) * 2.2, xx = x + (k % 2 ? 1.2 : -1.2);
+        if (y < g0 + 2.4 || !H.clearOf(xx - 1.8, z - 1.2, xx + 1.8, z + 1.2, 0)) continue;
+        K.cyl(xx - 1.6, terrainAt(xx - 1.6, z), z + sd * 0.9, 0.07, y - terrainAt(xx - 1.6, z), '#3a3550', { outline: 0.02, seg: 5 });
+        K.cyl(xx + 1.6, terrainAt(xx + 1.6, z), z + sd * 0.9, 0.07, y - terrainAt(xx + 1.6, z), '#3a3550', { outline: 0.02, seg: 5 });
+        B.add(new THREE.BoxGeometry(3.6, 0.08, 2.4), new THREE.Matrix4().makeRotationX(0.16 * sd).setPosition(xx, y + 0.1, z), pick(r, SHADES), 'plain', { outlineT: 0.04, edges: false });
+        W.boxes.push({ x0: xx - 1.8, y0: y - 0.25, z0: z - 1.2, x1: xx + 1.8, y1: y + 0.2, z1: z + 1.2, tag: 'bounce', nocam: true, mstep: 1 });
+        H.reserve([xx - 1.8, z - 1.2, xx + 1.8, z + 1.2]);
+      }
+    } }
   W.marketAlleys = alleys;
   H.standers(vendors, 'market');
   H.busker('oud', 650, -45, 1.57);

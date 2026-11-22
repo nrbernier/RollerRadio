@@ -93,6 +93,8 @@ lawn: built first now); brick boxes on the rail siding (now goods wagons); dark 
 (downtown's street ribbons draped into the cut: streets now stop at its rim); music garden gravel darker.
 Roof routes (22 Nov): in the old town, planks from eave to eave across the lanes where the houses either side
 stand about as high (cross town at roof level), washing lines with laundry under the eaves elsewhere (grinds).
+Market: its houses already had stairs up their fronts, roof walkways and roof-to-roof links; an awning staircase
+was added where the edge houses are low enough (one so far: most edge houses are too tall for awnings).
 Check in play that the planks meet the roofs (no step up) and the lines are reachable from the roofs.
 Still to fix:
 - The bridge at the canal mouth (promenade): abutments now stand at the canal walls; still, just south of it a few
