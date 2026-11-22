@@ -907,7 +907,7 @@ function vineyards(H, r) {
   const seeds = [];
   for (let t = 0; t < 400 && seeds.length < 9; t++) { const x = U.lerp(bx0, bx1, r()), z = U.lerp(bz0, bz1, r()); if (inPoly(x, z) && seeds.every(s => Math.hypot(s.x - x, s.z - z) > 42)) {
     const gx = terrainAt(x + 3, z) - terrainAt(x - 3, z), gz = terrainAt(x, z + 3) - terrainAt(x, z - 3), a = (Math.hypot(gx, gz) > 0.05 ? Math.atan2(gz, gx) + Math.PI / 2 : r() * Math.PI) + (r() - 0.5) * 0.7;
-    seeds.push({ x, z, a, ux: Math.cos(a), uz: Math.sin(a), sp: 2.2 + r() * 0.6, terr: r() < 0.5, leaf: pick(r, ['#5f8f3a', '#6f9a42', '#58843a', '#7a9a3a', '#86a04a']) }); } }
+    seeds.push({ x, z, a, ux: Math.cos(a), uz: Math.sin(a), sp: 2.2 + r() * 0.6, terr: r() < 0.5, leaf: pick(r, ['#4f7a34', '#5a8a3a', '#4a7030', '#638a3c', '#6f8f3e']) }); } }
   const owner = (x, z) => { let a = null, da = 1e9, db = 1e9; for (const s of seeds) { const d = Math.hypot(s.x - x, s.z - z); if (d < da) { db = da; da = d; a = s; } else if (d < db) db = d; } return db - da < 5 ? null : a; };   // (null: on a path between parcels)
   for (const s of seeds) {
     const vx = -s.uz, vz = s.ux, R = Math.max(bx1 - bx0, bz1 - bz0);
@@ -920,8 +920,10 @@ function vineyards(H, r) {
         const ok = inPoly(xm, zm) && owner(xm, zm) === s && inPoly(ox + s.ux * t, oz + s.uz * t) && inPoly(ox + s.ux * (t + len), oz + s.uz * (t + len));
         if (ok && r() > 0.05 && H.clearOf(xm - len / 2, zm - len / 2, xm + len / 2, zm + len / 2, 0)) {
           const y = terrainAt(xm, zm), yaw = -s.a;
-          H.put(H.SH.BOX, xm, y + 0.35, zm, len, 0.7, 0.12, '#6a5040', 'wood', 0, yaw);
-          H.put(H.SH.ICO, xm, y + 0.85, zm, len * 0.52, 0.42 + r() * 0.12, 0.45, s.leaf, 'flat', 0.04, yaw);
+          // a row: a post at each end, the leafy hedge between them (taller than wide), dark trunks under it
+          for (const e of [-0.5, 0.5]) H.put(H.SH.BOX, xm + s.ux * len * e, y + 0.75, zm + s.uz * len * e, 0.12, 1.5, 0.12, '#6a5040', 'wood', 0, yaw);
+          H.put(H.SH.BOX, xm, y + 0.3, zm, len * 0.96, 0.6, 0.1, '#5a4434', 'wood', 0, yaw);
+          { const hh = 0.85 + r() * 0.2; H.put(H.SH.BOX, xm, y + 0.55 + hh / 2, zm, len * 0.97, hh, 0.5, s.leaf, 'flat', 0.03, yaw); }
           run.push([xm - vx * 1.1, zm - vz * 1.1]);
         } else flush();
         t += len + 0.6 + (r() < 0.06 ? 3 : 0);
