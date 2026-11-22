@@ -144,7 +144,9 @@ Still to fix:
   through gaps between walls
 - Check the new district music on a phone speaker (basses now have harmonics); retune the per-district move sounds (grind, tricks) to the new styles if they clash
 - Turning circles at road ends look a bit blobby (make them true circles)
-- Physics/camera bot (`tools/bot.py`) not run yet on the latest build
+- Physics/camera bot (`tools/bot.py 12 2`) run on the compact map (22 Nov): 16 runs, 3,839 frames, no errors.
+  First run: 8 bonks, 6 stuck, 1 below ground (positions not kept); second run: 7 bonks (walls, mostly by the
+  viaduct's piers at the canal quarter), nothing stuck. Run it longer (60 s, 4 seeds) to catch the stuck/below cases.
 
 ## Old town & market: life at roof level
 - Ways up to the roofs, and pathways at roof level to grind along and rest on
