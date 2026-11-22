@@ -6545,6 +6545,12 @@ function buildDistricts(K, S, F) {
   vineyards(H, U.rng(2027));          // (laid out on the real outline: no frame)
   X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
   fillRoutes(H); lap('routes');
+  // the elevated stations: a paved forecourt under each, along the line (they stood on bare lawn)
+  for (const st of H.W.stations || []) {
+    if (st.under || !st.p) continue;
+    const ux = st.p.dx, uz = st.p.dz, vx = -uz, vz = ux, cx = st.p.x, cz = st.p.z, a = 40, b = 17;
+    groundLayer(H.K.B, [[cx - ux * a - vx * b, cz - uz * a - vz * b], [cx + ux * a - vx * b, cz + uz * a - vz * b], [cx + ux * a + vx * b, cz + uz * a + vz * b], [cx - ux * a + vx * b, cz - uz * a + vz * b]], '#b9b2a4', 'paving', 3, 0.06);
+  }
   buildJunctions(H.K); lap('junctions');
   return H;
 }

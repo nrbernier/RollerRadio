@@ -91,14 +91,19 @@ Fixed:
 - Vineyards: hedge rows on posts (they were flat green lenses), on grass instead of the valley's sand.
 - No junction plates down in the sunken street (its cross streets pass over on bridges).
 - Debug views now use the terrain detail of their own camera (coarse far tiles hid roads in the pictures).
+Also done after feedback (22 Nov, morning):
+- The tower ("The Twist"): 80 m, a twisting stack of glass storeys, a spiral gallery ramp from the round sky deck
+  to the plaza (ride it down; its parapet top is the grind, nothing above it). The red pipe helix is gone.
+- Docks: two container trails (single lines of stacks rising and falling, short gaps, pads at the turns, grinds
+  only along the trail so a jump isn't pulled sideways), ramps up, a gantry crane with a high grind beam.
+- Grapes on the vines; stone houses outside the wall get windows; the Old Town station's stairs come up inside
+  the walls; quay paving never under the grass; paved forecourts under the elevated stations; the mountains
+  across the lake taper away at both ends.
 Still to fix:
-- Docks: the container yard's rows are laid out for the old map and only a broken, scattered part of them is
-  left after trimming: lay a new yard in real coordinates (rows along the quay, lanes between).
-- Outskirts: some houses are blank brick cubes (no windows) — use the old-house fronts.
-- The old town station's entrance canopy stands right against the town wall.
-- Grass shows through the quay paving in a few spots along the canal (small triangles of terrain above the apron).
+- Docks: the middle of the yard (between the road and the east trail) is empty; warehouses with sawtooth roofs
+  (rideable) would fill it. Check in play that the trail's gaps are all jumpable.
+- The tower's gallery: check in play that riding down never drops through between two slope pieces.
 - Water tower plaza: the two dark planter blocks look like bunkers.
-- Canal station and forest station: plain lawns under the viaduct; no forecourt.
 
 ### Checks (tools/geom.py, after the fixes below)
 - Walkers through walls: 116 → 3; cars through walls: 24 → 2 (downtown loop at z 218, x −150/−183: something
