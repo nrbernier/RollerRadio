@@ -6265,8 +6265,13 @@ function bridge(K, S, F, ax, az, bx, bz, width, rise = 1.4, o = {}) {
     const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(-Math.atan2(y1 - y0, segL), yaw, 0, 'YXZ')).setPosition(mid);
     B.add(new THREE.BoxGeometry(width, 0.9, segL + 0.06), m, col, o.kind || 'paving', { outlineT: 0.06, edges: false });
   }
-  // abutments on each bank
-  for (const [x, z, y] of [[ax, az, ya], [bx, bz, yb]]) {
+  // abutments on each bank: where the bridge meets the canal's walls (a long bridge also spans the quays)
+  const deckY = (t) => t < 0.5 ? U.lerp(ya, ym, U.smooth(t * 2)) : U.lerp(ym, yb, U.smooth(t * 2 - 1));
+  let ta = 0, tb = 1;
+  { let first = -1, last = -1; for (let k = 0; k <= 80; k++) { const t = k / 80; if (pathDist(C.path, U.lerp(ax, bx, t), U.lerp(az, bz, t), 60).d < C.half + 0.6) { if (first < 0) first = t; last = t; } }
+    if (first > 0.02 && last < 0.98) { ta = Math.max(0, first - 0.02); tb = Math.min(1, last + 0.02); } }
+  for (const t of [ta, tb]) {
+    const x = U.lerp(ax, bx, t), z = U.lerp(az, bz, t), y = deckY(t) - 0.9;
     const m = new THREE.Matrix4().makeRotationY(yaw).setPosition(x, (C.bedY + y) / 2 - 0.3, z);
     B.add(new THREE.BoxGeometry(width + 0.6, y - C.bedY, 3), m, o.wall || '#8f8577', 'brick', { outlineT: 0.05, edges: false });
   }

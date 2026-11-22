@@ -92,7 +92,9 @@ and straight allotment strips from the old strip fill (gone); the carousel had v
 lawn: built first now); brick boxes on the rail siding (now goods wagons); dark bands across the sunken street
 (downtown's street ribbons draped into the cut: streets now stop at its rim); music garden gravel darker.
 Still to fix:
-- The stone bridge at the canal mouth: its underside reads as folded white planes from the quay.
+- The bridge at the canal mouth (promenade): abutments now stand at the canal walls; still, just south of it a few
+  terrain triangles (~1 m up) poke into the water and the east quay paving overlaps the water in jags: the canal's
+  terrain cut misses a cell or two where it bends towards the mouth.
 - Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
   loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
