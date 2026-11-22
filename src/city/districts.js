@@ -269,6 +269,7 @@ function buildDistricts(K, S, F) {
   X('market', buildMarket, fillMarketPeople);
   X('oldtown', buildOldTown, fillOldTown);
   X('docks', buildDocks, fillDocks);
+  buildContainerTrail(H);          // (real coordinates)
   X('park', buildPark, buildCrag, fillPark, h => wild(h, U.rng(2026)));
   X('obs', buildObservatory, fillObservatory);
   X('site', buildSite); X('tower', buildTower);

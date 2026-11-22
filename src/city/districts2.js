@@ -131,34 +131,8 @@ function buildDocks(H) {
     for (let k = 0; k < n; k++) K.ramp(x0 + k * step, z0, x0 + (k + 1) * step, z1, 'x', bb.top, bb.top + 3.2, '#c9c2b4', false, bb.top - 0.2, 'roof');
     H.reserve([x0, z0, x1, z1]);
   }
-  // container yard: tidy rows of stacks with lanes between (jump from stack to stack)
+  // (the container yard is laid in real coordinates after the docks: see buildContainerTrail)
   const ccols = ['#c4523a', '#2f5f8a', '#e8b84a', '#3e8f86', '#8a5a9e', '#d97a3a', '#f2efe6', '#4a7a3a'];
-  for (let x = 620; x < 1010; x += 19) for (let z = 650; z < QZ - 40; z += 3.1) {
-    if (r() < 0.22) { z += 6; continue; }
-    const h = 1 + Math.floor(r() * r() * 4), w = 12.2, d = 2.5;
-    if (!H.clearOf(x - w / 2, z, x + w / 2, z + d, 0.6)) continue;
-    const y = terrainAt(x, z + 1.25);
-    for (let k = 0; k < h; k++) {
-      const c = pick(r, ccols);
-      K.box(x - w / 2, y + k * 2.6 - (k ? 0 : 0.3), z, x + w / 2, y + (k + 1) * 2.6, z + d, c, 'plain', { outlineT: 0.05, edges: k === h - 1 });
-      if (k === h - 1) F.box(x - w / 2, y - 0.3, z, x + w / 2, y + (k + 1) * 2.6, z + d, c, 0.2);
-    }
-    if (r() < 0.25) H.sound(x, y + h * 2.6, z + 1.25, 5, 'container');
-    // the top edges of every stack are grinds: hop from corner to corner up and down the rows
-    const ty = y + h * 2.6 + 0.02;
-    K.rail([[x - w / 2 + 0.25, ty, z + 0.12], [x + w / 2 - 0.25, ty, z + 0.12]], { hidden: true, voice: 'pipe' });
-    K.rail([[x - w / 2 + 0.25, ty, z + d - 0.12], [x + w / 2 - 0.25, ty, z + d - 0.12]], { hidden: true, voice: 'pipe' });
-    H.reserve([x - w / 2, z, x + w / 2, z + d]);
-  }
-  // staircases of containers at the front of the yard: 1, 2, 3 high, so you can climb by jumping
-  for (const [cx, cz] of [[640, 618], [780, 618], [920, 618]]) {
-    for (let k = 0; k < 3; k++) {
-      const x0 = cx + k * 4.2, y0 = terrainAt(x0, cz), c = pick(r, ccols);
-      K.box(x0 - 1.25, y0 - 0.3, cz - 6, x0 + 1.25, y0 + (k + 1) * 2.6, cz + 6, c, 'plain', { outlineT: 0.05 });
-      for (const ex of [x0 - 1.13, x0 + 1.13]) K.rail([[ex, y0 + (k + 1) * 2.6 + 0.02, cz - 5.75], [ex, y0 + (k + 1) * 2.6 + 0.02, cz + 5.75]], { hidden: true, voice: 'pipe' });
-    }
-    H.reserve([cx - 2, cz - 7, cx + 11, cz + 7]);
-  }
   // a rail siding with freight wagons along the west side
   const rx = 590;
   groundRibbon(B, [[rx, 500], [rx, QZ - 30]], 3.2, '#6a6458', 'gravel', 0.08);
@@ -367,4 +341,90 @@ function buildLido(H) {
   for (let x = L.x0 + 6; x < L.x1 - 4; x += 14) H.lamp(x, L.z0 + 13, { y, style: 'globe', h: 3.6, color: '#2f5f8a' });
   for (let x = L.x0 + 10; x < L.x1 - 20; x += 18) { K.cyl(x, y, L.z1 - 9, 0.07, 6, '#ffffff', { outline: 0, seg: 5 }); B.box(x + 0.07, y + 4.8, L.z1 - 9.02, x + 1.7, y + 5.8, L.z1 - 8.98, shade[(x | 0) % 5 < 0 ? 0 : Math.abs(x | 0) % 5], 'plain', { outlineT: 0, edges: false }); }
   W.lido = { x: (L.x0 + L.x1) / 2, z: (L.z0 + L.z1) / 2 };
+}
+
+// ============================================================
+//  THE STACKS — container trails in the docks yard (real coordinates). Not a grid: each trail is one line of
+//  stacks, end to end with short gaps, rising and falling (1 to 4 high), turning at wide pads (two containers side
+//  by side). Grinds only along the trail (no parallel rows next to it to pull a jump sideways). A ramp at each start,
+//  a gantry crane over the east trail with its beam as a high grind.
+// ============================================================
+function buildContainerTrail(H) {
+  const { K, W, B, F } = H, r = U.rng(9191), L = 12.2, Wd = 2.5, Hc = 2.6;
+  const ccols = ['#c4523a', '#2f5f8a', '#e8b84a', '#3e8f86', '#8a5a9e', '#d97a3a', '#f2efe6', '#4a7a3a'];
+  // (the docks' own reservations include warehouses that were trimmed away: the trails check what's really there)
+  const free = (x0, z0, x1, z1) => {
+    if (x0 < 282 || x1 > 638 || z0 < 268 || z1 > PLAN.docksQuayZ - 6) return false;
+    if (Math.hypot(Math.max(x0 - 262, 0, 262 - x1), Math.max(z0 - 322, 0, 322 - z1)) < 12) return false;     // the water tower
+    for (const rd of Object.values(PLAN.roads)) for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [(x0 + x1) / 2, (z0 + z1) / 2]]) if (pathDist(rd.path, x, z, 40).d < rd.width / 2 + 6) return false;
+    return true;
+  };
+  const stack = (x0, z0, x1, z1, h, along) => {     // along: 'x' or 'z' (the long side)
+    const y = Math.min(terrainAt(x0, z0), terrainAt(x1, z1), terrainAt(x0, z1), terrainAt(x1, z0));
+    for (let k = 0; k < h; k++) {
+      const c = pick(r, ccols);
+      K.box(x0, y + k * Hc - (k ? 0 : 0.4), z0, x1, y + (k + 1) * Hc, z1, c, 'plain', { outlineT: 0.05, edges: k === h - 1 });
+      // ribs on the long sides (corrugation reads from afar)
+      if (along === 'x') for (let x = x0 + 1; x < x1 - 0.5; x += 1.5) for (const z of [z0 - 0.06, z1 - 0.02]) B.box(x, y + k * Hc + 0.15, z, x + 0.35, y + (k + 1) * Hc - 0.15, z + 0.08, '#' + new THREE.Color(c).multiplyScalar(0.78).getHexString(), 'plain', { outlineT: 0, edges: false });
+    }
+    const ty = y + h * Hc;
+    F.box(x0, y - 0.4, z0, x1, ty, z1, '#8a6a5a', 0.2);
+    H.reserve([x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5]);
+    if (r() < 0.3) H.sound((x0 + x1) / 2, ty, (z0 + z1) / 2, 5, 'container');
+    return ty;
+  };
+  const trail = (P, prof) => {
+    let idx = 0, lastTop = null;
+    const rails = [];      // the trail's two edge grinds, broken where the height changes
+    for (let i = 0; i < P.length - 1; i++) {
+      const [ax, az] = P[i], [bx, bz] = P[i + 1], alongX = Math.abs(bx - ax) > Math.abs(bz - az), sgn = Math.sign(alongX ? bx - ax : bz - az), len = Math.abs(alongX ? bx - ax : bz - az);
+      let t = i === 0 ? 0 : Wd * 2 + 2;
+      const stop = i < P.length - 2 ? len - (Wd * 2 + 2) : len;      // (leave the corner to its pad)
+      while (t + L <= stop) {
+        const h = prof[idx++ % prof.length], c0 = t, c1 = t + L;
+        let x0, z0, x1, z1;
+        if (alongX) { x0 = ax + sgn * c0; x1 = ax + sgn * c1; if (x0 > x1) [x0, x1] = [x1, x0]; z0 = az - Wd / 2; z1 = az + Wd / 2; }
+        else { z0 = az + sgn * c0; z1 = az + sgn * c1; if (z0 > z1) [z0, z1] = [z1, z0]; x0 = ax - Wd / 2; x1 = ax + Wd / 2; }
+        if (!free(x0, z0, x1, z1)) { t += 2; continue; }
+        const ty = stack(x0, z0, x1, z1, h, alongX ? 'x' : 'z') + 0.02;
+        // the two long top edges: grinds
+        for (const e of [-1, 1]) {
+          const pts = alongX ? [[x0 + 0.25, ty, az + e * (Wd / 2 - 0.12)], [x1 - 0.25, ty, az + e * (Wd / 2 - 0.12)]] : [[ax + e * (Wd / 2 - 0.12), ty, z0 + 0.25], [ax + e * (Wd / 2 - 0.12), ty, z1 - 0.25]];
+          K.rail(pts, { hidden: true, voice: 'pipe' });
+        }
+        lastTop = ty;
+        t = c1 + (r() < 0.2 ? 0.05 : 1.6 + r() * 1.6);      // mostly short gaps, now and then flush
+      }
+      // a pad at the turn: two containers side by side, across the corner
+      if (i < P.length - 2) {
+        const h = prof[idx % prof.length], [cx, cz] = P[i + 1];
+        const ok = alongX ? free(cx - Wd - 0.1, cz - L / 2, cx + Wd + 0.1, cz + L / 2) : free(cx - L / 2, cz - Wd - 0.1, cx + L / 2, cz + Wd + 0.1);
+        if (ok) {
+          if (alongX) { for (const o of [-Wd / 2 - 0.02, Wd / 2 + 0.02]) stack(cx + o - Wd / 2, cz - L / 2, cx + o + Wd / 2, cz + L / 2, h, 'z'); }
+          else { for (const o of [-Wd / 2 - 0.02, Wd / 2 + 0.02]) stack(cx - L / 2, cz + o - Wd / 2, cx + L / 2, cz + o + Wd / 2, h, 'x'); }
+        }
+      }
+    }
+    void rails; void lastTop;
+  };
+  // the ramp up onto a trail's first stack
+  const ramp = (x0, z0, x1, z1, axis, yLow, yHigh, up) => K.ramp(x0, z0, x1, z1, axis, up ? yLow : yHigh, up ? yHigh : yLow, '#b8b2a6', false, yLow);
+  // east trail: down the east side, then west along the quay
+  const E = [[616, 286], [616, 446], [556, 446]];
+  { const y = terrainAt(616, 280); ramp(616 - Wd / 2, 272, 616 + Wd / 2, 286, 'z', y, y + Hc, true); }
+  trail(E, [1, 2, 2, 3, 2, 3, 4, 3, 2, 3, 2, 1]);
+  // west trail: a snake across the yard north of the road
+  const Wt = [[300, 282], [446, 282], [446, 314], [306, 314], [306, 346], [404, 346]];
+  { const y = terrainAt(290, 282); ramp(286, 282 - Wd / 2, 300, 282 + Wd / 2, 'x', y, y + Hc, true); }
+  trail(Wt, [1, 2, 3, 2, 3, 4, 4, 3, 2, 1, 2, 3, 2]);
+  // the gantry crane over the east trail: legs either side, the beam a long grind high above
+  { const gx0 = 600, gx1 = 632, gz = 380, top = terrainAt(616, gz) + 15;
+    for (const x of [gx0, gx1]) for (const dz of [-3, 3]) K.box(x - 0.6, terrainAt(x, gz + dz), gz + dz - 0.6, x + 0.6, top, gz + dz + 0.6, '#e8b84a', 'plain', { outlineT: 0.06 });
+    K.box(gx0 - 1.5, top, gz - 3.6, gx1 + 1.5, top + 1.4, gz + 3.6, '#e8b84a', 'plain', { outlineT: 0.08 });
+    K.rail([[gx0 - 1.2, top + 1.45, gz - 3.3], [gx1 + 1.2, top + 1.45, gz - 3.3]], { hidden: true, voice: 'pipe' });
+    K.rail([[gx0 - 1.2, top + 1.45, gz + 3.3], [gx1 + 1.2, top + 1.45, gz + 3.3]], { hidden: true, voice: 'pipe' });
+    K.box(613, top - 3, gz - 2, 619, top, gz + 2, '#3a3550', 'plain', { outlineT: 0.05 });      // the trolley
+    F.box(gx0 - 1.5, top, gz - 3.6, gx1 + 1.5, top + 1.4, gz + 3.6, '#e8b84a', 0.2); }
+  // bollards and pallets about the yard
+  for (let i = 0; i < 26; i++) { const x = U.lerp(300, 630, r()), z = U.lerp(280, 470, r()); if (!H.clearOf(x - 1, z - 1, x + 1, z + 1, 0.5)) continue; const y = terrainAt(x, z); K.box(x - 0.6, y, z - 0.6, x + 0.6, y + 0.15 + 0.15 * Math.floor(r() * 4), z + 0.6, '#a27a4a', 'wood', { outlineT: 0.03 }); }
 }
