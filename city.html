@@ -5974,7 +5974,8 @@ function buildJunctions(K) {
   const R = L.map(r => ({ ...r, A: acc(r.pts), bb: box(r.pts) }));
   const lay = (pts, w, color) => { groundRibbon.noLog = true; groundRibbon(B, pts, w, color, 'road', 0.14, 2); groundRibbon.noLog = false; };
   const done = [];
-  const seen = (x, z) => done.some(([a, b]) => Math.hypot(a - x, b - z) < 3);
+  const inCut = (x, z) => Math.abs(x - VALLEY.x) < VALLEY.rimHalf + 2 && z > VALLEY.z0 && z < VALLEY.z3;     // (streets cross it on bridges)
+  const seen = (x, z) => inCut(x, z) || done.some(([a, b]) => Math.hypot(a - x, b - z) < 3);
   for (let i = 0; i < R.length; i++) for (let j = 0; j < R.length; j++) {
     if (i === j) continue;
     const a = R[i], b = R[j], pad = 20;
@@ -6079,6 +6080,7 @@ function buildCity() {
   buildCanal(K, S, F);
   buildRoads(K, S, F);
   paveDowntown(K.B);
+  groundLayer(K.B, PLAN_REAL.vineyards, '#7d8a4e', 'grass');      // the vineyard: grass and soil, not the valley's sand
   buildMetro(K, M, S, F);
   buildStations(K, M, S, F);
   lap('canal, roads, metro');
@@ -6186,6 +6188,19 @@ function buildCanal(K, S, F) {
 
 // ---------- the big roads (district streets are laid by each district) ----------
 // (their lines are in PLAN.roads)
+// a ground layer over a polygon (draped, just above the terrain): the vineyard's grass and soil
+function groundLayer(B, poly, color, kind, st = 6, lift = 0.04) {
+  const inPoly = (x, z) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of poly) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+  const pos = [], uv = [], P = (x, z) => [x, terrainAt(x, z) + lift, z];
+  for (let z = z0; z < z1; z += st) for (let x = x0; x < x1; x += st) {
+    if (!inPoly(x + st / 2, z + st / 2)) continue;
+    const a = P(x, z), b = P(x + st, z), c = P(x, z + st), d = P(x + st, z + st);
+    pos.push(...a, ...c, ...b, ...b, ...c, ...d); for (const q of [a, c, b, b, c, d]) uv.push(q[0] / 6, q[2] / 6);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+  B.add(g, null, color, kind, { outlineT: 0, edges: false });
+}
 // downtown's open ground: paving, not bare earth (the streets are drawn over it; the sunken street and the
 // building site keep their own ground)
 function paveDowntown(B) {

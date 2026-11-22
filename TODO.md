@@ -88,18 +88,16 @@ Fixed:
 - The skatepark had never been built (the viaduct crossed its spot): now in the north-east corner above the old
   town, with a path from the ring street.
 - Street bridges over the canal now follow the street and span the quays (the promenade's bridge stood askew).
-- Vineyards: hedge rows on posts (they were flat green lenses).
+- Vineyards: hedge rows on posts (they were flat green lenses), on grass instead of the valley's sand.
+- No junction plates down in the sunken street (its cross streets pass over on bridges).
 - Debug views now use the terrain detail of their own camera (coarse far tiles hid roads in the pictures).
 Still to fix:
 - Docks: the container yard's rows are laid out for the old map and only a broken, scattered part of them is
   left after trimming: lay a new yard in real coordinates (rows along the quay, lanes between).
-- The vineyard's ground is pale sand (the old valley's paint): it should be grass and soil.
 - Outskirts: some houses are blank brick cubes (no windows) — use the old-house fronts.
 - The old town station's entrance canopy stands right against the town wall.
 - Grass shows through the quay paving in a few spots along the canal (small triangles of terrain above the apron).
 - Water tower plaza: the two dark planter blocks look like bunkers.
-- Faint darker bands across the sunken street: junction plates where downtown streets cross on bridges above
-  (skip junctions inside the cut).
 - Canal station and forest station: plain lawns under the viaduct; no forecourt.
 
 ### Checks (tools/geom.py, after the fixes below)
