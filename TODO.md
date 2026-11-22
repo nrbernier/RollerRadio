@@ -154,6 +154,14 @@ Still to fix:
   the move-as-a-block code: a second wheel stood by downtown. Fixed; instanced meshes now stay at the origin.
 - Turning circles were drawn where a street ends at a place (station, terrace, lido). Fixed.
 
+## Strict review pass (22 Nov 2026) — where it stopped
+Found and fixed: every pitched roof in the city was drawn inside out and turned 90° (flat tops and crossways ridge caps seen from above); old-town shop awnings, flat roofs inside the wall, houses across the wall or crowding the gates, white tubes (now ropes and wooden rails), seams up the wall, stray eave boards on house fronts, a fountain with no water, the empty docks yard (stacking bays added).
+- [ ] **Old Town station entrances (not yet checked by eye):** the cobble lid stood ~1 m above the street on the slope. Now the lid and fill follow the street's slope, the opening runs back as far as the stairs lack headroom, and the town rails are dark. Shoot the 3 views (street, other side, from above) before calling it done. Camera spots: (206,-465)→(206,-445), (215,-440)→(206,-452), (272,-410)→(272,-430).
+- [ ] Green and white slivers of ground poking through the cobbles around the Old Town station (seen from above).
+- [ ] Docks containers read a bit like toy blocks (checker colours on the end faces): consider doors on the ends, fewer white boxes.
+- [ ] Not yet reviewed in this pass: tower deck and ramp, market hall.
+- [ ] Wide empty lawn south of the old town between the roads (about x 100–160, z −250).
+
 ## Compact city: still to place
 - Docks and lakeshore along the new shore (they still follow the old one; the lakeshore's pier things sit in
   the water)
