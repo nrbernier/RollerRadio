@@ -94,7 +94,9 @@ lawn: built first now); brick boxes on the rail siding (now goods wagons); dark 
 Still to fix:
 - The bridge at the canal mouth (promenade): abutments now stand at the canal walls; still, just south of it a few
   terrain triangles (~1 m up) poke into the water and the east quay paving overlaps the water in jags: the canal's
-  terrain cut misses a cell or two where it bends towards the mouth.
+  terrain cut misses a cell or two where it bends towards the mouth. Checked (22 Nov): every cell over the water
+  IS a hole and the quay paving no longer folds over the water on tight bends; the wedge (Toon, y≈1.2, sloped) is
+  most likely a coarse terrain tile that skips the holes — look at the tile LOD's hole test (it samples every st cells).
 - Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
   loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
@@ -146,7 +148,8 @@ Still to fix:
 - Turning circles at road ends look a bit blobby (make them true circles)
 - Physics/camera bot (`tools/bot.py 12 2`) run on the compact map (22 Nov): 16 runs, 3,839 frames, no errors.
   First run: 8 bonks, 6 stuck, 1 below ground (positions not kept); second run: 7 bonks (walls, mostly by the
-  viaduct's piers at the canal quarter), nothing stuck. Run it longer (60 s, 4 seeds) to catch the stuck/below cases.
+  viaduct's piers at the canal quarter), nothing stuck. Longer run (28 s, 2 seeds): 27 "stuck", 20 of them on the canal's north quay at (-355..-328, 290) —
+  open paving there, the bot pushes against the canal's edge; the rest on the old town's west slope (steep). 1 below.
 
 ## Old town & market: life at roof level
 - Ways up to the roofs, and pathways at roof level to grind along and rest on

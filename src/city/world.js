@@ -259,6 +259,8 @@ function buildCanal(K, S, F) {
       if (!dry(i + 1)) continue;
       const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? (y1 === null ? Math.max(y0, terrainAt(x, z) + 0.08) : y0) : y1), z]; };      // (an apron never dips under the ground)
       const a = q(i, o0), b = q(i, o1), c = q(i + 1, o0), d = q(i + 1, o1);
+      // (on a tight bend the inner offset folds back over the water: drop those pieces)
+      { const lim = Math.min(Math.abs(o0), Math.abs(o1)) - 0.6; if (lim > 0 && [a, b, c, d].some(p => pathDist(PLAN.canal.path, p[0], p[2], 40).d < lim)) continue; }
       // faces up whichever side we're on
       if (sd > 0) pos.push(...a, ...c, ...b, ...b, ...c, ...d); else pos.push(...a, ...b, ...c, ...b, ...d, ...c);
       if (mesh) for (const p of [a, c, b, b, c, d]) uv.push(p[0] / 10, p[2] / 10);
