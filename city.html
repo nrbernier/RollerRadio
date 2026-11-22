@@ -9739,29 +9739,52 @@ function buildSite(H) {
 // ---------- the tower ----------
 function buildTower(H) {
   const { K, W, B, S, F } = H, put = H.put, cx = TOWER.x, cz = TOWER.z, y = TOWER.y, R = TOWER.block;
-  const deckY = Math.max((W.bizTop || 0) + 45, y + 200), glassC = '#8fb7cc', red = '#e4572e';
+  const deckY = y + 80, glassC = '#8fb7cc', red = '#e4572e';
   TOWER.deckY = deckY;
   // the plaza it stands in: paving, trees in planters, benches
-  H.patch(R, '#d8cfbf', 'tiles', 0.075);
-  for (const [px, pz] of [[R[0] + 10, R[1] + 10], [R[2] - 10, R[1] + 10], [R[0] + 10, R[3] - 10], [R[2] - 10, R[3] - 10], [R[0] + 10, cz], [R[2] - 10, cz]]) H.planter(px, pz, 3.4, 3.4, { h: 0.55, tree: pick(U.rng(px | 0), ['#5aa35a', '#6fb25e', '#4a8f4a']) });
-  for (const [bx, bz, ax] of [[cx - 18, R[3] - 8, true], [cx + 18, R[3] - 8, true], [R[0] + 8, cz - 22, false], [R[2] - 8, cz + 22, false]]) H.bench(bx, bz, ax, { color: '#5a4a3a' });
-  // the shaft: three tiers of glass, a red fin up each corner
-  const tiers = [[15, 0.46], [12, 0.8], [9.5, 1]]; let y0 = y - 2;
-  for (const [hw, f] of tiers) {
-    const y1 = y + (deckY - 1.2 - y) * f;
-    K.box(cx - hw, y0, cz - hw, cx + hw, y1, cz + hw, glassC, 'tower', { roofColor: '#c9c2b4', outlineT: 0.18 });
-    B.box(cx - hw - 0.25, y1 - 0.8, cz - hw - 0.25, cx + hw + 0.25, y1 - 0.1, cz + hw + 0.25, '#2a2838', 'plain', { outlineT: 0, edges: false });
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put(H.SH.BOX, cx + a * hw, (y0 + y1) / 2, cz + b * hw, 1.1, y1 - y0, 1.1, red, 'plain', 0.03);
-    F.box(cx - hw, y0, cz - hw, cx + hw, y1, cz + hw, glassC, 0.2);
-    y0 = y1;
+  H.patch(R, '#b4ab9c', 'tiles', 0.075);
+  for (const [px, pz] of [[R[0] + 10, R[1] + 10], [R[2] - 10, R[1] + 10], [R[0] + 10, R[3] - 10], [R[2] - 10, R[3] - 10]]) H.planter(px, pz, 3.4, 3.4, { h: 0.55, tree: pick(U.rng(px | 0), ['#5aa35a', '#6fb25e', '#4a8f4a']) });
+  for (const [bx, bz, ax] of [[cx - 26, R[3] - 8, true], [cx + 26, R[3] - 8, true], [R[0] + 8, cz - 26, false], [R[2] - 8, cz + 26, false]]) H.bench(bx, bz, ax, { color: '#5a4a3a' });
+  // the shaft: a twisting stack of glass storeys, each turned a little further, a white floor plate between them
+  const hw = 10, storey = 4.6, N = Math.ceil((deckY - 1.2 - y) / storey), twist = Math.PI / 2 / N * 1.5;
+  for (let k = 0; k < N; k++) {
+    const y0 = y - 0.5 + k * storey, y1 = Math.min(deckY - 1.2, y0 + storey), a = k * twist;
+    const m = new THREE.Matrix4().makeRotationY(a).setPosition(cx, (y0 + y1) / 2, cz);
+    B.add(new THREE.BoxGeometry(hw * 2, y1 - y0, hw * 2), m, glassC, 'tower', { outlineT: 0.12, edges: false });
+    const mp = new THREE.Matrix4().makeRotationY(a + twist / 2).setPosition(cx, y1 - 0.2, cz);
+    B.add(new THREE.BoxGeometry(hw * 2 + 1.6, 0.45, hw * 2 + 1.6), mp, '#f2efe6', 'plain', { outlineT: 0.04, edges: false });
   }
-  // the sky deck: an open platform wider than the shaft, a rail all round it (one long square grind)
-  const dh = 21;
-  K.box(cx - dh, deckY - 1.2, cz - dh, cx + dh, deckY, cz + dh, '#cfc8bb', 'paving', { outlineT: 0.1 });
-  B.box(cx - dh - 0.3, deckY - 1.6, cz - dh - 0.3, cx + dh + 0.3, deckY - 1.2, cz + dh + 0.3, red, 'plain', { outlineT: 0.04, edges: false });
-  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.rod(V3(cx + a * 9.5, deckY - 9, cz + b * 9.5), V3(cx + a * (dh - 1), deckY - 1.4, cz + b * (dh - 1)), 0.3, '#2a2838', 0.04);
-  K.rail([[cx - dh + 0.4, deckY + 1.05, cz - dh + 0.4], [cx + dh - 0.4, deckY + 1.05, cz - dh + 0.4], [cx + dh - 0.4, deckY + 1.05, cz + dh - 0.4], [cx - dh + 0.4, deckY + 1.05, cz + dh - 0.4]], { loop: true, color: '#e9e4f5', postColor: '#6a6458', postMax: 1.3, round: 1.5, radius: 0.07 });
-  F.box(cx - dh, deckY - 1.6, cz - dh, cx + dh, deckY, cz + dh, '#cfc8bb', 0);
+  W.boxes.push({ x0: cx - hw * 0.75, y0: y - 1, z0: cz - hw * 0.75, x1: cx + hw * 0.75, y1: deckY - 1.2, z1: cz + hw * 0.75, tag: 'tower' });
+  F.box(cx - hw, y - 1, cz - hw, cx + hw, deckY, cz + hw, glassC, 0.2);
+  // the sky deck: a round platform as wide as the gallery below it, its edge a rail all round
+  const dh = 18;
+  K.cyl(cx, deckY - 1.2, cz, dh, 1.2, '#cfc8bb', { seg: 32, outline: 0.1, kind: 'paving' });
+  W.boxes.push({ x0: cx - dh * 0.92, y0: deckY - 1.2, z0: cz - dh * 0.92, x1: cx + dh * 0.92, y1: deckY, z1: cz + dh * 0.92, tag: 'deck' });
+  K.cyl(cx, deckY - 1.6, cz, dh + 0.3, 0.4, red, { seg: 32, outline: 0.04 });
+  { const ring = []; for (let k = 27; k < 27 + 31; k++) { const a = k / 32 * Math.PI * 2; ring.push([cx + Math.cos(a) * (dh - 0.4), deckY + 1.05, cz + Math.sin(a) * (dh - 0.4)]); }
+    K.rail(ring, { color: '#e9e4f5', postColor: '#6a6458', round: 2 }); }
+  F.add(new THREE.CylinderGeometry(dh, dh, 1.6, 12), new THREE.Matrix4().makeTranslation(cx, deckY - 0.8, cz), '#cfc8bb');
+  // the gallery: a ramp winding round the tower from the deck's east edge down to the plaza, a parapet along its
+  // outer edge whose top is one long grind (nothing above it: easy to land on), brackets back to the shaft
+  { const r0 = hw * 1.45, r1 = dh, rm = (r0 + r1) / 2, segs = 28, y1g = deckY, y0g = terrainAt(cx, cz - rm) + 0.1;
+    const turns = Math.round((y1g - y0g) / 13), n = turns * segs, aEnd = -Math.PI / 2, aStart = aEnd - turns * Math.PI * 2;
+    const at = (k) => { const t = k / n, a = aStart + (aEnd - aStart) * t; return { a, y: U.lerp(y1g, y0g, t) }; };
+    const edge = [];
+    for (let k = 0; k < n; k++) {
+      const p = at(k), q = at(k + 1), ax = cx + Math.cos(p.a) * rm, az = cz + Math.sin(p.a) * rm, bx = cx + Math.cos(q.a) * rm, bz = cz + Math.sin(q.a) * rm;
+      const L = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(bz - az, bx - ax), pitch = Math.atan2(q.y - p.y, L);
+      S.add(ax, p.y, az, bx, q.y, bz, (r1 - r0) / 2);
+      const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, -yaw, pitch, 'YXZ')).setPosition((ax + bx) / 2, (p.y + q.y) / 2 - 0.25, (az + bz) / 2);
+      B.add(new THREE.BoxGeometry(L + 0.1, 0.5, r1 - r0), m, '#e8e2d6', 'paving', { outlineT: 0.04, edges: false });
+      const ox = Math.cos((p.a + q.a) / 2) * (r1 - 0.15), oz = Math.sin((p.a + q.a) / 2) * (r1 - 0.15);
+      const mp = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, -yaw, pitch, 'YXZ')).setPosition(cx + ox, (p.y + q.y) / 2 + 0.45, cz + oz);
+      B.add(new THREE.BoxGeometry(L + 0.1, 0.9, 0.3), mp, k % 2 ? '#f2efe6' : '#ebe6db', 'plain', { outlineT: 0.03, edges: false });
+      edge.push([cx + Math.cos(p.a) * (r1 - 0.15), p.y + 0.95, cz + Math.sin(p.a) * (r1 - 0.15)]);
+      if (k % 7 === 0 && p.y > y0g + 4) K.rod(V3(cx + Math.cos(p.a) * hw * 0.95, p.y - 2.2, cz + Math.sin(p.a) * hw * 0.95), V3(cx + Math.cos(p.a) * rm, p.y - 0.4, cz + Math.sin(p.a) * rm), 0.18, red, 0.03);
+    }
+    const e = at(n); edge.push([cx + Math.cos(e.a) * (r1 - 0.15), e.y + 0.95, cz + Math.sin(e.a) * (r1 - 0.15)]);
+    K.rail(edge, { hidden: true, voice: 'pipe', minSpeed: 8 });
+    TOWER.gallery = { r0, r1, turns }; }
   // on the deck: the lift's pavilion, benches at the edge, telescopes, the mast with its red light
   const px0 = cx - 3.5, pz0 = cz - 4, px1 = cx + 3.5, pz1 = cz + 3;
   K.box(px0, deckY, pz0, px1, deckY + 3.6, pz1, '#f6f1e7', 'plain', { outlineT: 0.08 });
@@ -9783,25 +9806,14 @@ function buildTower(H) {
     H.sign(label, dx, dy + 4.3, dz + 0.2, 0, 4.6, 0.9, '#1b1a24', '#ffe9b0', { oneSide: true });
     W.lamps.push([dx, dy + 3.4, dz + 1]); H.pool(dx, dz + 2.5, 5, '#ffc870', dy);
   };
-  const gz = cz + 15, gy = terrainAt(cx, gz + 2);
+  const gz = cz + hw + 0.2, gy = terrainAt(cx, gz + 2);
   door(cx, gz, gy, 'LIFT · SKY DECK'); door(cx, pz1, deckY, 'LIFT · STREET');
   K.box(cx - 3, gy + 3.3, gz, cx + 3, gy + 3.5, gz + 3.4, '#2a2838', 'plain', { outlineT: 0.04, nocam: true });
   H.patch([cx - 2, gz, cx + 2, gz + 9], red, 'paint', 0.11);
-  wallSign(H, 'THE NEEDLE', faceFrame('s', cx - 15, cz - 15, cx + 15, cz + 15), 0, gy + 7.4, 10, 1.8, red, '#fff6e0');
+  wallSign(H, 'THE TWIST', faceFrame('s', cx - hw, cz - hw, cx + hw, cz + hw), 0, gy + 5.6, 9, 1.6, red, '#fff6e0');
   W.lifts = [{ ax: cx, ay: gy, az: gz + 1.6, bx: cx, by: deckY, bz: pz1 + 1.6, r: 1.5 }];
-  // the way down: a red pipe winding five times round the tower, from the deck's east edge to the plaza
-  const turns = 5, hr = dh + 3.2;
-  const helix = pHelix(cx, cz, hr, 0, turns, deckY + 0.2, terrainAt(cx + hr, cz) + 1.1);
-  helix.unshift([cx + dh - 1, deckY + 0.5, cz - 6], [cx + dh + 1.6, deckY + 0.35, cz - 3]);
-  const last = helix[helix.length - 1]; helix.push([last[0] - 0.5, last[1] - 0.1, last[2] + 5], [last[0] - 1, terrainAt(last[0] - 1, last[2] + 11) + 0.9, last[2] + 11]);   // (it lands on the east side, clear of the lift door)
-  K.rail(helix, { kind: 'pipe', color: red, radius: 0.2, round: 0, stubs: false, collar: '#2a2838', minSpeed: 9, endBoost: 1 });
-  // struts from the shaft out to the pipe, four a turn
-  for (let k = 1; k < turns * 4; k++) {
-    const a = k * Math.PI / 2, t = k / (turns * 4), hy = U.lerp(deckY + 0.2, terrainAt(cx + hr, cz) + 1.1, t) - 0.15, f = (hy - y) / (deckY - 1.2 - y), hw = f < 0.46 ? 15 : f < 0.8 ? 12 : 9.5;
-    K.rod(V3(cx + Math.cos(a) * hw, hy + 1.2, cz + Math.sin(a) * hw), V3(cx + Math.cos(a) * hr, hy, cz + Math.sin(a) * hr), 0.1, '#2a2838', 0.02);
-  }
   // and for the brave: a cable from the deck's south rail all the way down to Central's plaza
-  { const cs = PLAN.stations.find(s => s.key === 'central').at, a = [cx - 8, deckY + 1.4, cz + dh - 0.2];
+  { const cs = PLAN.stations.find(s => s.key === 'central').at, a = [cx - 6, deckY + 1.4, cz + dh - 0.6];
     for (const [tx, tz] of [[cs[0] + 6, cs[1] - 46], [cs[0] + 30, cs[1] - 40], [cs[0] - 22, cs[1] - 44]]) {
       const b = [tx, terrainAt(tx, tz) + 5.5, tz], L = Math.hypot(b[0] - a[0], b[2] - a[2]);
       let clear = true;
