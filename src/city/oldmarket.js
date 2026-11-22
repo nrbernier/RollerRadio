@@ -389,18 +389,19 @@ function buildMarket(H) {
   shadeSteps(H, { f: 'n', cx: hx1 - 30, cz: hz0 - 1, nx: 0, nz: -1, L: 9 }, hy, r, ['#3e8f86', '#f6f1e7']);
   // stalls: a counter of goods under an awning on four poles (taut canvas: land on one and it throws you up)
   const GOODS = { fruit: ['#e85a3a', '#f2b23a', '#7ac04a', '#c83a6a', '#f2e04a', '#ff8a3a'], spice: ['#c8501e', '#e8a020', '#8a3a1e', '#d8c040', '#a82a1e'], flower: H.FLOWERS, cloth: ['#c4302b', '#2f6f9d', '#f2c14e', '#7a3a9e', '#3e8f56', '#f6f1e7', '#d9408a'] };
-  const stall = (x, z, col, kind = 'fruit', ah = 2.75) => {
-    const y = terrainAt(x, z), w = 3.6, d = 1.6, x0 = x - w / 2, z0 = z - d / 2, x1 = x + w / 2, z1 = z + d / 2, G = GOODS[kind];
+  const stall = (x, z, col, kind = 'fruit', ah = 2.75, rot = false) => {
+    const y = terrainAt(x, z), w = rot ? 1.6 : 3.6, d = rot ? 3.6 : 1.6, x0 = x - w / 2, z0 = z - d / 2, x1 = x + w / 2, z1 = z + d / 2, G = GOODS[kind];
     K.box(x0, y - 0.5, z0, x1, y + 0.9, z1, '#8a6a4a', 'wood', { outlineT: 0.04 });
     for (let k = 0; k < 4; k++) {
-      const gx = U.lerp(x0 + 0.5, x1 - 0.5, (k + 0.5) / 4), c = pick(r, G);
-      if (kind === 'cloth') put(H.SH.BOX, gx, y + 1.05, z, 0.7, 0.3, 1.2, c, 'plain', 0.02);
-      else if (kind === 'spice') { put(H.SH.CYL, gx, y + 0.98, z, 0.34, 0.16, 0.34, '#d8cfbf', 'plain', 0.02); put(H.SH.CONE, gx, y + 1.26, z, 0.3, 0.42, 0.3, c, 'plain', 0); }
-      else put(H.SH.ICO, gx, y + 1.08, z, 0.4, kind === 'flower' ? 0.42 : 0.28, 0.4, c, 'flat', 0);
+      const t = (k + 0.5) / 4, gx = rot ? x : U.lerp(x0 + 0.5, x1 - 0.5, t), gz = rot ? U.lerp(z0 + 0.5, z1 - 0.5, t) : z, c = pick(r, G);
+      if (kind === 'cloth') put(H.SH.BOX, gx, y + 1.05, gz, rot ? 1.2 : 0.7, 0.3, rot ? 0.7 : 1.2, c, 'plain', 0.02);
+      else if (kind === 'spice') { put(H.SH.CYL, gx, y + 0.98, gz, 0.34, 0.16, 0.34, '#d8cfbf', 'plain', 0.02); put(H.SH.CONE, gx, y + 1.26, gz, 0.3, 0.42, 0.3, c, 'plain', 0); }
+      else put(H.SH.ICO, gx, y + 1.08, gz, 0.4, kind === 'flower' ? 0.42 : 0.28, 0.4, c, 'flat', 0);
     }
     for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) put(H.SH.CYL, px, y + ah / 2, pz, 0.06, ah, 0.06, '#4a3a2a', 'plain', 0);
-    B.add(new THREE.BoxGeometry(w + 0.6, 0.08, d + 1.4), new THREE.Matrix4().makeRotationX(0.18).setPosition(x, y + ah + 0.15, z), col, 'plain', { outlineT: 0.04, edges: false });
-    W.boxes.push({ x0: x - w / 2, y0: y + ah - 0.25, z0: z - (d + 1.4) / 2, x1: x + w / 2, y1: y + ah + 0.2, z1: z + (d + 1.4) / 2, tag: 'bounce', nocam: true });
+    const aw = rot ? w + 1.4 : w + 0.6, ad = rot ? d + 0.6 : d + 1.4;
+    B.add(new THREE.BoxGeometry(aw, 0.08, ad), (rot ? new THREE.Matrix4().makeRotationZ(-0.18) : new THREE.Matrix4().makeRotationX(0.18)).setPosition(x, y + ah + 0.15, z), col, 'plain', { outlineT: 0.04, edges: false });
+    W.boxes.push({ x0: x - aw / 2, y0: y + ah - 0.25, z0: z - ad / 2, x1: x + aw / 2, y1: y + ah + 0.2, z1: z + ad / 2, tag: 'bounce', nocam: true });
     F.box(x0, y, z0, x1, y + ah, z1, col);
     H.sound(x, y + 1, z, 2.2, 'crate');
     return y;
@@ -416,14 +417,135 @@ function buildMarket(H) {
   H.patch(GM, '#dcc59c', 'tiles', 0.065);
   const rows = [[-120, 'cloth'], [-108, 'cloth'], [-96, 'spice'], [4, 'fruit'], [16, 'fruit'], [28, 'flower'], [40, 'flower']].map(([z, k]) => [z, k, GM[0] + 6, GM[2] - 4]);
   for (const z of [-70, -58, -46, -34, -22]) rows.push([z, 'spice', GM[0] + 6, hx0 - 8], [z, 'cloth', hx1 + 10, GM[2] - 4]);
+  // ---- things to ride, one kind per trade ----
+  // SPICE: heaps of paprika, turmeric, saffron, sumac in shallow trays: soft cones to ride up like kickers
+  const heap = (x, z, rad, ht) => {
+    if (!H.clearOf(x - rad - 0.6, z - rad - 0.6, x + rad + 0.6, z + rad + 0.6, 0.2)) return false;
+    const y = terrainAt(x, z), c = pick(r, ['#c8462a', '#e8b02a', '#e07a1a', '#8a2a3a', '#b8a03a']);
+    K.cyl(x, y - 0.1, z, rad + 0.5, 0.35, '#8a6a4a', { seg: 16, outline: 0.04, kind: 'wood' });
+    B.add(new THREE.ConeGeometry(rad, ht, 14), new THREE.Matrix4().makeTranslation(x, y + 0.25 + ht / 2, z), c, 'flat', { outlineT: 0.05, edges: false });
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; S.add(x + Math.cos(a) * (rad + 0.4), y + 0.2, z + Math.sin(a) * (rad + 0.4), x + Math.cos(a) * 0.3, y + 0.25 + ht - 0.15, z + Math.sin(a) * 0.3, 0.9); }
+    H.reserve([x - rad - 0.6, z - rad - 0.6, x + rad + 0.6, z + rad + 0.6]);
+    return true;
+  };
+  // BARRELS: wine and oil barrels on their sides in long lines (each line one grind along its top), and pyramids
+  const barrels = (x0, z, n) => {
+    const L = 1.5, R = 0.62, x1 = x0 + n * (L + 0.05);
+    if (!H.clearOf(x0 - 0.5, z - 1, x1 + 0.5, z + 1, 0.3)) return false;
+    const y = terrainAt((x0 + x1) / 2, z);
+    for (let k = 0; k < n; k++) {
+      const cx = x0 + k * (L + 0.05) + L / 2, c = pick(r, ['#7a4a2a', '#6a3a22', '#8a5a32']);
+      B.add(new THREE.CylinderGeometry(R, R, L, 12), new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(cx, y + R, z), c, 'wood', { outlineT: 0.04, edges: false });
+      for (const o of [-0.5, 0.5]) B.add(new THREE.CylinderGeometry(R + 0.03, R + 0.03, 0.1, 12), new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(cx + o, y + R, z), '#3a3530', 'plain', { outlineT: 0, edges: false });
+    }
+    W.boxes.push({ x0, y0: y, z0: z - R * 0.8, x1, y1: y + R * 1.7, z1: z + R * 0.8, tag: 'barrel' });
+    K.rail([[x0 + 0.2, y + R * 2 + 0.02, z], [x1 - 0.2, y + R * 2 + 0.02, z]], { hidden: true, voice: 'wood' });
+    H.reserve([x0 - 0.5, z - 1, x1 + 0.5, z + 1]);
+    return true;
+  };
+  const barrelPyramid = (x, z) => {
+    if (!H.clearOf(x - 3, z - 2, x + 3, z + 2, 0.3)) return;
+    const y = terrainAt(x, z), R = 0.62;
+    for (let row = 0; row < 3; row++) for (let k = 0; k < 3 - row; k++) {
+      const cx = x - (2 - row) * R * 1.05 + k * R * 2.1, cy = y + R + row * R * 1.75;
+      B.add(new THREE.CylinderGeometry(R, R, 2.6, 12), new THREE.Matrix4().makeRotationX(Math.PI / 2).setPosition(cx, cy, z), pick(r, ['#7a4a2a', '#6a3a22', '#8a5a32']), 'wood', { outlineT: 0.04, edges: false });
+      W.boxes.push({ x0: cx - R * 0.85, y0: cy - R, z0: z - 1.3, x1: cx + R * 0.85, y1: cy + R * 0.95, z1: z + 1.3, tag: 'barrel' });
+    }
+    H.reserve([x - 3, z - 2, x + 3, z + 2]);
+  };
+  // COUNTERS: fish and cheese on long marble counters, low ledges to grind down the aisle (both top edges)
+  const counter = (x0, z, len, kind) => {
+    const x1 = x0 + len; if (!H.clearOf(x0 - 0.5, z - 1, x1 + 0.5, z + 1, 0.3)) return false;
+    const y = Math.max(terrainAt(x0, z), terrainAt(x1, z));
+    K.box(x0, y - 0.4, z - 0.8, x1, y + 0.85, z + 0.8, '#e9e6df', 'plain', { outlineT: 0.05 });
+    B.box(x0 + 0.3, y + 0.85, z - 0.6, x1 - 0.3, y + 0.92, z + 0.6, kind === 'fish' ? '#cfe8ef' : '#e8d9b0', 'plain', { outlineT: 0, edges: false });
+    for (let x = x0 + 0.8; x < x1 - 0.6; x += 0.9) put(H.SH.BOX, x, y + 1.0, z + (r() - 0.5) * 0.6, kind === 'fish' ? 0.7 : 0.5, 0.14, kind === 'fish' ? 0.22 : 0.5, kind === 'fish' ? pick(r, ['#8aa0b0', '#c0c8d0', '#d0806a']) : pick(r, ['#f2d06a', '#e8b84a', '#f4e4b0']), 'plain', 0.02);
+    for (const e of [-0.75, 0.75]) K.rail([[x0 + 0.2, y + 0.87, z + e], [x1 - 0.2, y + 0.87, z + e]], { hidden: true, voice: 'pipe' });
+    H.reserve([x0 - 0.5, z - 1, x1 + 0.5, z + 1]);
+    return true;
+  };
+  // spice heaps along the spice row and the spice side rows; barrels down the fruit rows; counters on the cloth side
+  for (let x = GM[0] + 10; x < GM[2] - 8; x += 11 + r() * 8) heap(x, -90 + (r() - 0.5) * 2, 2.2 + r() * 1.2, 1.2 + r() * 0.9);
+  for (const z of [-64, -40]) for (let x = GM[0] + 12; x < hx0 - 10; x += 14 + r() * 6) heap(x, z, 1.8 + r(), 1.0 + r() * 0.7);
+  for (const z of [10, 22, 34]) for (let x = GM[0] + 14; x < GM[2] - 16; x += 26 + r() * 16) { if (barrels(x, z, 4 + Math.floor(r() * 5)) && r() < 0.4) barrelPyramid(x - 4, z); }
+  for (const z of [-58, -34]) for (let x = hx1 + 12; x < GM[2] - 14; x += 20 + r() * 8) counter(x, z, 8 + r() * 5, r() < 0.5 ? 'fish' : 'cheese');
+  // BUNTING: strings of little flags zig-zagging low over the aisles, from pole to pole (each string a grind)
+  for (const za of [-102, -2, 46]) {
+    let prev = null;
+    for (let x = GM[0] + 8, k = 0; x < GM[2] - 6; x += 9 + r() * 3, k++) {
+      const z = za + (k % 2 ? 2.6 : -2.6), gy = terrainAt(x, z);
+      if (!H.clearOf(x - 0.3, z - 0.3, x + 0.3, z + 0.3, 0)) { prev = null; continue; }
+      K.cyl(x, gy, z, 0.09, 3.6, '#4a3a2a', { outline: 0.02, seg: 5 }); H.block(x, z, 0.4);
+      const p = [x, gy + 3.5, z];
+      if (prev) {
+        K.rail([prev, p], { kind: 'cable', color: '#3a3550', sag: 0.12, posts: false });
+        for (let t = 0.1; t < 0.95; t += 0.12) { const fx = U.lerp(prev[0], p[0], t), fz = U.lerp(prev[2], p[2], t), fy = U.lerp(prev[1], p[1], t) - 0.5 * Math.sin(t * Math.PI) * 0.6 - 0.25;
+          B.add(new THREE.ConeGeometry(0.22, 0.42, 3), new THREE.Matrix4().makeRotationZ(Math.PI).setPosition(fx, fy, fz), pick(r, ['#e4572e', '#f2c14e', '#2f8f9d', '#ffffff', '#8a5a9e']), 'plain', { outlineT: 0, edges: false }); }
+      }
+      prev = p;
+    }
+  }
+  // the LOADING YARD behind the hall: a sloped bay up to a dock, roll-up doors, a parked market truck, crates
+  { const cands = [[hx1 + 14, hz0 - 34], [hx0 - 44, hz0 - 34], [hx1 + 14, hz1 + 4], [hx0 - 44, hz1 + 4]];
+    for (let yz = GM[3] - 24; yz > GM[1]; yz -= 6) for (let yx = GM[2] - 32; yx > GM[0] + 10; yx -= 6) cands.push([yx, yz]);
+    for (const [yx, yz] of cands) {
+      if (!H.clearOf(yx, yz, yx + 30, yz + 22, 0.5)) continue;
+      const y = terrainAt(yx + 15, yz + 11), dk = y + 1.3;
+      K.box(yx, y - 0.5, yz, yx + 30, y + 6, yz + 3, '#b8a888', 'brick', { outlineT: 0.1 });                              // the warehouse wall
+      for (const dx of [3, 12, 21]) { B.box(yx + dx, dk, yz + 3, yx + dx + 6, dk + 3.6, yz + 3.08, '#8a9098', 'plain', { outlineT: 0.02, edges: false }); for (let k = 0; k < 9; k++) B.box(yx + dx, dk + k * 0.4, yz + 3.08, yx + dx + 6, dk + k * 0.4 + 0.05, yz + 3.12, '#5a606a', 'plain', { outlineT: 0, edges: false }); B.box(yx + dx - 0.3, dk + 3.6, yz + 3, yx + dx + 6.3, dk + 3.9, yz + 3.4, '#f2c14e', 'plain', { outlineT: 0.02, edges: false }); }
+      K.box(yx, y - 0.5, yz + 3, yx + 30, dk, yz + 9, '#9a9488', 'paving', { outlineT: 0.06 });                            // the dock
+      K.rail([[yx + 0.3, dk + 0.02, yz + 8.85], [yx + 29.7, dk + 0.02, yz + 8.85]], { hidden: true, voice: 'pipe' });      // its edge: a grind
+      for (let x = yx + 2; x < yx + 29; x += 3.5) B.box(x, dk - 0.9, yz + 9, x + 0.5, dk - 0.1, yz + 9.25, '#2a2838', 'plain', { outlineT: 0, edges: false });     // rubber bumpers
+      K.ramp(yx - 10, yz + 3, yx, yz + 9, 'x', y, dk, '#b8b2a6', false, y);                                               // the sloped bay up to it
+      // the truck, backed up to the dock: a cargo box to ride onto and wallride along, a cab in front
+      const tx = yx + 18, tz = yz + 9.3;
+      K.box(tx - 1.3, y + 0.9, tz, tx + 1.3, y + 4.3, tz + 7.5, '#f2efe6', 'plain', { outlineT: 0.08 });
+      K.box(tx - 1.25, y + 0.6, tz + 7.6, tx + 1.25, y + 3.1, tz + 10, '#c4523a', 'plain', { outlineT: 0.08 });
+      B.box(tx - 1.0, y + 2.0, tz + 9.95, tx + 1.0, y + 2.9, tz + 10.05, '#3a4a5a', 'plain', { outlineT: 0, edges: false });
+      for (const [wx, wz] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, 6], [1.3, 6], [-1.3, 8.8], [1.3, 8.8]]) B.add(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 10), new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(tx + wx, y + 0.5, tz + wz), '#2a2838', 'plain', { outlineT: 0.03, edges: false });
+      for (const e of [-1.2, 1.2]) K.rail([[tx + e, y + 4.32, tz + 0.2], [tx + e, y + 4.32, tz + 7.3]], { hidden: true, voice: 'pipe' });
+      for (let i = 0; i < 7; i++) { const cx = yx + 3 + r() * 24, cz = yz + 12 + r() * 8; if (!H.clearOf(cx - 0.7, cz - 0.7, cx + 0.7, cz + 0.7, 0.2)) continue; const n = 1 + Math.floor(r() * 3); for (let k = 0; k < n; k++) K.box(cx - 0.6, y + k * 1.2, cz - 0.6, cx + 0.6, y + (k + 1) * 1.2, cz + 0.6, pick(r, ['#a27a4a', '#b8894f']), 'wood', { outlineT: 0.03 }); H.reserve([cx - 0.7, cz - 0.7, cx + 0.7, cz + 0.7]); }
+      H.reserve([yx - 10, yz, yx + 30, yz + 22]);
+      break;
+    }
+  }
+  // (the rows wave a little, stalls stand at uneven spacing, now and then a few turn across the row, and the
+  //  rows break here and there for a small square: a fountain to grind round, or a pile of crates to climb)
+  const squares = [];
   rows.forEach(([z, kind, xa, xb], ri) => {
-    for (let x = xa, k = 0; x < xb; x += 5.4, k++) {
-      if (crossX.some(c => Math.abs(x - c) < 4.6) || k % 7 === 6) continue;
-      if (!H.clearOf(x - 2.4, z - 1.4, x + 2.4, z + 1.4, 0.4)) continue;
-      const y = stall(x, z, pick(r, SHADES), kind, 2.75 + ((k + ri) % 3) * 0.55); vendors.push([x, z + 1.8, Math.PI, y]);
-      H.reserve([x - 2.4, z - 1.4, x + 2.4, z + 1.4]);
-      // most stalls have a neighbour back to back, facing the next aisle
-      if (r() < 0.7 && H.clearOf(x - 2.4, z - 4.4, x + 2.4, z - 1.6, 0.2)) { const y2 = stall(x, z - 3, pick(r, SHADES), kind, 2.75 + ((k + ri + 1) % 3) * 0.55); vendors.push([x, z - 4.8, 0, y2]); H.reserve([x - 2.4, z - 4.4, x + 2.4, z - 1.6]); }
+    const ph = r() * 6;
+    for (let x = xa + r() * 3, k = 0; x < xb; k++) {
+      const zz = z + Math.sin(x * 0.045 + ph) * 1.6;
+      if (crossX.some(c => Math.abs(x - c) < 4.6)) { x += 5; continue; }
+      if (r() < 0.07 && squares.every(q => Math.hypot(q[0] - x, q[1] - zz) > 40)) { squares.push([x + 7, zz - 1.5]); x += 16; continue; }
+      const rot = r() < 0.16, hw = rot ? 1.2 : 2.4, hd = rot ? 2.4 : 1.4;
+      if (!H.clearOf(x - hw, zz - hd, x + hw, zz + hd, 0.4)) { x += 3; continue; }
+      const y = stall(x, zz, pick(r, SHADES), kind, 2.6 + r() * 1.3, rot); vendors.push([x, zz + 1.8, Math.PI, y]);
+      H.reserve([x - hw, zz - hd, x + hw, zz + hd]);
+      if (!rot && r() < 0.55 && H.clearOf(x - 2.4, zz - 4.4, x + 2.4, zz - 1.6, 0.2)) { const y2 = stall(x + (r() - 0.5) * 1.2, zz - 3, pick(r, SHADES), kind, 2.6 + r() * 1.3); vendors.push([x, zz - 4.8, 0, y2]); H.reserve([x - 2.4, zz - 4.4, x + 2.4, zz - 1.6]); }
+      x += (rot ? 3.4 : 4.8) + (r() < 0.25 ? 2 + r() * 4 : r() * 1.2);
+    }
+  });
+  squares.forEach(([x, z], qi) => {
+    const y = terrainAt(x, z);
+    if (qi % 2 === 0) {
+      // a fountain: a round basin, its rim one ring of a grind, a jet in the middle
+      if (!H.clearOf(x - 5, z - 5, x + 5, z + 5, 0)) return;
+      K.cyl(x, y - 0.2, z, 4, 0.75, '#cfc3ad', { seg: 20, outline: 0.06, kind: 'paving' });
+      B.add(new THREE.CircleGeometry(3.6, 20), new THREE.Matrix4().makeRotationX(-Math.PI / 2).setPosition(x, y + 0.5, z), '#5fb0c8', 'plain', { outlineT: 0, edges: false });
+      K.cyl(x, y + 0.5, z, 0.35, 1.6, '#cfc3ad', { seg: 8, outline: 0.04 }); K.sphere(x, y + 2.3, z, 0.45, '#9fd6e6', { outline: 0.02, seg: 8 });
+      const ring = []; for (let k = 0; k <= 20; k++) { const a = k / 20 * Math.PI * 2; ring.push([x + Math.cos(a) * 3.85, y + 0.58, z + Math.sin(a) * 3.85]); }
+      K.rail(ring, { hidden: true, voice: 'pipe' });
+      H.sound(x, y + 1, z, 3, 'fountain'); H.reserve([x - 5, z - 5, x + 5, z + 5]);
+    } else {
+      // a pile of crates in steps: 1, 2, 3 high, then a jump to the nearest awnings
+      if (!H.clearOf(x - 5, z - 4, x + 5, z + 4, 0)) return;
+      for (let a = 0; a < 3; a++) for (let b = 0; b <= a; b++) {
+        const cx = x - 3.6 + a * 2.4, cz = z - 1.2 + (b % 2) * 0.3;
+        K.box(cx - 1.15, y - 0.2 + b * 1.1, cz - 1.6, cx + 1.15, y + (b + 1) * 1.1, cz + 1.6, pick(r, ['#a27a4a', '#b8894f', '#8a6a3a']), 'wood', { outlineT: 0.04 });
+      }
+      K.rail([[x + 1.4, y + 3.32, z - 2.6], [x + 1.4, y + 3.32, z + 0.2]], { hidden: true, voice: 'wood' });
+      H.reserve([x - 5, z - 4, x + 5, z + 4]);
     }
   });
   // strings of lanterns over the aisles (grinds)

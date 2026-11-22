@@ -92,7 +92,10 @@ Still to fix:
 - Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
   loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
-- Market: denser stalls (back to back) and stone paving done; the hall's surroundings still plain.
+- Market: stalls irregular (waving rows, uneven spacing, some turned across, small squares with fountains and
+  crate piles); things to ride by trade: spice heaps (soft kickers), barrel lines (grinds) and pyramids, marble
+  fish/cheese counters (low ledges), bunting zig-zagging over the aisles (grinds), a loading yard east of the hall
+  (sloped bay, dock edge grind, a truck to ride onto). Not yet ridden in play: check the heaps' slopes and the bunting.
 - Canal quarter: three rows of houses now follow the winding canal; a few white paving scraps remain on the north
   quay west of the stone bridge; the allotment strips north of the canal still lie on old straight lines.
 - Forest: the western strip is wooded now (its trees are smaller than the main forest's); the trails connect the
