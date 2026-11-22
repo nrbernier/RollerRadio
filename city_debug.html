@@ -6522,6 +6522,7 @@ function buildDistricts(K, S, F) {
   buildCable(H); lap('cable car');
   // (the old strip south of the park — ball courts, allotments, paths on the straight canal's lines — is gone)
   buildSkatepark(H);          // (real coordinates)
+  X('carousel', h => carousel(h, 250, 288, U.rng(2029)));      // (before the canal's houses take its lawn)
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
   // (the old canal quarter's fill followed the straight canal: the winding canal's own rows replace it)
   X('lake', buildLakeshore, fillLakeshore);
@@ -6546,7 +6547,6 @@ function buildDistricts(K, S, F) {
   X('obs', buildObservatory, fillObservatory);
   X('site', buildSite); X('tower', buildTower);
   vineyards(H, U.rng(2027));          // (laid out on the real outline: no frame)
-  X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
   fillRoutes(H); lap('routes');
   // the elevated stations: a paved forecourt under each, along the line (they stood on bare lawn)
   for (const st of H.W.stations || []) {
@@ -7346,7 +7346,10 @@ function buildDocks(H) {
   for (let z = 520; z < QZ - 60; z += 17) {
     if (r() < 0.3) continue;
     const y = terrainAt(rx, z), c = pick(r, ['#7a3a2a', '#3a4a5a', '#5a5a3a', '#8a6a3a']);
-    K.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 'shed', { outlineT: 0.08, roofColor: '#6a6a6a' });
+    K.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 'plain', { outlineT: 0.08 });         // a goods wagon: plank sides, a curved grey roof, wheels
+    B.box(rx - 1.6, y + 4.2, z + 0.1, rx + 1.6, y + 4.5, z + 14.9, '#6a6a6a', 'plain', { outlineT: 0.04, edges: false });
+    for (let k = 1; k < 10; k++) for (const sx of [-1.53, 1.5]) B.box(rx + sx, y + 1.0, z + k * 1.5 - 0.05, rx + sx + 0.03, y + 4.1, z + k * 1.5 + 0.05, '#2a2838', 'plain', { outlineT: 0, edges: false });
+    for (const wz of [2, 4, 11, 13]) for (const sx of [-1.2, 1.2]) B.add(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 10), new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(rx + sx, y + 0.5, z + wz), '#2a2838', 'plain', { outlineT: 0.02, edges: false });
     F.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 0.2);
   }
   H.line([[rx, 500], [rx, QZ - 30]], 3);
@@ -9583,7 +9586,7 @@ function wild(H, r) {
 function musicGarden(H, gx, gz, r) {
   const { K, W, B } = H;
   if (!H.clearOf(gx - 34, gz - 22, gx + 34, gz + 22, 0)) return;
-  H.blob(gx, gz, 33, 21, '#d4c39e', 'gravel', 0.07, 5);
+  H.blob(gx, gz, 33, 21, '#b5a688', 'gravel', 0.07, 5);
   const rain = ['#e4572e', '#f28c3a', '#f2c14e', '#a8c84a', '#3e8f86', '#2f8f9d', '#4a6ab8', '#8a5a9e'];
   // xylophone: bars rising in pitch from west to east (skate along it and it plays a scale)
   for (let k = 0; k < 15; k++) {

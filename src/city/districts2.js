@@ -140,7 +140,10 @@ function buildDocks(H) {
   for (let z = 520; z < QZ - 60; z += 17) {
     if (r() < 0.3) continue;
     const y = terrainAt(rx, z), c = pick(r, ['#7a3a2a', '#3a4a5a', '#5a5a3a', '#8a6a3a']);
-    K.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 'shed', { outlineT: 0.08, roofColor: '#6a6a6a' });
+    K.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 'plain', { outlineT: 0.08 });         // a goods wagon: plank sides, a curved grey roof, wheels
+    B.box(rx - 1.6, y + 4.2, z + 0.1, rx + 1.6, y + 4.5, z + 14.9, '#6a6a6a', 'plain', { outlineT: 0.04, edges: false });
+    for (let k = 1; k < 10; k++) for (const sx of [-1.53, 1.5]) B.box(rx + sx, y + 1.0, z + k * 1.5 - 0.05, rx + sx + 0.03, y + 4.1, z + k * 1.5 + 0.05, '#2a2838', 'plain', { outlineT: 0, edges: false });
+    for (const wz of [2, 4, 11, 13]) for (const sx of [-1.2, 1.2]) B.add(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 10), new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(rx + sx, y + 0.5, z + wz), '#2a2838', 'plain', { outlineT: 0.02, edges: false });
     F.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 0.2);
   }
   H.line([[rx, 500], [rx, QZ - 30]], 3);

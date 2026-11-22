@@ -845,7 +845,7 @@ function wild(H, r) {
 function musicGarden(H, gx, gz, r) {
   const { K, W, B } = H;
   if (!H.clearOf(gx - 34, gz - 22, gx + 34, gz + 22, 0)) return;
-  H.blob(gx, gz, 33, 21, '#d4c39e', 'gravel', 0.07, 5);
+  H.blob(gx, gz, 33, 21, '#b5a688', 'gravel', 0.07, 5);
   const rain = ['#e4572e', '#f28c3a', '#f2c14e', '#a8c84a', '#3e8f86', '#2f8f9d', '#4a6ab8', '#8a5a9e'];
   // xylophone: bars rising in pitch from west to east (skate along it and it plays a scale)
   for (let k = 0; k < 15; k++) {

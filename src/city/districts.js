@@ -260,6 +260,7 @@ function buildDistricts(K, S, F) {
   buildCable(H); lap('cable car');
   // (the old strip south of the park — ball courts, allotments, paths on the straight canal's lines — is gone)
   buildSkatepark(H);          // (real coordinates)
+  X('carousel', h => carousel(h, 250, 288, U.rng(2029)));      // (before the canal's houses take its lawn)
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
   // (the old canal quarter's fill followed the straight canal: the winding canal's own rows replace it)
   X('lake', buildLakeshore, fillLakeshore);
@@ -284,7 +285,6 @@ function buildDistricts(K, S, F) {
   X('obs', buildObservatory, fillObservatory);
   X('site', buildSite); X('tower', buildTower);
   vineyards(H, U.rng(2027));          // (laid out on the real outline: no frame)
-  X('carousel', h => carousel(h, 250, 288, U.rng(2029)));
   fillRoutes(H); lap('routes');
   // the elevated stations: a paved forecourt under each, along the line (they stood on bare lawn)
   for (const st of H.W.stations || []) {
