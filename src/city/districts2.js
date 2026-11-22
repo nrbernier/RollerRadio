@@ -61,14 +61,14 @@ function buildCanals(H) {
   const keep = PLAN.byKey.canals.shape;
   const house = (cx, cz, alongX, w, d, front) => {
     const hw = alongX ? w / 2 : d / 2, hd = alongX ? d / 2 : w / 2, x0 = cx - hw, x1 = cx + hw, z0 = cz - hd, z1 = cz + hd;
-    if (shapeDist(keep, cx, cz) > -4 || !H.clearOf(x0, z0, x1, z1, 0.5)) return false;
+    if (shapeDist(keep, cx, cz) > -4 || !H.clearOf(x0, z0, x1, z1, 0.3)) return false;
     const bb = H.bldg(x0, z0, x1, z1, 10 + r() * 8, pick(r, cols), { trim: '#f2ede2', outline: 0.12, kind: 'house' });
     if (alongX) H.frontage(x0, x1, front > 0 ? z0 : z1, front, bb.hi, bb.top, r, { shop: 0.25, balcony: 0.45 });
     H.roof(x0, z0, x1, z1, bb.top, 3.5 + r() * 2, pick(r, ['#5a4a42', '#6a5a52', '#4a4a52', '#7a4a3a']), alongX);
     H.reserve([x0, z0, x1, z1]);
     return true;
   };
-  for (const sd of [-1, 1]) for (const depth of [C.half + 16, C.half + 50]) {
+  for (const sd of [-1, 1]) for (const depth of [C.half + 19.5, C.half + 48, C.half + 78]) {      // (three rows: on the water, behind, and a lane further back)
     let s = 20;
     while (s < C.path.len - 30) {
       const w = 6.5 + r() * 4, d = 12 + r() * 4, q = at(s + w / 2);

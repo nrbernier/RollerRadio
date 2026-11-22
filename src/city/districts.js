@@ -261,7 +261,7 @@ function buildDistricts(K, S, F) {
   X('skate', fillSouthStrip);
   buildSkatepark(H);          // (real coordinates)
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
-  X('canals', fillCanalQuarter);
+  // (the old canal quarter's fill followed the straight canal: the winding canal's own rows replace it)
   X('lake', buildLakeshore, fillLakeshore);
   buildLido(H);
   X('garden', h => musicGarden(h, -500, 905, U.rng(2025)));
