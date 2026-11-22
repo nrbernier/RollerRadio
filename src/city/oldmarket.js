@@ -189,6 +189,32 @@ function buildWalledTown(H, r) {
     oldHouse(H, x0, z0, x1, z1, r, { front: ew ? (Math.cos(a) > 0 ? 'w' : 'e') : (Math.sin(a) > 0 ? 'n' : 's'), shop: 0.2, type: pick(r, types.length ? types : ['gable']), slopeX: !ew, h: 5.8 + r() * 3, jetty: r() < 0.5 });
   }
   // lamps on the lanes
+  // ROOF ROUTES: across the lanes, where the houses either side stand about as high, a plank from eave to eave
+  // (cross the town at roof level); elsewhere washing lines a little under the eaves (grinds) with laundry
+  { const topAt = (x, z) => { let t = -1e9; for (let b = W.boxes.length - 1, n = 0; b >= 0 && n < 60000; b--, n++) { const q = W.boxes[b]; if (x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1 && q.y1 > t) t = q.y1; } return t; };
+    const lau = ['#ffffff', '#e4572e', '#2f8f9d', '#f2c14e', '#d9779a', '#8fb7cc'];
+    W.oldLanesIn.forEach((c, li) => {
+      const w = li < 2 ? 2.5 : 1.7;
+      for (let k = 3; k < c.length - 3; k += 4) {
+        const [x, z] = c[k], [px, pz] = c[k - 1], [nx, nz] = c[k + 1], dx = nx - px, dz = nz - pz, L = Math.hypot(dx, dz) || 1, vx = -dz / L, vz = dx / L;
+        const ax = x + vx * (w + 1.0), az = z + vz * (w + 1.0), bx = x - vx * (w + 1.0), bz = z - vz * (w + 1.0);
+        const ha = topAt(ax, az), hb = topAt(bx, bz), g = terrainAt(x, z);
+        if (ha < g + 4 || hb < g + 4) continue;                         // a house both sides
+        const ex = (o) => [x + vx * o, z + vz * o];
+        if (Math.abs(ha - hb) < 1.2 && r() < 0.6) {
+          const y = Math.max(ha, hb), [p0x, p0z] = ex(w + 0.6), [p1x, p1z] = ex(-w - 0.6);
+          const m = new THREE.Matrix4().makeRotationY(-Math.atan2(vz, vx)).setPosition(x, y - 0.12, z);
+          B.add(new THREE.BoxGeometry(w * 2 + 1.6, 0.18, 1.1), m, '#8a6a4a', 'wood', { outlineT: 0.04, edges: false });
+          W.boxes.push({ x0: Math.min(p0x, p1x) - 0.55, y0: y - 0.25, z0: Math.min(p0z, p1z) - 0.55, x1: Math.max(p0x, p1x) + 0.55, y1: y, z1: Math.max(p0z, p1z) + 0.55, tag: 'plank' });
+        } else {
+          const y = Math.min(ha, hb) - 1.4, [p0x, p0z] = ex(w + 0.15), [p1x, p1z] = ex(-w - 0.15);
+          K.rail([[p0x, y, p0z], [p1x, y, p1z]], { kind: 'cable', color: '#e9e4f5', sag: 0.08, posts: false });
+          for (let t = 0.18; t < 0.86; t += 0.17) { const fx = U.lerp(p0x, p1x, t), fz = U.lerp(p0z, p1z, t), sq = 0.5 + r() * 0.4;
+            B.add(new THREE.BoxGeometry(0.06 + Math.abs(vz) * sq, 0.6 + r() * 0.3, 0.06 + Math.abs(vx) * sq), new THREE.Matrix4().makeTranslation(fx, y - 0.45 - Math.sin(t * Math.PI) * 0.15, fz), pick(r, lau), 'plain', { outlineT: 0.02, edges: false }); }
+        }
+        k += Math.floor(r() * 3);
+      }
+    }); }
   for (const c of W.oldLanesIn) for (let k = 4; k < c.length; k += 9) { const [x, z] = c[k]; if (H.clearOf(x + 2.2, z - 0.3, x + 2.8, z + 0.3, 0)) H.lamp(x + 2.5, z, { style: 'globe', h: 3.4, color: '#2a2a32' }); }
   // ---- the wall: a stone ring with a walk on top and battlements, round towers, gate towers over the main lanes ----
   const N = 128, P = [], stone = '#b3a68e', cap = '#cbbfa6';

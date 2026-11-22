@@ -91,6 +91,9 @@ Second tour (22 Nov, 11:00), fixed: ground outside downtown was sand (now grass-
 and straight allotment strips from the old strip fill (gone); the carousel had vanished (canal houses took its
 lawn: built first now); brick boxes on the rail siding (now goods wagons); dark bands across the sunken street
 (downtown's street ribbons draped into the cut: streets now stop at its rim); music garden gravel darker.
+Roof routes (22 Nov): in the old town, planks from eave to eave across the lanes where the houses either side
+stand about as high (cross town at roof level), washing lines with laundry under the eaves elsewhere (grinds).
+Check in play that the planks meet the roofs (no step up) and the lines are reachable from the roofs.
 Still to fix:
 - The bridge at the canal mouth (promenade): abutments now stand at the canal walls; still, just south of it a few
   terrain triangles (~1 m up) poke into the water and the east quay paving overlaps the water in jags: the canal's
