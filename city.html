@@ -5901,7 +5901,7 @@ function makeTrains(W, M, scene) {
 //  CITY WORLD — assembles terrain, water, roads, metro and districts
 // ============================================================
 const GROUND_COLS = {
-  park: '#3d5f36', obs: '#6f8f4f', oldtown: '#7c8a56', business: '#8f9670', market: '#b89a72',
+  park: '#3d5f36', obs: '#6f8f4f', oldtown: '#7c8a56', business: '#8f9670', market: '#8f9670',
   canals: '#7d8a5e', docks: '#8c877e', lake: '#6c9150'
 };
 const _gc = new THREE.Color(), _gc2 = new THREE.Color(), _gw = {};
@@ -6139,7 +6139,7 @@ function buildCity() {
   buildRoads(K, S, F);
   paveDowntown(K.B);
   groundLayer(K.B, PLAN_REAL.vineyards, '#7d8a4e', 'grass');
-  groundLayer(K.B, PLAN_REAL.byKey.market.shape.poly, '#a8957a', 'paving', 6, 0.04);      // the market: worn stone, not sand      // the vineyard: grass and soil, not the valley's sand
+  groundLayer(K.B, PLAN_REAL.byKey.market.shape.poly, '#a8957a', 'paving', 2.5, 0.04);      // the market: worn stone, not sand      // the vineyard: grass and soil, not the valley's sand
   buildMetro(K, M, S, F);
   buildStations(K, M, S, F);
   lap('canal, roads, metro');
