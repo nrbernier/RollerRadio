@@ -43,7 +43,6 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   medieval houses are too large (shopFront glass); make them small medieval shop fronts.
 - Between the old town and the market (south-east of the wall) the market's houses are tall flat-roofed town
   houses with modern-looking windows: next to the medieval town they look out of place.
-- Music garden: now on the summit's slope below the observatory; its gravel patch is very pale.
 - Empty grass: the strip between the forest edge and downtown (under the metro's west side), the slopes between
   the summit and the old town, and the strip between downtown's ring and the canal quarter (under the metro's
   south side) are large plain lawns. Fill them: allotments, a park with paths, sports pitches, trees along the
@@ -88,7 +87,12 @@ Also done after feedback (22 Nov, morning):
 - Grapes on the vines; stone houses outside the wall get windows; the Old Town station's stairs come up inside
   the walls; quay paving never under the grass; paved forecourts under the elevated stations; the mountains
   across the lake taper away at both ends.
+Second tour (22 Nov, 11:00), fixed: ground outside downtown was sand (now grass-green); white paving scraps
+and straight allotment strips from the old strip fill (gone); the carousel had vanished (canal houses took its
+lawn: built first now); brick boxes on the rail siding (now goods wagons); dark bands across the sunken street
+(downtown's street ribbons draped into the cut: streets now stop at its rim); music garden gravel darker.
 Still to fix:
+- The stone bridge at the canal mouth: its underside reads as folded white planes from the quay.
 - Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
   loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
@@ -100,7 +104,6 @@ Still to fix:
   quay west of the stone bridge; the allotment strips north of the canal still lie on old straight lines.
 - Forest: the western strip is wooded now (its trees are smaller than the main forest's); the trails connect the
   glasshouse, the crag, the station and the pond.
-- Water tower plaza: the two dark planter blocks look like bunkers.
 
 ### Checks (tools/geom.py, after the fixes below)
 - Walkers through walls: 116 → 3; cars through walls: 24 → 2 (downtown loop at z 218, x −150/−183: something

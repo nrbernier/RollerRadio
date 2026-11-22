@@ -24,6 +24,18 @@ function paintGround(x, z, y, steep, out) {
 
 // a ribbon laid on the ground (roads, paths, quays): pts [[x,z],...]
 function groundRibbon(B, pts, width, color, kind = 'road', lift = 0.09, step = 4) {
+  // (streets never drape down into the sunken street's cut: they cross it on bridges; only its own street may)
+  if (!groundRibbon.inCut && typeof VALLEY !== 'undefined' && (kind === 'road' || kind === 'walk')) {
+    const V = VALLEY, cut = (x, z) => Math.abs(x - V.x) < V.rimHalf + width / 2 && z > V.z0 && z < V.z3;
+    const fine = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 2)); for (let k = 0; k < n; k++) fine.push([U.lerp(ax, bx, k / n), U.lerp(az, bz, k / n)]); }
+    if (pts.length) fine.push(pts[pts.length - 1]);
+    if (fine.some(p => cut(p[0], p[1]))) {
+      const out = []; let run = [];
+      const go = () => { if (run.length > 1) { groundRibbon.inCut = true; try { out.push(...groundRibbon(B, run, width, color, kind, lift, step)); } finally { groundRibbon.inCut = false; } } run = []; };
+      for (const p of fine) { if (cut(p[0], p[1])) go(); else run.push(p); }
+      go(); return out;
+    }
+  }
   // resample
   const P = [];
   for (let i = 0; i < pts.length - 1; i++) {

@@ -139,8 +139,8 @@ function buildValley(H) {
   const { K, W, B, S, F } = H, V = VALLEY, stone = '#9c9384', cope = '#c9c2b4';
   // the street down in the cut: sidewalks along the walls, asphalt in the middle, dashes
   { const pts = []; for (let z = V.z0 + 6; z <= V.z3 - 6; z += 6) pts.push([V.x, z]);
-    groundRibbon(B, pts, V.floorHalf * 2 - 0.6, '#c8c1b4', 'walk', 0.07, 3);
-    const P = groundRibbon(B, pts, V.floorHalf * 2 - 9, '#5a5868', 'road', 0.1, 3); roadDashes(B, P); }
+    groundRibbon.inCut = true; groundRibbon(B, pts, V.floorHalf * 2 - 0.6, '#c8c1b4', 'walk', 0.07, 3);
+    const P = groundRibbon(B, pts, V.floorHalf * 2 - 9, '#5a5868', 'road', 0.1, 3); groundRibbon.inCut = false; roadDashes(B, P); }
   for (const sd of [-1, 1]) {
     const xe = V.x + sd * V.floorHalf, xr = V.x + sd * V.rimHalf, xa = Math.min(xe, xr), xb = Math.max(xe, xr);
     let rail = [];
