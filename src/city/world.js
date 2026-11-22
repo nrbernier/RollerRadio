@@ -244,7 +244,7 @@ function buildCanal(K, S, F) {
     const pos = [], uv = [];
     for (let i = 0; i < n - 1; i++) for (const sd of (o0 === -o1 ? [1] : [-1, 1])) {
       if (!dry(i + 1)) continue;
-      const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? y0 : y1), z]; };
+      const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? (y1 === null ? Math.max(y0, terrainAt(x, z) + 0.08) : y0) : y1), z]; };      // (an apron never dips under the ground)
       const a = q(i, o0), b = q(i, o1), c = q(i + 1, o0), d = q(i + 1, o1);
       // faces up whichever side we're on
       if (sd > 0) pos.push(...a, ...c, ...b, ...b, ...c, ...d); else pos.push(...a, ...b, ...c, ...b, ...d, ...c);

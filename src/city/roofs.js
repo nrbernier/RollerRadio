@@ -105,7 +105,7 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   const col = o.col || pick(r, Q.walls), rc = o.rc || pick(r, Q.roofs);
   const h = o.h ?? (type === 'tower' ? 14 + r() * 5 : type === 'terrace' ? 5.5 + r() * 3 : 6.5 + r() * 5.5);
   const flat = type === 'terrace' || type === 'tower';
-  const bb = H.bldg(x0, z0, x1, z1, h, col, { trim: flat ? false : Q.trim, outline: 0.12, kind: type === 'stone' || type === 'tower' ? 'brick' : 'oldhouse', top: o.top, roof: flat ? '#d9cdb4' : col });
+  const bb = H.bldg(x0, z0, x1, z1, h, col, { trim: flat ? false : Q.trim, outline: 0.12, kind: type === 'tower' ? 'brick' : 'oldhouse', top: o.top, roof: flat ? '#d9cdb4' : col });
   const c = { x0, z0, x1, z1, top: bb.top, lo: bb.lo, hi: bb.hi, rise: 0, flat, type, col, rc };
   if (flat) roofTerrace(H, c, r, { wall: type === 'tower' ? col : '#efe6d4', tower: type === 'tower', flag: Q.roofs[0] });
   else {

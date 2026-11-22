@@ -3037,7 +3037,7 @@ const PLAN = {
   stations: [
     { key: 'forest',    name: 'Forest',    at: [-300, -20] },
     { key: 'vineyards', name: 'Vineyards', at: [-210, -338] },
-    { key: 'hilltop',   name: 'Old Town',  at: [232, -417], under: true, entrances: 2 },      // (two stairways up into the walled town)
+    { key: 'hilltop',   name: 'Old Town',  at: [232, -417], under: true, entrances: 2, exitSide: -1 },      // (two stairways up into the walled town)
     { key: 'market',    name: 'Market',    at: [317, 110] },
     { key: 'canal',     name: 'Canal',     at: [-20, 252] },
   ],
@@ -5396,7 +5396,7 @@ function planMetro() {
       // two off each platform, each in an open well (a terrain hole on the grid's lines)
       const sn = (v, o, c, up) => o + (up ? Math.ceil((v - o) / c - 1e-6) : Math.floor((v - o) / c + 1e-6)) * c;
       st.exits = [];
-      const pairs = st.entrances === 2 ? [[-9, 1], [13, 1]] : [[-9, -1], [-9, 1], [13, -1], [13, 1]];     // (PLAN can ask for just two: one each side, staggered)
+      const es = st.exitSide || 1, pairs = st.entrances === 2 ? [[-9, es], [13, es]] : [[-9, -1], [-9, 1], [13, -1], [13, 1]];     // (PLAN can ask for just two: one each side, staggered)
       for (const [k, sd] of pairs) {
         const e = pts[(st.i + k + N) % N], nx = -e.dz * sd, nz = e.dx * sd;          // straight out sideways
         const ax = Math.abs(nx) > Math.abs(nz) ? 'x' : 'z';
@@ -6143,7 +6143,7 @@ function buildCanal(K, S, F) {
     const pos = [], uv = [];
     for (let i = 0; i < n - 1; i++) for (const sd of (o0 === -o1 ? [1] : [-1, 1])) {
       if (!dry(i + 1)) continue;
-      const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? y0 : y1), z]; };
+      const q = (k, o) => { const x = P[k][0] + N[k][0] * o * sd, z = P[k][1] + N[k][1] * o * sd; return [x, o === o1 && y1 === null ? terrainAt(x, z) + 0.08 : (o === o0 ? (y1 === null ? Math.max(y0, terrainAt(x, z) + 0.08) : y0) : y1), z]; };      // (an apron never dips under the ground)
       const a = q(i, o0), b = q(i, o1), c = q(i + 1, o0), d = q(i + 1, o1);
       // faces up whichever side we're on
       if (sd > 0) pos.push(...a, ...c, ...b, ...b, ...c, ...d); else pos.push(...a, ...b, ...c, ...b, ...d, ...c);
@@ -7733,7 +7733,7 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   const col = o.col || pick(r, Q.walls), rc = o.rc || pick(r, Q.roofs);
   const h = o.h ?? (type === 'tower' ? 14 + r() * 5 : type === 'terrace' ? 5.5 + r() * 3 : 6.5 + r() * 5.5);
   const flat = type === 'terrace' || type === 'tower';
-  const bb = H.bldg(x0, z0, x1, z1, h, col, { trim: flat ? false : Q.trim, outline: 0.12, kind: type === 'stone' || type === 'tower' ? 'brick' : 'oldhouse', top: o.top, roof: flat ? '#d9cdb4' : col });
+  const bb = H.bldg(x0, z0, x1, z1, h, col, { trim: flat ? false : Q.trim, outline: 0.12, kind: type === 'tower' ? 'brick' : 'oldhouse', top: o.top, roof: flat ? '#d9cdb4' : col });
   const c = { x0, z0, x1, z1, top: bb.top, lo: bb.lo, hi: bb.hi, rise: 0, flat, type, col, rc };
   if (flat) roofTerrace(H, c, r, { wall: type === 'tower' ? col : '#efe6d4', tower: type === 'tower', flag: Q.roofs[0] });
   else {
