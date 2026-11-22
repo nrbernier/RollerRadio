@@ -410,9 +410,22 @@ function buildMarket(H) {
   H.roof(hx0 - 1, hz0 - 1, hx1 + 1, hz1 + 1, hy, 9, '#a0523a', false);
   W.camBoxes.push({ x0: hx0, y0: hy, z0: hz0, x1: hx1, y1: hy + 9, z1: hz1 });
   H.reserve([hx0 - 3, hz0 - 3, hx1 + 3, hz1 + 3]);
-  // shades as steps up two of the hall's posts, to its roof
-  shadeSteps(H, { f: 's', cx: hx0 + 30, cz: hz1 + 1, nx: 0, nz: 1, L: 9 }, hy, r, ['#c4523a', '#f6f1e7']);
-  shadeSteps(H, { f: 'n', cx: hx1 - 30, cz: hz0 - 1, nx: 0, nz: -1, L: 9 }, hy, r, ['#3e8f86', '#f6f1e7']);
+  // a delivery pile against each long side: crates and pallets stacked in steps up to the eaves (the way onto
+  // the roof); each step's front edge a grind
+  const crateClimb = (x0, sd) => {
+    const zf = sd > 0 ? hz1 + 1.3 : hz0 - 1.3, d = 2.6, g = terrainAt(x0, zf), n = Math.ceil((hy - g) / 1.25), ch = (hy - g) / n;
+    for (let k = 0; k < n; k++) {
+      const x = x0 + (n - 1 - k) * 2.3, za = sd > 0 ? zf : zf - d, zb = sd > 0 ? zf + d : zf;
+      for (let j = 0; j <= k; j++) {
+        const wood = j % 3 === 2, c = wood ? '#8a6a3a' : pick(r, ['#a27a4a', '#b8894f', '#c4523a', '#3e8f86', '#e8b84a']);
+        K.box(x - 1.1, g + j * ch - (j ? 0 : 0.3), za, x + 1.1, g + (j + 1) * ch, zb, c, 'wood', { outlineT: 0.04 });
+      }
+      K.rail([[x - 1.05, g + (k + 1) * ch + 0.02, sd > 0 ? zb - 0.1 : za + 0.1], [x + 1.05, g + (k + 1) * ch + 0.02, sd > 0 ? zb - 0.1 : za + 0.1]], { hidden: true, voice: 'wood' });
+    }
+    H.reserve([x0 - 1.5, Math.min(zf, zf + sd * d) - 0.5, x0 + n * 2.3, Math.max(zf, zf + sd * d) + 0.5]);
+  };
+  crateClimb(hx0 + 24, 1);
+  crateClimb(hx1 - 44, -1);
   // stalls: a counter of goods under an awning on four poles (taut canvas: land on one and it throws you up)
   const GOODS = { fruit: ['#e85a3a', '#f2b23a', '#7ac04a', '#c83a6a', '#f2e04a', '#ff8a3a'], spice: ['#c8501e', '#e8a020', '#8a3a1e', '#d8c040', '#a82a1e'], flower: H.FLOWERS, cloth: ['#c4302b', '#2f6f9d', '#f2c14e', '#7a3a9e', '#3e8f56', '#f6f1e7', '#d9408a'] };
   const stall = (x, z, col, kind = 'fruit', ah = 2.75, rot = false) => {
