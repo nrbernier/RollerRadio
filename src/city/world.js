@@ -26,7 +26,8 @@ function paintGround(x, z, y, steep, out) {
 function groundRibbon(B, pts, width, color, kind = 'road', lift = 0.09, step = 4) {
   // (streets never drape down into the sunken street's cut: they cross it on bridges; only its own street may)
   if (!groundRibbon.inCut && typeof VALLEY !== 'undefined' && (kind === 'road' || kind === 'walk')) {
-    const V = VALLEY, cut = (x, z) => Math.abs(x - V.x) < V.rimHalf + width / 2 && z > V.z0 && z < V.z3;
+    const V = VALLEY, C = PLAN_REAL.canal, cut = (x, z) => (Math.abs(x - V.x) < V.rimHalf + width / 2 && z > V.z0 && z < V.z3)
+      || (z < PLAN_REAL.docksQuayZ + 4 && pathDist(C.path, x, z, 40).d < C.half + width / 2 + 0.5);      // (nor into the canal: bridges carry them)
     const fine = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 2)); for (let k = 0; k < n; k++) fine.push([U.lerp(ax, bx, k / n), U.lerp(az, bz, k / n)]); }
     if (pts.length) fine.push(pts[pts.length - 1]);
     if (fine.some(p => cut(p[0], p[1]))) {

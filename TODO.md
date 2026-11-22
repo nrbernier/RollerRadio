@@ -97,11 +97,8 @@ Market: its houses already had stairs up their fronts, roof walkways and roof-to
 was added where the edge houses are low enough (one so far: most edge houses are too tall for awnings).
 Check in play that the planks meet the roofs (no step up) and the lines are reachable from the roofs.
 Still to fix:
-- The bridge at the canal mouth (promenade): abutments now stand at the canal walls; still, just south of it a few
-  terrain triangles (~1 m up) poke into the water and the east quay paving overlaps the water in jags: the canal's
-  terrain cut misses a cell or two where it bends towards the mouth. Checked (22 Nov): every cell over the water
-  IS a hole and the quay paving no longer folds over the water on tight bends; the wedge (Toon, y≈1.2, sloped) is
-  most likely a coarse terrain tile that skips the holes — look at the tile LOD's hole test (it samples every st cells).
+- Fixed: the wedge under the canal-mouth bridge was the promenade's road strip draped down into the canal
+  (street strips now stop at the canal's edge; bridges carry them).
 - Docks: check in play that the trail's gaps are all jumpable and the sawtooth roofs ride well (three sheds,
   loading ramps up; about twenty loose containers now scattered about the yard).
 - The tower's gallery: check in play that riding down never drops through between two slope pieces.
