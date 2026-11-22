@@ -160,7 +160,8 @@ class StaticBatch {
     }
   }
   box(x0, y0, z0, x1, y1, z1, color, kind = 'plain', opts) {
-    const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    // (corners in either order: a negative size would turn the box inside out)
+    const geo = new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0));
     const m = new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     this.add(geo, m, color, kind, opts);
   }

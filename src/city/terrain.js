@@ -128,7 +128,9 @@ function terrainMeshes(paint, mat) {
       }
       if (st > 1) {
         // skirts along the four edges, between this level's edge vertices
-        const edge = (pts) => { for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], a2 = skirtOf.get(a), b2 = skirtOf.get(b); if (a2 === undefined || b2 === undefined) continue; idx.push(a, b, a2, b, b2, a2, a, a2, b, b, a2, b2); } };
+        // (no skirt by a hole: it would hang in the open, across the canal)
+        const nearHole = (v) => { const i = v % (ni + 1), j = (v - i) / (ni + 1); for (let dj = -st; dj <= st; dj++) for (let di = -st; di <= st; di++) if (hole(ti + i + di, tj + j + dj)) return true; return false; };
+        const edge = (pts) => { for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], a2 = skirtOf.get(a), b2 = skirtOf.get(b); if (a2 === undefined || b2 === undefined || nearHole(a) || nearHole(b)) continue; idx.push(a, b, a2, b, b2, a2, a, a2, b, b, a2, b2); } };
         const xs = [], zs = []; for (let i = 0; i < ni; i += st) xs.push(i); xs.push(ni); for (let j = 0; j < nj; j += st) zs.push(j); zs.push(nj);
         edge(xs.map(i => V(i, 0))); edge(xs.map(i => V(i, nj))); edge(zs.map(j => V(0, j))); edge(zs.map(j => V(ni, j)));
       }

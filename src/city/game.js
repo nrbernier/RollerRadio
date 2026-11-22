@@ -453,10 +453,19 @@ function start() { boot().catch(e => { console.error(e); const l = $('loading');
 start();
 
 // debug helper for tests: a perspective view from (px, py, pz) towards (tx, ty, tz); heights are above the ground there
+// what's under a point of a debugView picture (u, v in -1..1, v up): the first hits, for hunting odd shapes
+window.debugPick = (px, py, pz, tx, ty, tz, u, v, fov = 60) => {
+  const cam = new THREE.PerspectiveCamera(fov, 16 / 9, 0.3, 3000);
+  cam.position.set(px, terrainAt(px, pz) + py, pz); cam.lookAt(tx, terrainAt(tx, tz) + ty, tz); cam.updateMatrixWorld();
+  Game.W.updateCells(px, pz, 5000);       // (terrain detail for this camera, every cell shown)
+  const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(u, v), cam);
+  return rc.intersectObjects(G.scene.children, true).filter(h => !h.object.isLine && !h.object.isLineSegments).slice(0, 4).map(h => { const m = h.object, mt = Array.isArray(m.material) ? m.material[0] : m.material;
+    return [m.type, m.name || m.userData.kind || '', mt && mt.color ? mt.color.getHexString() : '-', mt && mt.type, 'side' + (mt && mt.side), h.point.toArray().map(a => +a.toFixed(1)).join(','), 'n' + (h.face ? h.face.normal.toArray().map(a => +a.toFixed(2)).join(',') : '')].join(' '); });
+};
 window.debugView = (px, py, pz, tx, ty, tz, w = 1280, h = 720, fov = 60) => {
   const cam = new THREE.PerspectiveCamera(fov, w / h, 0.3, 3000);
   cam.position.set(px, terrainAt(px, pz) + py, pz); cam.lookAt(tx, terrainAt(tx, tz) + ty, tz);
-  for (const g of Game.W.cells.values()) g.visible = true;
+  Game.W.updateCells(px, pz, 5000);       // (terrain detail for this camera, every cell shown)
   G.renderer.setPixelRatio(1); G.renderer.setSize(w, h, false);
   G.renderer.render(G.scene, cam);
   const url = G.renderer.domElement.toDataURL('image/png');
@@ -467,7 +476,7 @@ window.debugView = (px, py, pz, tx, ty, tz, w = 1280, h = 720, fov = 60) => {
 window.debugTopDown = (x0, z0, x1, z1, px = 1600) => {
   const cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 1, 4000);
   cam.position.set(0, 1500, 0); cam.up.set(0, 0, -1); cam.lookAt(0, 0, 0);
-  for (const g of Game.W.cells.values()) g.visible = true;
+  Game.W.updateCells((x0 + x1) / 2, (z0 + z1) / 2, 5000);       // (terrain detail for this camera, every cell shown)
   const fog = G.scene.fog; G.scene.fog = null;
   const w = px, h = Math.round(px * (z1 - z0) / (x1 - x0));
   G.renderer.setPixelRatio(1); G.renderer.setSize(w, h, false);

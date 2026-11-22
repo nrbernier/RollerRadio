@@ -260,7 +260,7 @@ function makeKit(meta) {
 
   K.box = (x0, y0, z0, x1, y1, z1, color, kind = 'plain', o = {}) => {
     B.box(x0, y0, z0, x1, y1, z1, color, kind, o);
-    if (o.collide !== false) W.boxes.push({ x0, y0, z0, x1, y1, z1, tag: o.tag, nocam: o.nocam });
+    if (o.collide !== false) W.boxes.push({ x0: Math.min(x0, x1), y0: Math.min(y0, y1), z0: Math.min(z0, z1), x1: Math.max(x0, x1), y1: Math.max(y0, y1), z1: Math.max(z0, z1), tag: o.tag, nocam: o.nocam });
   };
   K.bld = (x0, z0, x1, z1, top, color, roof, trim = '#14101f', base = STREET) => {
     K.box(x0, base, z0, x1, top, z1, color, 'building', { roofColor: roof, outlineT: 0.16 });

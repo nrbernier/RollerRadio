@@ -277,7 +277,8 @@ class StaticBatch {
     }
   }
   box(x0, y0, z0, x1, y1, z1, color, kind = 'plain', opts) {
-    const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    // (corners in either order: a negative size would turn the box inside out)
+    const geo = new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0));
     const m = new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     this.add(geo, m, color, kind, opts);
   }
@@ -1263,7 +1264,7 @@ function makeKit(meta) {
 
   K.box = (x0, y0, z0, x1, y1, z1, color, kind = 'plain', o = {}) => {
     B.box(x0, y0, z0, x1, y1, z1, color, kind, o);
-    if (o.collide !== false) W.boxes.push({ x0, y0, z0, x1, y1, z1, tag: o.tag, nocam: o.nocam });
+    if (o.collide !== false) W.boxes.push({ x0: Math.min(x0, x1), y0: Math.min(y0, y1), z0: Math.min(z0, z1), x1: Math.max(x0, x1), y1: Math.max(y0, y1), z1: Math.max(z0, z1), tag: o.tag, nocam: o.nocam });
   };
   K.bld = (x0, z0, x1, z1, top, color, roof, trim = '#14101f', base = STREET) => {
     K.box(x0, base, z0, x1, top, z1, color, 'building', { roofColor: roof, outlineT: 0.16 });
@@ -3295,7 +3296,9 @@ function terrainMeshes(paint, mat) {
       }
       if (st > 1) {
         // skirts along the four edges, between this level's edge vertices
-        const edge = (pts) => { for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], a2 = skirtOf.get(a), b2 = skirtOf.get(b); if (a2 === undefined || b2 === undefined) continue; idx.push(a, b, a2, b, b2, a2, a, a2, b, b, a2, b2); } };
+        // (no skirt by a hole: it would hang in the open, across the canal)
+        const nearHole = (v) => { const i = v % (ni + 1), j = (v - i) / (ni + 1); for (let dj = -st; dj <= st; dj++) for (let di = -st; di <= st; di++) if (hole(ti + i + di, tj + j + dj)) return true; return false; };
+        const edge = (pts) => { for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], a2 = skirtOf.get(a), b2 = skirtOf.get(b); if (a2 === undefined || b2 === undefined || nearHole(a) || nearHole(b)) continue; idx.push(a, b, a2, b, b2, a2, a, a2, b, b, a2, b2); } };
         const xs = [], zs = []; for (let i = 0; i < ni; i += st) xs.push(i); xs.push(ni); for (let j = 0; j < nj; j += st) zs.push(j); zs.push(nj);
         edge(xs.map(i => V(i, 0))); edge(xs.map(i => V(i, nj))); edge(zs.map(j => V(0, j))); edge(zs.map(j => V(ni, j)));
       }
@@ -3513,6 +3516,10 @@ function deckBridge(H, ax, az, bx, bz, width, o = {}) {
 // ---------- the sunken street: walls, the walks along its rims, three bridges, ways down ----------
 function buildValley(H) {
   const { K, W, B, S, F } = H, V = VALLEY, stone = '#9c9384', cope = '#c9c2b4';
+  // the street down in the cut: sidewalks along the walls, asphalt in the middle, dashes
+  { const pts = []; for (let z = V.z0 + 6; z <= V.z3 - 6; z += 6) pts.push([V.x, z]);
+    groundRibbon(B, pts, V.floorHalf * 2 - 0.6, '#c8c1b4', 'walk', 0.07, 3);
+    const P = groundRibbon(B, pts, V.floorHalf * 2 - 9, '#5a5868', 'road', 0.1, 3); roadDashes(B, P); }
   for (const sd of [-1, 1]) {
     const xe = V.x + sd * V.floorHalf, xr = V.x + sd * V.rimHalf, xa = Math.min(xe, xr), xb = Math.max(xe, xr);
     let rail = [];
@@ -11600,10 +11607,19 @@ function start() { boot().catch(e => { console.error(e); const l = $('loading');
 start();
 
 // debug helper for tests: a perspective view from (px, py, pz) towards (tx, ty, tz); heights are above the ground there
+// what's under a point of a debugView picture (u, v in -1..1, v up): the first hits, for hunting odd shapes
+window.debugPick = (px, py, pz, tx, ty, tz, u, v, fov = 60) => {
+  const cam = new THREE.PerspectiveCamera(fov, 16 / 9, 0.3, 3000);
+  cam.position.set(px, terrainAt(px, pz) + py, pz); cam.lookAt(tx, terrainAt(tx, tz) + ty, tz); cam.updateMatrixWorld();
+  Game.W.updateCells(px, pz, 5000);       // (terrain detail for this camera, every cell shown)
+  const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(u, v), cam);
+  return rc.intersectObjects(G.scene.children, true).filter(h => !h.object.isLine && !h.object.isLineSegments).slice(0, 4).map(h => { const m = h.object, mt = Array.isArray(m.material) ? m.material[0] : m.material;
+    return [m.type, m.name || m.userData.kind || '', mt && mt.color ? mt.color.getHexString() : '-', mt && mt.type, 'side' + (mt && mt.side), h.point.toArray().map(a => +a.toFixed(1)).join(','), 'n' + (h.face ? h.face.normal.toArray().map(a => +a.toFixed(2)).join(',') : '')].join(' '); });
+};
 window.debugView = (px, py, pz, tx, ty, tz, w = 1280, h = 720, fov = 60) => {
   const cam = new THREE.PerspectiveCamera(fov, w / h, 0.3, 3000);
   cam.position.set(px, terrainAt(px, pz) + py, pz); cam.lookAt(tx, terrainAt(tx, tz) + ty, tz);
-  for (const g of Game.W.cells.values()) g.visible = true;
+  Game.W.updateCells(px, pz, 5000);       // (terrain detail for this camera, every cell shown)
   G.renderer.setPixelRatio(1); G.renderer.setSize(w, h, false);
   G.renderer.render(G.scene, cam);
   const url = G.renderer.domElement.toDataURL('image/png');
@@ -11614,7 +11630,7 @@ window.debugView = (px, py, pz, tx, ty, tz, w = 1280, h = 720, fov = 60) => {
 window.debugTopDown = (x0, z0, x1, z1, px = 1600) => {
   const cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 1, 4000);
   cam.position.set(0, 1500, 0); cam.up.set(0, 0, -1); cam.lookAt(0, 0, 0);
-  for (const g of Game.W.cells.values()) g.visible = true;
+  Game.W.updateCells((x0 + x1) / 2, (z0 + z1) / 2, 5000);       // (terrain detail for this camera, every cell shown)
   const fog = G.scene.fog; G.scene.fog = null;
   const w = px, h = Math.round(px * (z1 - z0) / (x1 - x0));
   G.renderer.setPixelRatio(1); G.renderer.setSize(w, h, false);
