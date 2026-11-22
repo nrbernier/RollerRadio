@@ -40,7 +40,6 @@ const XF_CONSTS = [
   [() => OLD_Q, 'oldtown', (o, dx, dz) => { for (const q of o) _xpt(q.at, dx, dz); }],
   [() => MKT, 'market', (o, dx, dz) => { _xrc(o.hall, dx, dz); _xrc(o.field, dx, dz); _xpt(o.tower, dx, dz); for (let i = 0; i < o.cross.length; i++) o.cross[i] += dx; for (let i = 0; i < o.lanes.length; i++) o.lanes[i] += dz; for (const n of o.inns) _xrc(n, dx, dz); _xrc(o.dyers, dx, dz); }],
   [() => CELLAR, 'cellar', _xrc],
-  [() => SKATE, 'skate', _xrc],
   [() => OBS_T, 'obs', _xpt],
 ].map(([get, home, shift]) => ({ get, home, shift, off: [0, 0] }));     // off: what has been added to the written values
 

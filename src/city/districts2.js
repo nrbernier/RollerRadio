@@ -3,7 +3,7 @@
 // ============================================================
 // terrain edits that must happen before the ground is drawn
 const CELLAR = [878, 166, 902, 190];          // grid-aligned: the sunken record shop in the market
-const SKATE = [-620, 200, -470, 312];      // the skatepark in the strip south of the park: levelled
+const SKATE = [246, -752, 356, -672];      // the skatepark (real coordinates): the north-east corner, above the old town; levelled
 const OBS_T = [96, -1180];                 // the observatory's terrace
 function prepDistricts() {
   TER.holes.push(CELLAR);
@@ -30,10 +30,19 @@ function buildCanals(H) {
   const crossings = [];
   for (const [key, rd] of Object.entries(PLAN.roads)) {
     const R = rd.path.pts; let prev = null;
-    for (let k = 0; k < R.length; k++) { const d = pathDist(C.path, R[k][0], R[k][1], 40); const inside = d.d < C.half + 3; if (inside && !prev) crossings.push({ key, s: d.s, width: rd.width }); prev = inside; }
+    for (let k = 0; k < R.length; k++) { const d = pathDist(C.path, R[k][0], R[k][1], 40); const inside = d.d < C.half + 3; if (inside && !prev) {
+      // the bridge runs along the street, from its last point clear of the canal to the first one past it
+      const clear = (j) => pathDist(C.path, R[j][0], R[j][1], 40).d > C.half + 16;       // (past the quay apron too)
+      let a = k; while (a > 0 && !clear(a)) a--; let b = k; while (b < R.length - 1 && !clear(b)) b++;
+      crossings.push({ key, s: d.s, width: rd.width, a: R[a], b: R[b] }); }
+      prev = inside; }
   }
   const bridgeAt = (s, width, rise, o) => { const a = off(s, -(C.half + 5)), b = off(s, C.half + 5); bridge(H.K, S, F, a[0], a[1], b[0], b[1], width, rise, o); H.line([off(s, -(C.half + 22)), off(s, C.half + 22)], width / 2 + 2); };
-  for (const c of crossings) bridgeAt(c.s, c.width + 4, c.key === 'main' ? 2.8 : 1.6, c.key === 'main' ? { color: '#a89a82', wall: '#8a7a64' } : {});
+  for (const c of crossings) {
+    const o = c.key === 'main' ? { color: '#a89a82', wall: '#8a7a64' } : {}, rise = c.key === 'main' ? 2.8 : 1.6;
+    if (c.a && c.b && Math.hypot(c.b[0] - c.a[0], c.b[1] - c.a[1]) > C.half * 2) { bridge(H.K, S, F, c.a[0], c.a[1], c.b[0], c.b[1], c.width + 4, rise, o); H.line([c.a, c.b], (c.width + 4) / 2 + 2); }
+    else bridgeAt(c.s, c.width + 4, rise, o);
+  }
   // footbridges between them, about every 160 m
   const taken = crossings.map(c => c.s);
   for (let s = 90; s < C.path.len - 90; s += 150 + r() * 40) if (!taken.some(t => Math.abs(t - s) < 70)) { bridgeAt(s, 7, 1.6); taken.push(s); }

@@ -259,6 +259,7 @@ function buildDistricts(K, S, F) {
   X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
   buildCable(H); lap('cable car');
   X('skate', fillSouthStrip);
+  buildSkatepark(H);          // (real coordinates)
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
   X('canals', fillCanalQuarter);
   X('lake', buildLakeshore, fillLakeshore);

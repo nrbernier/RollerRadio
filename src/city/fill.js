@@ -435,14 +435,15 @@ function fillLakeshore(H) {
 }
 
 // between the park and the avenue: a skatepark, ball courts, allotments
-function fillSouthStrip(H) {
-  const { K, W, B } = H, r = U.rng(1404);
-  const z0 = 190, z1 = PLAN.avenueZ - 18;
+function buildSkatepark(H) {
+  const { K, W, B } = H, r = U.rng(1405);
   // the skatepark
   const [sx0, sz0, sx1, sz1] = SKATE;
   const y = PLAN.skateY;
   if (H.clearOf(sx0, sz0, sx1, sz1, 0)) {
-    H.patch(SKATE, '#c8c4bc', 'tiles', 0.06);
+    H.patch(SKATE, '#a9a49a', 'tiles', 0.06);
+    // a path up from the old town's ring street
+    { const pts = [[300, -548], [304, -600], [298, -640], [300, SKATE[3] + 1]]; groundRibbon.noLog = true; groundRibbon(B, pts, 5, '#c8c1b4', 'walk', 0.08, 3); groundRibbon.noLog = false; H.line(pts, 3.5); }
     // quarter pipes at both ends (curved: steeper as they rise), each in short straight pieces
     const qp = (xWall, dir) => {
       const D = 6, Hh = 3.2, n = 6;
@@ -469,10 +470,15 @@ function fillSouthStrip(H) {
     K.rail([[sx0 + 14, y + 2.25, sz1 - 0.3], [sx1 - 14, y + 2.25, sz1 - 0.3]], { color: '#e9e4f5', round: 0, postMax: 3 });
     for (const [lx, lz] of [[sx0 + 20, fz - 16], [sx1 - 30, fz + 16]]) { K.box(lx, y - 0.1, lz - 0.8, lx + 12, y + 0.6, lz + 0.8, '#9a9488', 'paving', { outlineT: 0.04 }); K.rail([[lx + 0.2, y + 0.62, lz - 0.7], [lx + 11.8, y + 0.62, lz - 0.7]], { hidden: true }); K.rail([[lx + 0.2, y + 0.62, lz + 0.7], [lx + 11.8, y + 0.62, lz + 0.7]], { hidden: true }); }
     // graffiti panels (colour blocks) and skaters hanging out
-    for (let i = 0; i < 6; i++) H.put(H.SH.BOX, sx0 + 10 + i * 22, y + 1.2, sz1 + 1.2, 10, 2.4, 0.3, pick(r, ['#ff7a5a', '#2f8f9d', '#f2c14e', '#8a5a9e', '#3e8f86']), 'plain', 0.04);
+    for (let i = 0; i < Math.floor((sx1 - sx0 - 20) / 22); i++) H.put(H.SH.BOX, sx0 + 10 + i * 22, y + 1.2, sz1 + 1.2, 10, 2.4, 0.3, pick(r, ['#ff7a5a', '#2f8f9d', '#f2c14e', '#8a5a9e', '#3e8f86']), 'plain', 0.04);
     H.standers([[sx0 + 8, sz0 + 4, 1, y], [sx0 + 9, sz0 + 6, 2.5, y], [sx1 - 6, fz, -1.6, y], [fx, sz1 - 2, 3.1, y + 2.2]], 'park');
     H.reserve([sx0 - 8, sz0 - 2, sx1 + 8, sz1 + 2]);
   }
+}
+
+function fillSouthStrip(H) {
+  const { K, W, B } = H, r = U.rng(1404);
+  const z0 = 190, z1 = PLAN.avenueZ - 18;
   // two ball courts with players
   for (const [cx, cz] of [[-760, 265], [-380, 265]]) {
     if (!H.clearOf(cx - 16, cz - 10, cx + 16, cz + 10, 0)) continue;
