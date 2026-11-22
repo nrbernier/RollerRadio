@@ -2,3 +2,6 @@ dist/
 vendor/
 __pycache__/
 .DS_Store
+full*.png
+geom.json
+bot_log.json
