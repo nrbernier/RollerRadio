@@ -181,7 +181,8 @@ function buildCity() {
   buildCanal(K, S, F);
   buildRoads(K, S, F);
   paveDowntown(K.B);
-  groundLayer(K.B, PLAN_REAL.vineyards, '#7d8a4e', 'grass');      // the vineyard: grass and soil, not the valley's sand
+  groundLayer(K.B, PLAN_REAL.vineyards, '#7d8a4e', 'grass');
+  groundLayer(K.B, PLAN_REAL.byKey.market.shape.poly, '#bfa585', 'paving', 6, 0.04);      // the market: worn stone, not sand      // the vineyard: grass and soil, not the valley's sand
   buildMetro(K, M, S, F);
   buildStations(K, M, S, F);
   lap('canal, roads, metro');
