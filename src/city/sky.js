@@ -145,7 +145,7 @@ const Sky = (() => {
     if (M.tower) M.tower.emissiveIntensity = S.night * 0.85;
     if (M.grid) M.grid.emissiveIntensity = S.night * 0.85;
     if (M.deco) M.deco.emissiveIntensity = S.night * 0.85;
-    if (W.lighthouse) { W.lighthouse.piv.rotation.y += dt * 0.5; W.lighthouse.beam.material.opacity = S.night * 0.22; }
+    if (W.lighthouse) { W.lighthouse.beam.position.set(60, 0, 0); W.lighthouse.piv.rotation.y += dt * 0.5; W.lighthouse.beam.material.opacity = S.night * 0.22; }
     M.lamp.color.copy(_a.copy(lampDay).lerp(lampNight, S.night)).multiplyScalar(0.75 + S.night * 0.5);
     if (W.lakeMat) W.lakeMat.color.copy(_a.set('#6fb0c8').lerp(k.fog, 0.35).multiplyScalar(1 - S.night * 0.45));
     if (W.canalWaterMat) W.canalWaterMat.color.copy(_a.set('#5f9fa0').multiplyScalar(1 - S.night * 0.5));

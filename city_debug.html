@@ -7424,6 +7424,8 @@ function buildDocks(H) {
   for (const o of [-0.75, 0.75]) K.rail([[rx + o, terrainAt(rx + o, 500) + 0.25, 500], [rx + o, terrainAt(rx + o, QZ - 30) + 0.25, QZ - 30]], { color: '#8a8a92', posts: false, radius: 0.06, round: 0 });
   for (let z = 520; z < QZ - 60; z += 17) {
     if (r() < 0.3) continue;
+    { const rz = z + (XF.g ? XF.dz : 0), rxx = rx + (XF.g ? XF.dx : 0);      // (no wagon across a street)
+      if (Object.values(PLAN_REAL.roads).some(rd => [rz, rz + 7.5, rz + 15].some(zz => pathDist(rd.path, rxx, zz, 40).d < rd.width / 2 + 5))) continue; }
     const y = terrainAt(rx, z), c = pick(r, ['#7a3a2a', '#3a4a5a', '#5a5a3a', '#8a6a3a']);
     K.box(rx - 1.5, y + 0.9, z, rx + 1.5, y + 4.2, z + 15, c, 'plain', { outlineT: 0.08 });         // a goods wagon: plank sides, a curved grey roof, wheels
     B.box(rx - 1.6, y + 4.2, z + 0.1, rx + 1.6, y + 4.5, z + 14.9, '#6a6a6a', 'plain', { outlineT: 0.04, edges: false });
@@ -7730,7 +7732,7 @@ function buildContainerTrail(H) {
     // big doors on the long sides, a loading ramp at one end (the way up)
     for (const z of [z0 - 0.06, z1 - 0.04]) for (let x = x0 + 6; x < x1 - 8; x += 14) B.box(x, y, z, x + 5, y + 4.6, z + 0.1, '#3a4452', 'plain', { outlineT: 0.02, edges: false });
     K.ramp(x0 - 12, z0 + 2, x0, z0 + 8, 'x', terrainAt(x0 - 12, z0 + 5), top, '#b8b2a6', false, terrainAt(x0 - 12, z0 + 5));
-    F.box(x0, y, z0, x1, top + th, z1, '#9a5a44', 0.2);
+    F.box(x0, y, z0, x1, top, z1, '#9a5a44', 0.2);      // (far view: just the walls; the teeth would read as a solid block)
     placed.push([x0 - 12, z0, x1, z1]); H.reserve([x0 - 12, z0, x1, z1]);
   };
   shed(530, 352, 590, 382, 7.5);
@@ -10591,7 +10593,7 @@ const Sky = (() => {
     if (M.tower) M.tower.emissiveIntensity = S.night * 0.85;
     if (M.grid) M.grid.emissiveIntensity = S.night * 0.85;
     if (M.deco) M.deco.emissiveIntensity = S.night * 0.85;
-    if (W.lighthouse) { W.lighthouse.piv.rotation.y += dt * 0.5; W.lighthouse.beam.material.opacity = S.night * 0.22; }
+    if (W.lighthouse) { W.lighthouse.beam.position.set(60, 0, 0); W.lighthouse.piv.rotation.y += dt * 0.5; W.lighthouse.beam.material.opacity = S.night * 0.22; }
     M.lamp.color.copy(_a.copy(lampDay).lerp(lampNight, S.night)).multiplyScalar(0.75 + S.night * 0.5);
     if (W.lakeMat) W.lakeMat.color.copy(_a.set('#6fb0c8').lerp(k.fog, 0.35).multiplyScalar(1 - S.night * 0.45));
     if (W.canalWaterMat) W.canalWaterMat.color.copy(_a.set('#5f9fa0').multiplyScalar(1 - S.night * 0.5));
