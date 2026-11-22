@@ -459,7 +459,7 @@ window.debugPick = (px, py, pz, tx, ty, tz, u, v, fov = 60) => {
   cam.position.set(px, terrainAt(px, pz) + py, pz); cam.lookAt(tx, terrainAt(tx, tz) + ty, tz); cam.updateMatrixWorld();
   Game.W.updateCells(px, pz, 5000);       // (terrain detail for this camera, every cell shown)
   const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(u, v), cam);
-  return rc.intersectObjects(G.scene.children, true).filter(h => !h.object.isLine && !h.object.isLineSegments).slice(0, 4).map(h => { const m = h.object, mt = Array.isArray(m.material) ? m.material[0] : m.material;
+  return rc.intersectObjects(G.scene.children, true).filter(h => { if (h.object.isLine || h.object.isLineSegments || h.distance < 1.6) return false; const mt = Array.isArray(h.object.material) ? h.object.material[0] : h.object.material; if (mt && (!mt.visible || mt.colorWrite === false || (mt.transparent && mt.opacity < 0.05))) return false; for (let o = h.object; o; o = o.parent) if (!o.visible) return false; return true; }).slice(0, 4).map(h => { const m = h.object, mt = Array.isArray(m.material) ? m.material[0] : m.material;
     return [m.type, m.name || m.userData.kind || '', mt && mt.color ? mt.color.getHexString() : '-', mt && mt.type, 'side' + (mt && mt.side), h.point.toArray().map(a => +a.toFixed(1)).join(','), 'n' + (h.face ? h.face.normal.toArray().map(a => +a.toFixed(2)).join(',') : '')].join(' '); });
 };
 window.debugView = (px, py, pz, tx, ty, tz, w = 1280, h = 720, fov = 60) => {

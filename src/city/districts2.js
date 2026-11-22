@@ -453,6 +453,22 @@ function buildContainerTrail(H) {
   shed(530, 352, 590, 382, 7.5);
   shed(306, 366, 366, 394, 7.5);
   shed(540, 396, 596, 428, 7);
+  // the stacking bays: blocks of containers side by side, stacked unevenly (the yard is a store, not an empty lot).
+  // Kept well clear of the trails, so they don't pull a line sideways; their tops are flat to land on
+  for (let i = 0, n = 0; i < 1500 && n < 30; i++) {
+    const along = r() < 0.5, cols = 4 + Math.floor(r() * 6), rows = 1 + Math.floor(r() * 3), x = U.lerp(290, 632, r()), z = U.lerp(272, PLAN.docksQuayZ - 12, r());
+    const lw = rows * (L + 0.4), cw = cols * (Wd + 0.05), w = along ? lw : cw, d = along ? cw : lw, x0 = x - w / 2, z0 = z - d / 2, x1 = x + w / 2, z1 = z + d / 2;
+    if (!free(x0, z0, x1, z1, 6)) continue;
+    for (let j = 0; j < rows; j++) {
+      let h = 1 + Math.floor(r() * 3); const b = j * (L + 0.4);
+      for (let k = 0; k < cols; k++) {
+        h = U.clamp(h + (r() < 0.5 ? 0 : r() < 0.5 ? 1 : -1), 1, 4);
+        const a = k * (Wd + 0.05);
+        if (along) stack(x0 + b, z0 + a, x0 + b + L, z0 + a + Wd, h, 'x'); else stack(x0 + a, z0 + b, x0 + a + Wd, z0 + b + L, h, 'z');
+      }
+    }
+    placed.push([x0 - 4, z0 - 4, x1 + 4, z1 + 4]); n++;
+  }
   // loose containers about the yard: singles and pairs, lying either way, now and then one on top of another
   for (let i = 0, n = 0; i < 300 && n < 22; i++) {
     const along = r() < 0.5, x = U.lerp(290, 632, r()), z = U.lerp(272, PLAN.docksQuayZ - 12, r());

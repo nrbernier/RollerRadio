@@ -100,7 +100,7 @@ function roofTerrace(H, c, r, o = {}) {
 // one old-town house. o: { q (quarter), front (the side the lane is on), type, top, col, rc, rise, slopeX, shop }
 function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   const { K, W, B } = H, Q = o.q || oldQ((x0 + x1) / 2, (z0 + z1) / 2), w = x1 - x0, d = z1 - z0;
-  let type = o.type || pick(r, Q.types);
+  let type = o.type || pick(r, oldWallIn((x0 + x1) / 2, (z0 + z1) / 2, 0) ? Q.types.filter(t => t !== 'terrace').concat(['gable']) : Q.types);      // (no flat roofs inside the wall)
   if (type === 'tower' && (Math.max(w, d) > 8.5 || o.top !== undefined)) type = 'gable';
   const col = o.col || pick(r, Q.walls), rc = o.rc || pick(r, Q.roofs);
   const h = o.h ?? (type === 'tower' ? 14 + r() * 5 : type === 'terrace' ? 5.5 + r() * 3 : 6.5 + r() * 5.5);
@@ -116,7 +116,7 @@ function oldHouse(H, x0, z0, x1, z1, r, o = {}) {
   }
   if (o.front) {
     const fr = faceFrame(o.front, x0, z0, x1, z1), [gl, gh] = frGround(fr, 0.6);
-    if (type !== 'tower' && r() < (o.shop ?? 0.28)) shopFront(H, fr, gh, r, c);
+    if (type !== 'tower' && r() < (o.shop ?? 0.28)) oldShopFront(H, fr, gh, r, c);
     else if (type !== 'tower' && fr.L > 4.5 && bb.top - gh > 4.2) kitFront(H, fr, gh, bb.top, c, Q, r);
     else {
       // a door with a step, sometimes a pot of flowers
@@ -147,7 +147,7 @@ function kitFront(H, fr, gh, top, c, Q, r) {
   const wallH = top - gh, floors = Math.max(1, Math.min(4, Math.floor((wallH - 0.9) / 2.8))), bays = Math.max(1, Math.min(5, Math.round((fr.L - 1) / 2.6)));
   const kind = c.type === 'timber' ? 'timber' : c.type === 'stone' ? 'stone' : 'town', d = 6;
   const h = KIT.house({ w: fr.L - 0.4, d, floors, kind, bays, lite: true }), fz = d / 2;
-  const parts = h.parts.filter(p => p.at[2] > fz - 0.6 && p.tag !== 'solid' && p.tag !== 'roof' && p.s !== 'prism' && p.at[1] < h.eave)
+  const parts = h.parts.filter(p => p.at[2] > fz - 0.6 && p.tag !== 'solid' && p.tag !== 'roof' && p.s !== 'prism' && p.at[1] < h.eave && !(p.size && p.size[0] > fr.L - 0.5))      // (not the kit's eave board: this front's own eave can be a floor higher)
     .map(p => Object.assign({}, p, { at: [p.at[0], p.at[1], p.at[2] - fz] }));
   const wall = '#' + new THREE.Color(c.col).getHexString(), sh = pick(r, SHUT), dr = pick(r, DOORS);
   const pal = Object.assign({}, KIT.HOUSES[0].pal, { wall, wall2: '#' + new THREE.Color(c.col).multiplyScalar(0.86).getHexString(), shutter: sh, shutter2: '#' + new THREE.Color(sh).multiplyScalar(0.85).getHexString(),
@@ -166,7 +166,7 @@ function terraceRow(H, alongX, a0, a1, c, dir, r, o = {}) {
     let w = 6.5 + r() * 4.5; if (a + w > a1 - 5.5) w = a1 - a; if (w > 12) w /= 2;
     const d = 8 + r() * 3.5;
     const [x0, z0, x1, z1] = alongX ? [a, dir > 0 ? c : c - d, a + w, dir > 0 ? c + d : c] : [dir > 0 ? c : c - d, a, dir > 0 ? c + d : c, a + w];
-    if (H.clearOf(x0 + 0.05, z0 + 0.05, x1 - 0.05, z1 - 0.05, o.pad ?? 0)) out.push(oldHouse(H, x0, z0, x1, z1, r, Object.assign({ slopeX: !alongX, front: alongX ? (dir > 0 ? 'n' : 's') : (dir > 0 ? 'w' : 'e') }, o)));
+    if (H.clearOf(x0 + 0.05, z0 + 0.05, x1 - 0.05, z1 - 0.05, o.pad ?? 0) && !crossesOldWall(x0, z0, x1, z1)) out.push(oldHouse(H, x0, z0, x1, z1, r, Object.assign({ slopeX: !alongX, front: alongX ? (dir > 0 ? 'n' : 's') : (dir > 0 ? 'w' : 'e') }, o)));
     a += w;
   }
   return out;
@@ -181,6 +181,23 @@ function shopFront(H, fr, gh, r, c, o = {}) {
   b = frBox(fr, -hw, hw, 0, 1.9); B.box(b[0], gh + 2.86, b[1], b[2], gh + 3.0, b[3], col, 'plain', { outlineT: 0.03, edges: false });
   W.boxes.push({ x0: b[0], y0: gh + 2.55, z0: b[1], x1: b[2], y1: gh + 3.0, z1: b[3], tag: 'bounce', nocam: true });
   if (r() < 0.4) { const s = pick(r, BIZ_SHOPS); wallSign(H, s[0], fr, 0, gh + 3.75, Math.min(4.2, fr.L - 2), 0.8, s[1], s[2]); }
+}
+// a medieval shop: a timber-framed opening, its lower shutter let down as a counter (a little ledge), a sign
+// on an iron bracket over it — no canvas, no plate glass
+function oldShopFront(H, fr, gh, r, c) {
+  const { K, B } = H, hw = Math.min(1.8, fr.L / 2 - 0.9), wood = pick(r, ['#5a4030', '#4a3426', '#6a4a32']);
+  let b = frBox(fr, -hw - 0.2, hw + 0.2, 0, 0.12); B.box(b[0], gh + 0.7, b[1], b[2], gh + 2.6, b[3], wood, 'wood', { outlineT: 0.02, edges: false });
+  b = frBox(fr, -hw, hw, 0, 0.14); B.box(b[0], gh + 0.9, b[1], b[2], gh + 2.4, b[3], '#2a221c', 'plain', { outlineT: 0, edges: false });
+  // the counter (shutter let down on chains): goods on it
+  b = frBox(fr, -hw, hw, 0, 0.75); K.box(b[0], gh + 0.82, b[1], b[2], gh + 0.94, b[3], wood, 'wood', { outlineT: 0.03 });
+  for (let u = -hw + 0.4; u < hw - 0.2; u += 0.55) { const [px, pz] = frPt(fr, u, 0.4); H.put(H.SH.ICO, px, gh + 1.08, pz, 0.24, 0.2, 0.24, pick(r, ['#c8462a', '#e8b02a', '#7a9a3a', '#a27a4a', '#d8cfbf']), 'flat', 0.02, 0); }
+  // the upper shutter, propped open
+  b = frBox(fr, -hw, hw, 0.05, 0.75); B.box(b[0], gh + 2.55, b[1], b[2], gh + 2.66, b[3], wood, 'wood', { outlineT: 0.02, edges: false });
+  // a hanging sign: an iron arm out from the wall, a little board under it
+  const [ax, az] = frPt(fr, hw + 0.5, 0), [ex, ez] = frPt(fr, hw + 0.5, 1.2), sy = gh + 3.4;
+  K.rod(V3(ax, sy, az), V3(ex, sy, ez), 0.04, '#2a2622', 0.01);
+  const [sx, sz] = frPt(fr, hw + 0.5, 0.75); const nx = ex - ax, nz = ez - az, L = Math.hypot(nx, nz) || 1;
+  B.add(new THREE.BoxGeometry(0.06, 0.7, 0.9), new THREE.Matrix4().makeRotationY(Math.atan2(nx / L, nz / L) + Math.PI / 2).setPosition(sx, sy - 0.45, sz), pick(r, ['#c4523a', '#2f5f8a', '#e8b84a', '#3e8f86']), 'plain', { outlineT: 0.03, edges: false });
 }
 // shades as stepping stones: from a crate you jump to the first, and each throws you up to the next, to the roof
 function shadeSteps(H, fr, top, r, cols) {
@@ -223,7 +240,7 @@ function outStair(H, c, r, o = {}) {
       if (sl > 0.8 || sl < 0.12 || !H.clearOf(b[0] + 0.08, b[1] + 0.08, b[2] - 0.08, b[3] - 0.08, 0)) continue;
       K.ramp(b[0], b[1], b[2], b[3], ax ? 'x' : 'z', dir > 0 ? g : c.top, dir > 0 ? c.top : g, o.color || '#c9a878', true, 0, 'wood');
       const p0 = frPt(fr, -dir * fr.L / 2, wd), p1 = frPt(fr, dir * fr.L / 2, wd);
-      K.rail([[p0[0], g + 0.95, p0[1]], [p1[0], c.top + 0.95, p1[1]]], { color: o.rail || '#e9e4f5', postColor: '#6a4a2e', postMax: 16, round: 0, radius: 0.06 });
+      K.rail([[p0[0], g + 0.95, p0[1]], [p1[0], c.top + 0.95, p1[1]]], { color: o.rail || '#5a4636', postColor: '#6a4a2e', postMax: 16, round: 0, radius: 0.06 });
       H.reserve(b); c.way = 'stair'; c.wayAt = foot; return true;
     }
   }
@@ -274,11 +291,11 @@ function roofLinks(H, list, r, o = {}) {
       for (const s of [-1, 1]) K.rail(dir ? [[m + s * hw, ya + 1.3, A.z1], [m + s * hw, yb + 1.3, C.z0]] : [[A.x1, ya + 1.3, m + s * hw], [C.x0, yb + 1.3, m + s * hw]], { kind: 'cable', color: '#8a6a4a', posts: false, sag: 0.25 });
       n++; continue;
     }
-    if (bg < 2.6) continue;
+    if (bg < 2.6 || Math.abs(ya - yb) > 2.5) continue;          // (a line steeper than that reads as a stray pole)
     const a = [pa[0], ya + 0.5, pa[1]], b = [pb[0], yb + 0.5, pb[1]];
     for (const p of [a, b]) H.put(H.SH.BOX, p[0], p[1] - 0.2, p[2], 0.14, 0.5, 0.14, '#4a3a2a', 'plain', 0.02);
     if (o.lanterns && r() < o.lanterns) K.rail([a, b], { kind: 'cable', lanterns: true, posts: false, sag: 0.45 });
-    else K.rail([a, b], { kind: 'cable', laundry: true, posts: false, sag: 0.4, color: '#e9e4f5' });
+    else K.rail([a, b], { kind: 'cable', laundry: true, posts: false, sag: 0.4, color: '#5a4a3a' });       // (rope, not a white pipe)
     n++;
   }
   return n;

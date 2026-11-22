@@ -51,7 +51,7 @@ function districtKit(K, S, F) {
     const ax = alongX ?? (x1 - x0 < z1 - z0);       // ridge runs along the long side; slopes across the short one
     if (ax) { const m = (x0 + x1) / 2; K.ramp(x0 - 0.4, z0 - 0.4, m, z1 + 0.4, 'x', y, y + rise, col, false, y - 0.3, 'roof'); K.ramp(m, z0 - 0.4, x1 + 0.4, z1 + 0.4, 'x', y + rise, y, col, false, y - 0.3, 'roof'); }
     else { const m = (z0 + z1) / 2; K.ramp(x0 - 0.4, z0 - 0.4, x1 + 0.4, m, 'z', y, y + rise, col, false, y - 0.3, 'roof'); K.ramp(x0 - 0.4, m, x1 + 0.4, z1 + 0.4, 'z', y + rise, y, col, false, y - 0.3, 'roof'); }
-    const g = ax ? prismGeo(x1 - x0 + 0.8, rise, z1 - z0 + 0.8, true) : prismGeo(x1 - x0 + 0.8, rise, z1 - z0 + 0.8, false);
+    const g = prismGeo(x1 - x0 + 0.8, rise, z1 - z0 + 0.8, !ax);      // (prismGeo's flag is the ridge's direction: along z when the slopes run along x)
     F.add(g, new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y, (z0 + z1) / 2), col);
     // a chimney or two, sometimes a dormer
     const rr = U.rng(((x0 * 31 + z0 * 17) | 0) ^ 0x5f3), n = rr() < 0.7 ? 1 + (rr() < 0.3 ? 1 : 0) : 0;
@@ -244,6 +244,13 @@ function prismGeo(w, h, d, alongX) {
   const g = new THREE.BufferGeometry(), hw = w / 2, hd = d / 2, v = [];
   if (alongX) { const A = [-hw, 0, -hd], Bq = [-hw, 0, hd], C = [-hw, h, 0], D = [hw, 0, -hd], E = [hw, 0, hd], Fv = [hw, h, 0]; v.push(...A, ...C, ...Bq, ...D, ...E, ...Fv, ...A, ...D, ...Fv, ...A, ...Fv, ...C, ...Bq, ...C, ...Fv, ...Bq, ...Fv, ...E); }
   else { const A = [-hw, 0, -hd], Bq = [hw, 0, -hd], C = [0, h, -hd], D = [-hw, 0, hd], E = [hw, 0, hd], Fv = [0, h, hd]; v.push(...A, ...Bq, ...C, ...D, ...Fv, ...E, ...A, ...C, ...Fv, ...A, ...Fv, ...D, ...Bq, ...E, ...Fv, ...Bq, ...Fv, ...C); }
+  // every face wound to face outwards (they were inside out: from outside you saw through a roof to the inside of its far slope)
+  for (let i = 0; i < v.length; i += 9) {
+    const ax = v[i + 3] - v[i], ay = v[i + 4] - v[i + 1], az = v[i + 5] - v[i + 2], bx = v[i + 6] - v[i], by = v[i + 7] - v[i + 1], bz = v[i + 8] - v[i + 2];
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    const cx = (v[i] + v[i + 3] + v[i + 6]) / 3, cy = (v[i + 1] + v[i + 4] + v[i + 7]) / 3 - h / 3, cz = (v[i + 2] + v[i + 5] + v[i + 8]) / 3;
+    if (nx * cx + ny * cy + nz * cz < 0) for (let k = 0; k < 3; k++) { const t = v[i + 3 + k]; v[i + 3 + k] = v[i + 6 + k]; v[i + 6 + k] = t; }
+  }
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g;
 }
 const pick = (r, a) => a[Math.floor(r() * a.length) % a.length];
