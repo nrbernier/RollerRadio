@@ -84,6 +84,8 @@ function buildJunctions(K) {
   const at = (P, A, s) => { s = U.clamp(s, 0, A[A.length - 1]); let i = 0; while (i < P.length - 2 && A[i + 1] < s) i++; const t = (s - A[i]) / ((A[i + 1] - A[i]) || 1); return [U.lerp(P[i][0], P[i + 1][0], t), U.lerp(P[i][1], P[i + 1][1], t)]; };
   const near = (P, x, z) => { let bd = 1e9, bq = null; for (let i = 0; i < P.length - 1; i++) { const [a, b] = seg(P, i), dx = b[0] - a[0], dz = b[1] - a[1], u = U.clamp(((x - a[0]) * dx + (z - a[1]) * dz) / ((dx * dx + dz * dz) || 1), 0, 1), q = [a[0] + dx * u, a[1] + dz * u], d = Math.hypot(q[0] - x, q[1] - z); if (d < bd) { bd = d; bq = q; } } return [bd, bq]; };
   const box = (P) => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; };
+  const nearSeg = (P, x, z) => { let bd = 1e9, bq = null, bi = 0; for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], u = U.clamp(((x - a[0]) * dx + (z - a[1]) * dz) / ((dx * dx + dz * dz) || 1), 0, 1), q = [a[0] + dx * u, a[1] + dz * u], d = Math.hypot(q[0] - x, q[1] - z); if (d < bd) { bd = d; bq = q; bi = i; } } return [bd, bq, bi]; };
+  const dirOf = (P, i) => { const a = P[i], b = P[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
   const R = L.map(r => ({ ...r, A: acc(r.pts), bb: box(r.pts) }));
   const lay = (pts, w, color) => { groundRibbon.noLog = true; groundRibbon(B, pts, w, color, 'road', 0.14, 2); groundRibbon.noLog = false; };
   const done = [];
@@ -99,7 +101,7 @@ function buildJunctions(K) {
       if (d > b.full / 2 + 3 || d < 0.5 || inCanal(C[0], C[1]) || seen(C[0] + i * 1e-3, C[1])) continue;
       const back = a.pts[end === 0 ? 1 : a.pts.length - 2], ux = E[0] - back[0], uz = E[1] - back[1], l = Math.hypot(ux, uz) || 1;
       lay([[E[0] - ux / l * 2, E[1] - uz / l * 2], C], a.w, a.color);
-      done.push([C[0] + i * 1e-3, C[1]]);
+      { const [bd, bq, bi] = nearSeg(b.pts, C[0], C[1]); const db = dirOf(b.pts, bi); done.push([C[0] + i * 1e-3, C[1], Math.max(a.w, b.w), a.color, { C, dA: [ux / l, uz / l], wA: a.w, dB: db, wB: b.w, T: true }]); void bd; void bq; }
     }
     // a and b crossing (X): each is carried across the other's full width
     if (i < j) for (let p = 0; p < a.pts.length - 1; p++) for (let q = 0; q < b.pts.length - 1; q++) {
@@ -109,9 +111,52 @@ function buildJunctions(K) {
       if (ea < b.full / 2 + 2 || eb < a.full / 2 + 2) continue;          // (that's a T, laid above)
       lay([at(a.pts, a.A, sa - b.full / 2 - 0.5), at(a.pts, a.A, sa + b.full / 2 + 0.5)], a.w, a.color);
       lay([at(b.pts, b.A, sb - a.full / 2 - 0.5), at(b.pts, b.A, sb + a.full / 2 + 0.5)], b.w, b.color);
-      done.push([I[0], I[1]]);
+      done.push([I[0], I[1], Math.max(a.w, b.w), a.color, { C: [I[0], I[1]], dA: dirOf(a.pts, p), wA: a.w, dB: dirOf(b.pts, q), wB: b.w, T: false }]);
     }
   }
+  for (const [, , w, color, J] of done) if (w && J) junctionFillets(B, J, color, 4.5);
+}
+// kerb curves: in each corner of a junction, a fillet of asphalt between the two streets' edges, so the
+// sidewalk's corner is rounded. J: { C, dA, wA, dB, wB, T } (T: street A ends at B coming along dA)
+function junctionFillets(B, J, color, R) {
+  const cr = (u, v) => u[0] * v[1] - u[1] * v[0];
+  if (Math.abs(cr(J.dA, J.dB)) < 0.35) return;                       // (too shallow an angle: leave it)
+  const nA = [-J.dA[1], J.dA[0]], nB = [-J.dB[1], J.dB[0]], C = J.C;
+  const meet = (oa, ob) => {        // the point on A's line offset oa and B's line offset ob
+    const p = [C[0] + nA[0] * oa, C[1] + nA[1] * oa], q = [C[0] + nB[0] * ob, C[1] + nB[1] * ob];
+    const den = cr(J.dA, J.dB), t = cr([q[0] - p[0], q[1] - p[1]], J.dB) / den; return [p[0] + J.dA[0] * t, p[1] + J.dA[1] * t]; };
+  const pos = [], Y = (x, z) => terrainAt(x, z) + 0.135;
+  for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
+    // a T: only the corners on the side street A comes from
+    if (J.T && Math.sign(-(J.dA[0] * nB[0] + J.dA[1] * nB[1])) !== sb) continue;
+    const P = meet(sa * J.wA / 2, sb * J.wB / 2), O = meet(sa * (J.wA / 2 + R), sb * (J.wB / 2 + R));
+    const T1 = [O[0] - nA[0] * sa * R, O[1] - nA[1] * sa * R], T2 = [O[0] - nB[0] * sb * R, O[1] - nB[1] * sb * R];
+    let a1 = Math.atan2(T1[1] - O[1], T1[0] - O[0]), a2 = Math.atan2(T2[1] - O[1], T2[0] - O[0]);
+    let da = a2 - a1; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+    const n = 8;
+    for (let k = 0; k < n; k++) {
+      const u0 = a1 + da * k / n, u1 = a1 + da * (k + 1) / n;
+      const p0 = [O[0] + Math.cos(u0) * R, O[1] + Math.sin(u0) * R], p1 = [O[0] + Math.cos(u1) * R, O[1] + Math.sin(u1) * R];
+      const tri = [[P[0], Y(P[0], P[1]), P[1]], [p0[0], Y(p0[0], p0[1]), p0[1]], [p1[0], Y(p1[0], p1[1]), p1[1]]];
+      // face up
+      const ux = tri[1][0] - tri[0][0], uz = tri[1][2] - tri[0][2], vx = tri[2][0] - tri[0][0], vz = tri[2][2] - tri[0][2];
+      if (uz * vx - ux * vz > 0) pos.push(...tri[0], ...tri[1], ...tri[2]); else pos.push(...tri[0], ...tri[2], ...tri[1]);
+    }
+  }
+  if (!pos.length) return;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  B.add(g, null, color, 'road', { outlineT: 0, edges: false });
+}
+// a round asphalt disc over a junction: it cuts the sidewalks' square corners into kerb curves
+function junctionDisc(B, x, z, rad, color) {
+  const N = 28, pos = [], c = [x, terrainAt(x, z) + 0.135, z];
+  for (let k = 0; k < N; k++) {
+    const a0 = k / N * Math.PI * 2, a1 = (k + 1) / N * Math.PI * 2;
+    const p = (a) => { const px = x + Math.cos(a) * rad, pz = z + Math.sin(a) * rad; return [px, terrainAt(px, pz) + 0.135, pz]; };
+    pos.push(...c, ...p(a1), ...p(a0));
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  B.add(g, null, color, 'road', { outlineT: 0, edges: false });
 }
 // dashed centre line
 function roadDashes(B, P, color = '#f2ead0', w = 0.25, dash = 3, gap = 5) {

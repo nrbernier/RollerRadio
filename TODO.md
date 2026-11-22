@@ -23,7 +23,7 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
 
 ### Streets and junctions
 - Junctions: asphalt plates now cover every crossing and T (sidewalks and dashes no longer run through the
-  middle). Still missing: kerb radii at the corners (corners are square), stop lines, and a sliver of sidewalk
+  middle). Kerb curves now round every corner (a 4.5 m fillet of asphalt between the two edges). Still missing: stop lines, and a sliver of sidewalk
   shows where a plate meets a curved street at a shallow angle (main street × old town road above downtown).
 - Downtown's own grid streets end in slanted cuts where the district outline trims them (north-west corner,
   next to the ring street): end them square on the ring street instead.
