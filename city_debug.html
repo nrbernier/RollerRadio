@@ -9864,7 +9864,8 @@ function carousel(H, x, z, r) {
 // Lavaux on the observatory's south slope: dry-stone terrace walls along the contours (long level
 // grinds), rows of vines between, a winemaker's house with a tower, people at work
 function vineyards(H, r) {
-  const { K, W, B } = H, P = PLAN.vineyards;
+  const { K, W, B, S } = H, P = PLAN.vineyards;
+  const s0col = () => pick(r, ['#5a2e6a', '#4a2a5e', '#6a3a7a']);
   // the vineyard's outline (real coordinates): split into parcels around a few seeds, each with its own row
   // direction (along the slope's contour, give or take), grass paths between them, terraces here and there
   const inPoly = (x, z) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
@@ -9877,9 +9878,11 @@ function vineyards(H, r) {
   for (const s of seeds) {
     const vx = -s.uz, vz = s.ux, R = Math.max(bx1 - bx0, bz1 - bz0);
     for (let k = -R / s.sp, n = 0; k < R / s.sp; k++, n++) {
-      let run = [], t = -R;
+      let run = [], t = -R, wire = [];
       const ox = s.x + vx * k * s.sp, oz = s.z + vz * k * s.sp;
-      const flush = () => { if (s.terr && n % 4 === 0 && run.length > 3) H.ledge(run, { h: 0.7 + r() * 0.4, w: 0.6, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' }); run = []; };
+      // every other row: the trellis wire over the posts is a grind, as long as the row runs unbroken
+      const flushWire = () => { if (wire.length > 3) K.rail(wire, { hidden: true, voice: 'pipe' }); wire = []; };
+      const flush = () => { flushWire(); if (s.terr && n % 4 === 0 && run.length > 3) H.ledge(run, { h: 0.7 + r() * 0.4, w: 0.6, color: pick(r, ['#b8ae9a', '#ada390', '#c2b8a2']), kind: 'paving', top: '#cfc6b4' }); run = []; };
       while (t < R) {
         const len = 3 + r() * 5, xm = ox + s.ux * (t + len / 2), zm = oz + s.uz * (t + len / 2);
         const ok = inPoly(xm, zm) && owner(xm, zm) === s && inPoly(ox + s.ux * t, oz + s.uz * t) && inPoly(ox + s.ux * (t + len), oz + s.uz * (t + len));
@@ -9895,6 +9898,7 @@ function vineyards(H, r) {
             H.put(H.SH.ICO, gx, y + 0.66, gz, 0.21, 0.3, 0.21, s.grape, 'flat', 0.02, 0);
           }
           run.push([xm - vx * 1.1, zm - vz * 1.1]);
+          if (n % 2) for (const e of [-0.5, 0.5]) { const wx = xm + s.ux * len * e, wz = zm + s.uz * len * e; wire.push([wx, terrainAt(wx, wz) + 1.62, wz]); }
         } else flush();
         t += len + 0.6 + (r() < 0.06 ? 3 : 0);
       }
@@ -9903,6 +9907,31 @@ function vineyards(H, r) {
     // a peach tree or two at the parcel's heart
     if (r() < 0.6 && H.clearOf(s.x - 2, s.z - 2, s.x + 2, s.z + 2, 0)) H.tree(s.x, s.z, { s: 0.6, h: 2.4, color: '#7a9a3a', far: false });
   }
+  // the harvest: carts left on the paths (a sloped tailboard: a kicker onto the load), stacks of picking crates
+  { let carts = 0, stacks = 0;
+    for (let i = 0; i < 2000 && (carts < 6 || stacks < 10); i++) {
+      const x = U.lerp(bx0, bx1, r()), z = U.lerp(bz0, bz1, r());
+      if (!inPoly(x, z) || owner(x, z) || !H.clearOf(x - 3, z - 3, x + 3, z + 3, 0.3)) continue;
+      const y = terrainAt(x, z), a = r() * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+      if (carts < 6) {
+        // the cart: a box of grapes on two wheels, a board from the ground up to its back
+        const m = new THREE.Matrix4().makeRotationY(-a);
+        B.add(new THREE.BoxGeometry(3.2, 1.0, 1.8), m.clone().setPosition(x, y + 1.0, z), '#8a5a32', 'wood', { outlineT: 0.05, edges: false });
+        B.add(new THREE.BoxGeometry(3.0, 0.3, 1.6), m.clone().setPosition(x, y + 1.55, z), s0col(), 'flat', { outlineT: 0.03, edges: false });
+        for (const sd of [-1, 1]) B.add(new THREE.CylinderGeometry(0.55, 0.55, 0.15, 10), new THREE.Matrix4().makeRotationX(Math.PI / 2).premultiply(new THREE.Matrix4().makeRotationY(-a)).setPosition(x - sa * sd * 1.0, y + 0.55, z + ca * sd * 1.0), '#3a2a1a', 'plain', { outlineT: 0.03, edges: false });
+        W.boxes.push({ x0: x - 1.7, y0: y, z0: z - 1.7, x1: x + 1.7, y1: y + 1.5, z1: z + 1.7, tag: 'cart' });
+        const bx = x - ca * 3.6, bz = z - sa * 3.6;
+        S.add(bx, terrainAt(bx, bz) + 0.02, bz, x - ca * 1.6, y + 1.5, z - sa * 1.6, 0.8);
+        B.add(new THREE.BoxGeometry(2.4, 0.12, 1.5), new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, -a, Math.atan2(1.5, 2.0), 'YXZ')).setPosition((bx + x - ca * 1.6) / 2, y + 0.78, (bz + z - sa * 1.6) / 2), '#b8894f', 'wood', { outlineT: 0.03, edges: false });
+        H.reserve([x - 4, z - 4, x + 4, z + 4]); carts++;
+      } else {
+        // a stack of picking crates, 1 to 3 high, now and then two side by side
+        const n = 1 + Math.floor(r() * 3);
+        for (let k = 0; k < n; k++) K.box(x - 0.6, y + k * 0.7 - (k ? 0 : 0.2), z - 0.45, x + 0.6, y + (k + 1) * 0.7, z + 0.45, k % 2 ? '#c4523a' : '#b8894f', 'wood', { outlineT: 0.03 });
+        if (r() < 0.5) K.box(x + 0.62, y - 0.2, z - 0.45, x + 1.82, y + 0.7, z + 0.45, '#b8894f', 'wood', { outlineT: 0.03 });
+        H.reserve([x - 1, z - 1, x + 2, z + 1]); stacks++;
+      }
+    } }
   const x0 = bx0, x1 = bx1, z0 = bz0;
   // the winemaker's house at the top, with a little tower
   const top = P.reduce((a, b) => b[1] < a[1] ? b : a), hx = top[0] + 14, hz = top[1] + 30;

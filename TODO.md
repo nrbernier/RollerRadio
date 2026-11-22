@@ -96,6 +96,21 @@ stand about as high (cross town at roof level), washing lines with laundry under
 Market: its houses already had stairs up their fronts, roof walkways and roof-to-roof links; an awning staircase
 was added where the edge houses are low enough (one so far: most edge houses are too tall for awnings).
 Check in play that the planks meet the roofs (no step up) and the lines are reachable from the roofs.
+Feedback round (22 Nov, 15:00), done:
+- Tower: deck furniture on a ring inside the rail; the gallery ramp now wraps outside the deck and starts flush
+  with it at a marked gap (stripe, flags, RAMP sign).
+- Record shop cellar: the market's and docks' paving no longer covers its ramp.
+- Docks: lighthouse beam pinned to its lamp (it swept a 688 m circle over the docks), no wagons across the street,
+  the sawtooth sheds' far model no longer a solid block over the roof.
+- Market hall: the floating shade steps replaced by crate piles stepped up to the eaves on both long sides.
+- Old town: all stone (a new ashlar texture; far copies were covering the near walls), new gatehouses (square
+  towers over a round arch, collision matching what you see), three stairs up the inside of the wall to its walk,
+  the wall blocks the camera, the camera checks three sight-lines (narrow lanes), the station's entrances small
+  (steeper stairs roofed with cobbles, only the top 7.5 m open, a stone frame).
+- Vineyard: trellis wires over every other row (grinds), harvest carts with a tailboard kicker, crate stacks.
+Check in play: the stairs up the wall (only one of the three is easy to reach from a lane), the cart kickers'
+angle, the old town station's stairs (steep: does skating up them work?).
+
 Third tour (22 Nov, 14:30), 56 views + full map, fixed: a tree crown poking through the old town wall (no
 trees in the wall's band now), the empty lawn where the skatepark used to be (a small park of trees), the
 market's glaring pale paving (warmer), an orange patch of terrain spreading round the market (now grass).
