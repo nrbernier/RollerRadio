@@ -76,6 +76,32 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   the viaduct (houses under the market's side of the line, the market hall's corner).
 - The tunnel mouths on the old town's hill: look at them from the lanes (portal blocks, the cut in the slope).
 
+### Playtest tour (22 Nov): 56 views at eye level, every district — what was found
+Fixed:
+- The game started underground: the spawn point was the old map's, and the summit terrace was built 58 m too low
+  (heights in moved districts were shifted twice: the real height functions call each other by their patched names).
+- The sky was a dark green sheet: the outer hills mesh assumed the map's width was a multiple of 48 m.
+- Black voids across the canal: terrain tile skirts hanging in the open where the canal cuts the terrain.
+- Downtown towers drawn black: boxes given with their corners in reverse came out inside out (now any order works).
+- The sunken street had no road surface (now asphalt and sidewalks); downtown's open ground was bare sandy earth
+  (now paved).
+- The skatepark had never been built (the viaduct crossed its spot): now in the north-east corner above the old
+  town, with a path from the ring street.
+- Street bridges over the canal now follow the street and span the quays (the promenade's bridge stood askew).
+- Vineyards: hedge rows on posts (they were flat green lenses).
+- Debug views now use the terrain detail of their own camera (coarse far tiles hid roads in the pictures).
+Still to fix:
+- Docks: the container yard's rows are laid out for the old map and only a broken, scattered part of them is
+  left after trimming: lay a new yard in real coordinates (rows along the quay, lanes between).
+- The vineyard's ground is pale sand (the old valley's paint): it should be grass and soil.
+- Outskirts: some houses are blank brick cubes (no windows) — use the old-house fronts.
+- The old town station's entrance canopy stands right against the town wall.
+- Grass shows through the quay paving in a few spots along the canal (small triangles of terrain above the apron).
+- Water tower plaza: the two dark planter blocks look like bunkers.
+- Faint darker bands across the sunken street: junction plates where downtown streets cross on bridges above
+  (skip junctions inside the cut).
+- Canal station and forest station: plain lawns under the viaduct; no forecourt.
+
 ### Checks (tools/geom.py, after the fixes below)
 - Walkers through walls: 116 → 3; cars through walls: 24 → 2 (downtown loop at z 218, x −150/−183: something
   stands on the street by the building site); people standing in walls: 235 → 26 (mostly canal quarter quays).
