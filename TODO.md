@@ -49,11 +49,6 @@ Seen in test shots (tools/shot.py with "view" / "top" steps). Fix in roughly thi
   houses with modern-looking windows: next to the medieval town they look out of place.
 - Market: a huge sand-coloured paved field with stalls scattered over it; it reads as empty. Give it a real
   layout (stall rows along lanes, the hall, the clock tower square) at the compact size.
-- Docks: an enormous grey yard with containers scattered at random. Make proper container stacks in rows,
-  sheds, rail sidings, and fewer of them.
-- Vineyards: rebuilt as irregular parcels on the real outline (rows along the contour, paths between parcels,
-  short terraces). Still: the pale downtown ground (the old sunken street's patch) shows under the south half;
-  the winemaker's house stands right by the viaduct.
 - Music garden: now on the summit's slope below the observatory; its gravel patch is very pale.
 - Empty grass: the strip between the forest edge and downtown (under the metro's west side), the slopes between
   the summit and the old town, and the strip between downtown's ring and the canal quarter (under the metro's
@@ -88,7 +83,7 @@ Fixed:
 - The skatepark had never been built (the viaduct crossed its spot): now in the north-east corner above the old
   town, with a path from the ring street.
 - Street bridges over the canal now follow the street and span the quays (the promenade's bridge stood askew).
-- Vineyards: hedge rows on posts (they were flat green lenses), on grass instead of the valley's sand.
+- Vineyards: irregular parcels on the real outline, hedge rows on posts with grapes, on grass.
 - No junction plates down in the sunken street (its cross streets pass over on bridges).
 - Debug views now use the terrain detail of their own camera (coarse far tiles hid roads in the pictures).
 Also done after feedback (22 Nov, morning):
@@ -181,7 +176,6 @@ Not yet used:
   Never listened to: levels are guesses, check on a phone (list in `music/README.md`)
 
 ## World
-- Vineyards: improve them, make the grapes visible
 - More relief: only the sunken street so far. More streets at different heights, more bridges
 
 ## New places: to check
