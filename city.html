@@ -10216,7 +10216,9 @@ const Sky = (() => {
     S.dome = cityDome(); G.scene.add(S.dome);
     // mountains across the lake: a jagged ring in the south, snow on top
     const pos = [], col = [], seg = 160, R0 = 5200;
-    const ridge = (a) => 260 + Math.sin(a * 7) * 120 + Math.sin(a * 17 + 1) * 90 + Math.sin(a * 41) * 40 + Math.max(0, Math.sin(a * 3 - 0.6)) * 380;
+    // (tapering to nothing at both ends of the arc: no cut-off cliff when seen from up high)
+    const taper = (a) => U.smooth(U.clamp(Math.min(a - Math.PI * 0.08, Math.PI * 0.92 - a) / (Math.PI * 0.14), 0, 1));
+    const ridge = (a) => (260 + Math.sin(a * 7) * 120 + Math.sin(a * 17 + 1) * 90 + Math.sin(a * 41) * 40 + Math.max(0, Math.sin(a * 3 - 0.6)) * 380) * taper(a) + 2;
     const cS = c('#f2f4f8'), cR = c('#7a8aa8'), cB = c('#5a6a88');
     for (let i = 0; i < seg; i++) {
       const a0 = Math.PI * 0.08 + i / seg * Math.PI * 0.84, a1 = Math.PI * 0.08 + (i + 1) / seg * Math.PI * 0.84;
