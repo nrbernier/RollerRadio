@@ -258,7 +258,7 @@ function buildDistricts(K, S, F) {
   X('business', h => H.line([[VALLEY.x, VALLEY.z0], [VALLEY.x, VALLEY.z3]], VALLEY.rimHalf + 1));
   X('park', prePark); X('site', h => H.reserve(SITE)); X('tower', h => H.reserve(TOWER.block));
   buildCable(H); lap('cable car');
-  X('skate', fillSouthStrip);
+  // (the old strip south of the park — ball courts, allotments, paths on the straight canal's lines — is gone)
   buildSkatepark(H);          // (real coordinates)
   buildCanals(H); lap('canals');           // (laid along the new canal: no frame)
   // (the old canal quarter's fill followed the straight canal: the winding canal's own rows replace it)
