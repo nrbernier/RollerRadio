@@ -96,6 +96,11 @@ stand about as high (cross town at roof level), washing lines with laundry under
 Market: its houses already had stairs up their fronts, roof walkways and roof-to-roof links; an awning staircase
 was added where the edge houses are low enough (one so far: most edge houses are too tall for awnings).
 Check in play that the planks meet the roofs (no step up) and the lines are reachable from the roofs.
+Third tour (22 Nov, 14:30), 56 views + full map, fixed: a tree crown poking through the old town wall (no
+trees in the wall's band now), the empty lawn where the skatepark used to be (a small park of trees), the
+market's glaring pale paving (warmer), an orange patch of terrain spreading round the market (now grass).
+Seen and left: forest trails that end in the open (north of the pond, west of the vineyards); the summit's two
+short paths to nowhere; the cable from the tower deck reads as a thin line across downtown from above.
 Still to fix:
 - Fixed: the wedge under the canal-mouth bridge was the promenade's road strip draped down into the canal
   (street strips now stop at the canal's edge; bridges carry them).
