@@ -154,13 +154,13 @@ Still to fix:
   the move-as-a-block code: a second wheel stood by downtown. Fixed; instanced meshes now stay at the origin.
 - Turning circles were drawn where a street ends at a place (station, terrace, lido). Fixed.
 
-## Strict review pass (22 Nov 2026) — where it stopped
-Found and fixed: every pitched roof in the city was drawn inside out and turned 90° (flat tops and crossways ridge caps seen from above); old-town shop awnings, flat roofs inside the wall, houses across the wall or crowding the gates, white tubes (now ropes and wooden rails), seams up the wall, stray eave boards on house fronts, a fountain with no water, the empty docks yard (stacking bays added).
-- [ ] **Old Town station entrances (not yet checked by eye):** the cobble lid stood ~1 m above the street on the slope. Now the lid and fill follow the street's slope, the opening runs back as far as the stairs lack headroom, and the town rails are dark. Shoot the 3 views (street, other side, from above) before calling it done. Camera spots: (206,-465)→(206,-445), (215,-440)→(206,-452), (272,-410)→(272,-430).
-- [ ] Green and white slivers of ground poking through the cobbles around the Old Town station (seen from above).
-- [ ] Docks containers read a bit like toy blocks (checker colours on the end faces): consider doors on the ends, fewer white boxes.
-- [ ] Not yet reviewed in this pass: tower deck and ramp, market hall.
+## Strict review pass (22–25 Nov 2026)
+Found and fixed: every pitched roof in the city was drawn inside out and turned 90°; every lettered sign in a shifted district stayed where it was built (invisible or far away: shop signs, MARKET, DYERS, RECORDS, THE TWIST…); old-town shop awnings, flat roofs inside the wall, houses across the wall or crowding the gates, white tubes, seams up the wall, stray eave boards, a fountain with no water; the empty docks yard; Old Town station entrances (raised lid, grass through the cobbles); the sky deck (lift door now faces the way down, a continuous stripe, the gap only where the ramp starts, chevrons on the ramp, the RAMP sign readable); the Market station's ramp ran through the market hall and into a road, the Canal station's into the building site.
+- [ ] Docks containers read a bit like toy blocks (checker colours on the end faces): doors on the ends, fewer white boxes.
+- [ ] Market stalls: the goods are single big coloured blocks; the hall's roof underside is very dark.
+- [ ] Old Town station: at the top end of each stairway there is a small kerb where the street slopes across it (acceptable, but could be a proper step).
 - [ ] Wide empty lawn south of the old town between the roads (about x 100–160, z −250).
+- [ ] Not yet played through: the deck lift now drops you facing north (check the camera turns the right way).
 
 ## Compact city: still to place
 - Docks and lakeshore along the new shore (they still follow the old one; the lakeshore's pier things sit in

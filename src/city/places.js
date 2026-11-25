@@ -234,7 +234,7 @@ function buildTower(H) {
   K.cyl(cx, deckY - 1.2, cz, dh, 1.2, '#cfc8bb', { seg: 32, outline: 0.1, kind: 'paving' });
   W.boxes.push({ x0: cx - dh * 0.92, y0: deckY - 1.2, z0: cz - dh * 0.92, x1: cx + dh * 0.92, y1: deckY, z1: cz + dh * 0.92, tag: 'deck' });
   K.cyl(cx, deckY - 1.6, cz, dh + 0.3, 0.4, red, { seg: 32, outline: 0.04 });
-  { const ring = []; for (let k = 27; k < 55; k++) { const a = k / 32 * Math.PI * 2; ring.push([cx + Math.cos(a) * (dh - 0.4), deckY + 1.05, cz + Math.sin(a) * (dh - 0.4)]); }
+  { const ring = []; for (let a = -0.95; a <= -1.62 + Math.PI * 2 + 1e-6; a += (Math.PI * 2 - 0.67) / 29) ring.push([cx + Math.cos(a) * (dh - 0.4), deckY + 1.05, cz + Math.sin(a) * (dh - 0.4)]);      // (open only where the ramp starts: just west of north round to its first bend east)
     K.rail(ring, { color: '#e9e4f5', postColor: '#6a6458', round: 2 }); }
   F.add(new THREE.CylinderGeometry(dh, dh, 1.6, 12), new THREE.Matrix4().makeTranslation(cx, deckY - 0.8, cz), '#cfc8bb');
   // the gallery: a ramp winding round the tower from the deck's east edge down to the plaza, a parapet along its
@@ -257,41 +257,48 @@ function buildTower(H) {
     }
     const e = at(n); edge.push([cx + Math.cos(e.a) * (r1 - 0.15), e.y + 0.95, cz + Math.sin(e.a) * (r1 - 0.15)]);
     K.rail(edge, { hidden: true, voice: 'pipe', minSpeed: 8 });
+    // painted chevrons on its first stretch, pointing the way round (east)
+    for (const k of [0.6, 1.4, 2.2]) { const p = at(k), tx = cx + Math.cos(p.a) * rm, tz = cz + Math.sin(p.a) * rm, ttx = -Math.sin(p.a), ttz = Math.cos(p.a), nx = Math.cos(p.a), nz = Math.sin(p.a);
+      for (const sd of [-1, 1]) { let dx = -ttx + nx * sd * 0.9, dz = -ttz + nz * sd * 0.9; const l = Math.hypot(dx, dz); dx /= l; dz /= l;
+        B.add(new THREE.BoxGeometry(1.7, 0.06, 0.42), new THREE.Matrix4().makeRotationY(Math.atan2(-dz, dx)).setPosition(tx + dx * 0.8, p.y + 0.04, tz + dz * 0.8), red, 'plain', { outlineT: 0, edges: false }); } }
     TOWER.gallery = { r0, r1, turns }; }
   // on the deck: the lift's pavilion, benches at the edge, telescopes, the mast with its red light
-  const px0 = cx - 3.5, pz0 = cz - 4, px1 = cx + 3.5, pz1 = cz + 3;
+  const px0 = cx - 3.5, pz0 = cz - 1, px1 = cx + 3.5, pz1 = cz + 6;      // (south of the centre, its door facing north: out of the lift you look straight at the way down)
   K.box(px0, deckY, pz0, px1, deckY + 3.6, pz1, '#f6f1e7', 'plain', { outlineT: 0.08 });
   B.box(px0 - 0.5, deckY + 3.6, pz0 - 0.5, px1 + 0.5, deckY + 3.9, pz1 + 0.5, red, 'plain', { outlineT: 0.05 });
-  K.cyl(cx, deckY + 3.9, cz - 0.5, 0.35, 16, '#d9d4ea', { outline: 0.04, seg: 8 }); K.cyl(cx, deckY + 19.9, cz - 0.5, 0.12, 12, '#d9d4ea', { outline: 0.03, seg: 6 });
-  K.sphere(cx, deckY + 32.3, cz - 0.5, 0.6, '#ff5a5a', { kind: 'lamp', outline: 0.04, seg: 8 });
-  F.add(new THREE.CylinderGeometry(0.3, 0.6, 28, 5), new THREE.Matrix4().makeTranslation(cx, deckY + 18, cz - 0.5), '#d9d4ea');
+  K.cyl(cx, deckY + 3.9, cz + 2.5, 0.35, 16, '#d9d4ea', { outline: 0.04, seg: 8 }); K.cyl(cx, deckY + 19.9, cz + 2.5, 0.12, 12, '#d9d4ea', { outline: 0.03, seg: 6 });
+  K.sphere(cx, deckY + 32.3, cz + 2.5, 0.6, '#ff5a5a', { kind: 'lamp', outline: 0.04, seg: 8 });
+  F.add(new THREE.CylinderGeometry(0.3, 0.6, 28, 5), new THREE.Matrix4().makeTranslation(cx, deckY + 18, cz + 2.5), '#d9d4ea');
   // benches, telescopes and lamps on a ring inside the rail (none at the ramp's gap at the north)
   const ring = (rad, a) => [cx + Math.cos(a) * rad, cz + Math.sin(a) * rad];
   for (const a of [0.35, 1.2, 2.1, 2.9, 3.7]) { const [bx, bz] = ring(dh - 3, a); H.bench(bx, bz, Math.abs(Math.sin(a)) > 0.7, { y: deckY + 0.02, color: '#5a4a3a' }); }
   for (const a of [0.8, 2.5, 4.4]) { const [tx, tz] = ring(dh - 1.6, a); K.cyl(tx, deckY, tz, 0.12, 1.1, '#3a3550', { outline: 0.02, seg: 6 }); B.add(new THREE.CylinderGeometry(0.22, 0.3, 1.1, 8), new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, -a, Math.PI / 2 - 0.3, 'YXZ')).setPosition(tx, deckY + 1.35, tz), '#3a3550', 'plain', { outlineT: 0.03, edges: false }); }
-  for (const a of [0.0, 1.6, 3.2, 5.3]) { const [lx, lz] = ring(dh - 1.2, a); H.lamp(lx, lz, { y: deckY, h: 3.4, style: 'globe', sound: 'lamp' }); }
+  for (const a of [0.0, 1.6, 3.2, 5.65]) { const [lx, lz] = ring(dh - 1.2, a); H.lamp(lx, lz, { y: deckY, h: 3.4, style: 'globe', sound: 'lamp' }); }
   // the way down: a gap in the rail at the north, a painted stripe to it, two flagpoles and a sign
   { const a0 = -Math.PI / 2;
-    for (let k = 0; k < 8; k++) { const r0s = 5 + k * 1.6; const [x, z] = ring(r0s, a0); B.box(x - 1.3, deckY + 0.01, z - 0.5, x + 1.3, deckY + 0.04, z + 0.3, k % 2 ? '#ffffff' : red, 'plain', { outlineT: 0, edges: false }); }
-    for (const sd of [-1, 1]) { const [fx, fz] = ring(dh - 0.6, a0 + sd * 0.2); K.cyl(fx, deckY, fz, 0.1, 6, '#ffffff', { outline: 0.02, seg: 6 }); B.box(fx + 0.1, deckY + 4.6, fz - 0.02, fx + 2.2, deckY + 5.9, fz + 0.02, red, 'plain', { outlineT: 0.02, edges: false }); }
-    const [sx, sz] = ring(dh - 3.5, a0); H.sign('RAMP ↓', sx, deckY + 3.2, sz, Math.PI, 3.6, 0.9, red, '#fff6e0'); K.cyl(sx, deckY, sz, 0.08, 2.7, '#3a3550', { outline: 0.02, seg: 5 }); }
+    for (let k = 0; k < 9; k++) { const r0s = 2.6 + k * 1.6; const [x, z] = ring(r0s, a0); B.box(x - 1.3, deckY + 0.03, z - 0.8, x + 1.3, deckY + 0.07, z + 0.8, k % 2 ? '#ffffff' : red, 'plain', { outlineT: 0, edges: false }); }
+    for (const fa of [-1.66, -0.9]) { const [fx, fz] = ring(dh - 0.6, fa); K.cyl(fx, deckY, fz, 0.1, 6, '#ffffff', { outline: 0.02, seg: 6 }); B.box(fx + 0.1, deckY + 4.6, fz - 0.02, fx + 2.2, deckY + 5.9, fz + 0.02, red, 'plain', { outlineT: 0.02, edges: false }); }
+    const [sx0, sz] = ring(dh - 3.5, a0), sx = sx0 + 3.4; H.sign('RAMP →', sx, deckY + 3.2, sz, 0, 3.6, 0.9, red, '#fff6e0'); K.cyl(sx, deckY, sz, 0.08, 2.7, '#3a3550', { outline: 0.02, seg: 5 }); }
   H.spot('skydeck', cx, cz, 46); W.spots[W.spots.length - 1].y = deckY;
   // the lift: a lit doorway in the foot of the tower, and another in the pavilion on the deck
-  const door = (dx, dz, dy, label) => {
-    B.box(dx - 1.5, dy, dz - 0.06, dx + 1.5, dy + 2.9, dz + 0.1, '#1f2a36', 'plain', { outlineT: 0, edges: false });
-    for (const [a, b] of [[-1.4, -0.05], [0.05, 1.4]]) B.box(dx + a, dy + 0.1, dz + 0.1, dx + b, dy + 2.7, dz + 0.16, '#c9d2da', 'plain', { outlineT: 0, edges: false });
-    B.box(dx - 1.75, dy, dz + 0.05, dx - 1.5, dy + 3.1, dz + 0.3, red, 'plain', { outlineT: 0.03, edges: false }); B.box(dx + 1.5, dy, dz + 0.05, dx + 1.75, dy + 3.1, dz + 0.3, red, 'plain', { outlineT: 0.03, edges: false });
-    B.box(dx - 1.75, dy + 2.9, dz + 0.05, dx + 1.75, dy + 3.2, dz + 0.3, red, 'plain', { outlineT: 0.03, edges: false });
-    B.box(dx - 0.5, dy + 3.3, dz + 0.1, dx + 0.5, dy + 3.55, dz + 0.22, '#ffe9b0', 'lamp', { outlineT: 0, edges: false });
-    H.sign(label, dx, dy + 4.3, dz + 0.2, 0, 4.6, 0.9, '#1b1a24', '#ffe9b0', { oneSide: true });
-    W.lamps.push([dx, dy + 3.4, dz + 1]); H.pool(dx, dz + 2.5, 5, '#ffc870', dy);
+  const door = (dx, dz, dy, label, f = 1, lab = null) => {      // lab: where its label hangs, if not over the door      // f: the side it faces (+1 south, -1 north)
+    const Z = (o) => dz + f * o;
+    B.box(dx - 1.5, dy, Z(-0.06), dx + 1.5, dy + 2.9, Z(0.1), '#1f2a36', 'plain', { outlineT: 0, edges: false });
+    for (const [a, b] of [[-1.4, -0.05], [0.05, 1.4]]) B.box(dx + a, dy + 0.1, Z(0.1), dx + b, dy + 2.7, Z(0.16), '#c9d2da', 'plain', { outlineT: 0, edges: false });
+    B.box(dx - 1.75, dy, Z(0.05), dx - 1.5, dy + 3.1, Z(0.3), red, 'plain', { outlineT: 0.03, edges: false }); B.box(dx + 1.5, dy, Z(0.05), dx + 1.75, dy + 3.1, Z(0.3), red, 'plain', { outlineT: 0.03, edges: false });
+    B.box(dx - 1.75, dy + 2.9, Z(0.05), dx + 1.75, dy + 3.2, Z(0.3), red, 'plain', { outlineT: 0.03, edges: false });
+    B.box(dx - 0.5, dy + 3.3, Z(0.1), dx + 0.5, dy + 3.55, Z(0.22), '#ffe9b0', 'lamp', { outlineT: 0, edges: false });
+    if (lab) H.sign(label, lab[0], lab[1], lab[2], f > 0 ? 0 : Math.PI, 4.6, 0.8, '#1b1a24', '#ffe9b0'); else H.sign(label, dx, dy + 4.3, Z(0.2), f > 0 ? 0 : Math.PI, 4.6, 0.9, '#1b1a24', '#ffe9b0', { oneSide: true });
+    W.lamps.push([dx, dy + 3.4, Z(1)]); H.pool(dx, Z(2.5), 5, '#ffc870', dy);
   };
+
   const gz = cz + hw + 0.2, gy = terrainAt(cx, gz + 2);
-  door(cx, gz, gy, 'LIFT · SKY DECK'); door(cx, pz1, deckY, 'LIFT · STREET');
+  door(cx, gz, gy, 'LIFT · SKY DECK', 1, [cx, gy + 2.85, gz + 3.3]);      // (its label under the canopy's front edge, where the tower's slabs can't hide it)
+  door(cx, pz0, deckY, 'LIFT · STREET', -1);
   K.box(cx - 3, gy + 3.3, gz, cx + 3, gy + 3.5, gz + 3.4, '#2a2838', 'plain', { outlineT: 0.04, nocam: true });
   H.patch([cx - 2, gz, cx + 2, gz + 9], red, 'paint', 0.11);
-  wallSign(H, 'THE TWIST', faceFrame('s', cx - hw, cz - hw, cx + hw, cz + hw), 0, gy + 5.6, 9, 1.6, red, '#fff6e0');
-  W.lifts = [{ ax: cx, ay: gy, az: gz + 1.6, bx: cx, by: deckY, bz: pz1 + 1.6, r: 1.5 }];
+  H.sign('THE TWIST', cx, gy + 4.25, gz + 3.2, 0, 6.4, 1.3, red, '#fff6e0');      // (standing on the canopy: on the wall the twisted storeys hid half of it)
+  W.lifts = [{ ax: cx, ay: gy, az: gz + 1.6, bx: cx, by: deckY, bz: pz0 - 1.6, bf: -1, r: 1.5 }];
   // and for the brave: a cable from the deck's south rail all the way down to Central's plaza
   { const cs = PLAN.stations.find(s => s.key === 'central').at, a = [cx - 6, deckY + 1.4, cz + dh - 0.6];
     for (const [tx, tz] of [[cs[0] + 6, cs[1] - 46], [cs[0] + 30, cs[1] - 40], [cs[0] - 22, cs[1] - 44]]) {

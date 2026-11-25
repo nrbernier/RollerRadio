@@ -366,10 +366,19 @@ function buildStations(K, M, S, F) {
     for (const sd of [-1, 1]) {
       const kEnd = sd > 0 ? hn : -hn, e = M.pts[idx(kEnd)], dirA = sd > 0 ? 1 : -1;
       const tx = e.dx * dirA, tz = e.dz * dirA, ox = -e.dz * sd, oz = e.dx * sd;
-      const ux = tx * 0.86 + ox * 0.5, uz = tz * 0.86 + oz * 0.5;
       const [sx, , sz] = L(e, sd * (IN + WIDTH / 2), PH);
-      let len = 30, gy = 0;
-      for (len = 30; len < 150; len += 4) { gy = terrainAt(sx + ux * len, sz + uz * len); if ((p.y + PH - gy) / len < 0.13) break; }
+      // the ramp leaves at an angle; if that runs it into a building (the market hall and the building site did: they are built later, so they are checked by name), it bends closer to the line
+      let ux = 0, uz = 0, len = 30, gy = 0;
+      for (const [ca, cb] of [[0.86, 0.5], [0.94, 0.34], [0.98, 0.2], [1, 0]]) {
+        const l = Math.hypot(ca, cb); ux = (tx * ca + ox * cb) / l; uz = (tz * ca + oz * cb) / l;
+        for (len = 30; len < 150; len += 4) { gy = terrainAt(sx + ux * len, sz + uz * len); if ((p.y + PH - gy) / len < 0.13) break; }
+        let hit = false;
+        for (let d = 4; d <= len && !hit; d += 2) { const x = sx + ux * d, z = sz + uz * d, y = U.lerp(p.y + PH, gy, d / len); hit = [typeof MKT !== 'undefined' && MKT.hall, typeof SITE !== 'undefined' && SITE].some(R => R && x > R[0] - 3 && x < R[2] + 3 && z > R[1] - 3 && z < R[3] + 3) || W.boxes.some(b => b.tag !== 'pillar' && x > b.x0 - 2.2 && x < b.x1 + 2.2 && z > b.z0 - 2.2 && z < b.z1 + 2.2 && b.y1 > y - 1 && b.y0 < y + 3); }
+        // (nor land in a road: then it stops short of it, a little steeper)
+        const inRoad = (l) => { const ex = sx + ux * l, ez = sz + uz * l; return Object.values(PLAN.roads).some(rd => pathDist(rd.path, ex, ez, 40).d < rd.width / 2 + 2.5); };
+        if (!hit && inRoad(len)) { let l = len; while (l > 24 && inRoad(l)) l -= 2; const g2 = terrainAt(sx + ux * l, sz + uz * l); if (!inRoad(l) && (p.y + PH - g2) / l < 0.2) { len = l; gy = g2; } else hit = true; }
+        if (!hit) break;
+      }
       const ex = sx + ux * len, ez = sz + uz * len; gy = terrainAt(ex, ez);
       S.add(sx, p.y + PH, sz, ex, gy, ez, 1.9);
       const ryaw = Math.atan2(ux, uz), n = Math.ceil(len / 6);

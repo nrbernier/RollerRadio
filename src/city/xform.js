@@ -87,7 +87,7 @@ function xfShift(v, dx, dz, seen, depth = 0) {
   if (!v || typeof v !== 'object' || depth > 6 || seen.has(v)) return;
   seen.add(v);
   if (v.isVector3) { v.x += dx; v.z += dz; return; }
-  if (v.isObject3D) { v.position.x += dx; v.position.z += dz; return; }
+  if (v.isObject3D) { v.position.x += dx; v.position.z += dz; if (!v.matrixAutoUpdate) v.updateMatrix(); return; }      // (a frozen matrix must follow, or the thing stays where it was built: the signs did)
   if (v.isMaterial || v.isTexture || v.isBufferGeometry || v.isColor) return;
   if (Array.isArray(v)) {
     if (v.length >= 2 && v.length <= 4 && v.every(n => typeof n === 'number')) {
@@ -222,7 +222,7 @@ function xfRun(H, g, ...fns) {
   // (models added to the scene first, and remembered, so a registry that holds one doesn't move it twice)
   const seen = new WeakSet();
   // (instanced meshes stay at the origin: their instances are placed in real coordinates while the game runs)
-  for (let i = nKids; i < W.group.children.length; i++) { const o = W.group.children[i]; seen.add(o); if (o.isInstancedMesh) continue; o.position.x += dx; o.position.z += dz; }
+  for (let i = nKids; i < W.group.children.length; i++) { const o = W.group.children[i]; seen.add(o); if (o.isInstancedMesh) continue; o.position.x += dx; o.position.z += dz; if (!o.matrixAutoUpdate) o.updateMatrix(); }
   const keep = (v) => { const c = xfCentre(v); if (!c) return true; Object.assign(XF, { g, keep: G.keep, margin: G.margin || 0 }); const ok = xfKeepPoint(c[0], c[1]); XF.g = null; return ok; };
   for (const k of Object.keys(W)) {
     if (XF_SKIP.has(k) || typeof W[k] === 'function') continue;
