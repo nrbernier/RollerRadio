@@ -6789,10 +6789,12 @@ function buildBusiness(H) {
     const lots = [];
     if (r() < 0.35) lots.push([bx0, bz0, bx1, bz1]);
     else { const mx = U.lerp(bx0, bx1, 0.4 + r() * 0.2), mz = U.lerp(bz0, bz1, 0.4 + r() * 0.2); lots.push([bx0, bz0, mx - 4, mz - 4], [mx + 4, bz0, bx1, mz - 4], [bx0, mz + 4, mx - 4, bz1], [mx + 4, mz + 4, bx1, bz1]); }
-    for (const [x0, z0, x1, z1] of lots) {
+    for (let [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
+      // a lot that brushes a street's or the line's clearance first gives up a few metres along its edges
+      if (!H.clearOf(x0, z0, x1, z1, 4)) for (const ins of [2, 4, 6, 8]) { if (x1 - x0 - 2 * ins < 14 || z1 - z0 - 2 * ins < 14) break; if (H.clearOf(x0 + ins, z0 + ins, x1 - ins, z1 - ins, 4)) { x0 += ins; z0 += ins; x1 -= ins; z1 -= ins; break; } }
       if (inPlace(x0, z0, x1, z1)) continue;
-      if (!xfInside(x0, z0, x1, z1, 10)) continue;       // (clear of the ring street round downtown)
+      if (!xfInside(x0, z0, x1, z1, 4)) continue;       // (clear of the ring street round downtown: the shape already stops at its sidewalk)
       const faces = []; if (x0 === bx0 && i > 0) faces.push('w'); if (x1 === bx1 && i < xs.length - 2) faces.push('e'); if (z0 === bz0 && j > 0) faces.push('n'); if (z1 === bz1 && j < zs.length - 2) faces.push('s');
       if (underSkyRail(x0, z0, x1, z1)) { for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); } continue; }
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
@@ -7170,7 +7172,14 @@ function bizPodium(H, x0, z0, x1, z1, h, col, style, sr, faces, land) {
   const glass = '#34465a', trimC = '#3a3550', pale = '#e6dfd0';
   const body = (a0, c0, a1, c1, y0, y1, kind = 'building', c = col) => K.box(a0, y0, c0, a1, y1, c1, c, kind, { roofColor: c, outlineT: 0.16 });
   // the band of shop windows sits at each side's own pavement level (the lots slope)
-  const band = (a0, c0, a1, c1, y0 = null, y1 = null) => { for (const [ax, az, bx, bz] of [[a0 - 0.06, c0 + 1, a0 + 0.1, c1 - 1], [a1 - 0.1, c0 + 1, a1 + 0.06, c1 - 1], [a0 + 1, c0 - 0.06, a1 - 1, c0 + 0.1], [a0 + 1, c1 - 0.1, a1 - 1, c1 + 0.06]]) { const g = y0 ?? Math.max(terrainAt(ax, az), terrainAt(bx, bz)) + 0.2; B.box(ax, g, az, bx, Math.min(top - 1, y1 ?? g + 3.2), bz, glass, 'plain', { outlineT: 0, edges: false }); } };
+  // (glass from the side's lowest pavement point, with mullions and a fascia: a plain dark slab read as a blank panel)
+  const band = (a0, c0, a1, c1, y0 = null, y1 = null) => { for (const [ax, az, bx, bz] of [[a0 - 0.06, c0 + 1, a0 + 0.1, c1 - 1], [a1 - 0.1, c0 + 1, a1 + 0.06, c1 - 1], [a0 + 1, c0 - 0.06, a1 - 1, c0 + 0.1], [a0 + 1, c1 - 0.1, a1 - 1, c1 + 0.06]]) {
+    const lo = Math.min(terrainAt(ax, az), terrainAt(bx, bz)), hi2 = Math.max(terrainAt(ax, az), terrainAt(bx, bz)), g = y0 ?? lo - 0.1, gt = Math.min(top - 1, y1 ?? hi2 + 3.4);
+    B.box(ax, g, az, bx, gt, bz, glass, 'plain', { outlineT: 0, edges: false });
+    const alongX = bx - ax > bz - az, L = alongX ? bx - ax : bz - az, n = Math.max(1, Math.round(L / 2.6)), out = 0.06;
+    for (let k = 0; k <= n; k++) { const t = k / n, mx = alongX ? U.lerp(ax, bx, t) : (ax + bx) / 2, mz = alongX ? (az + bz) / 2 : U.lerp(az, bz, t);
+      B.box(mx - (alongX ? 0.07 : 0.12 + out), g, mz - (alongX ? 0.12 + out : 0.07), mx + (alongX ? 0.07 : 0.12 + out), gt, mz + (alongX ? 0.12 + out : 0.07), '#d8d2c4', 'plain', { outlineT: 0, edges: false }); }
+    B.box(ax - (alongX ? 0 : out), gt - 0.35, az - (alongX ? out : 0), bx + (alongX ? 0 : out), gt, bz + (alongX ? out : 0), trimC, 'plain', { outlineT: 0.02, edges: false }); } };
   const cap = (a0, c0, a1, c1, y) => B.box(a0 - 0.2, y - 0.7, c0 - 0.2, a1 + 0.2, y - 0.05, c1 + 0.2, trimC, 'plain', { outlineT: 0, edges: false });
   const post = (x, z, y1, w = 0.45, c = pale) => { const g = terrainAt(x, z); K.box(x - w, g - 1, z - w, x + w, y1, z + w, c, 'paving', { outlineT: 0.05 }); };
   const w = x1 - x0, d = z1 - z0;
@@ -7451,6 +7460,17 @@ function buildCanals(H) {
       house(cx, cz, alongX, w, d, front);
       s += w + (r() < 0.15 ? 7 : 0.4);
     }
+  }
+  // lanes behind the rows: the second and third rows face a cobbled lane (they stood in a lawn with no way to their doors)
+  for (const sd of [-1, 1]) for (const o of [C.half + 41.75, C.half + 71]) {
+    let run = [];
+    const flush = () => { if (run.length > 2) groundRibbon(B, run, 6, '#cbc2ae', 'cobble', 0.07); run = []; };
+    for (let s = 8; s < C.path.len - 8; s += 4) {
+      const [x, z] = off(s, sd * o);
+      const ok = shapeDist(keep, x, z) < -3 && !Object.values(PLAN.roads).some(rd => pathDist(rd.path, x, z, 40).d < rd.width / 2 + 3) && H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0);
+      if (ok) run.push([x, z]); else flush();
+    }
+    flush();
   }
   // bollards, trees and lamps along the quays
   for (let s = 12; s < C.path.len - 8; s += 14) for (const sd of [-1, 1]) {

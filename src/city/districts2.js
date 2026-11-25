@@ -80,6 +80,17 @@ function buildCanals(H) {
       s += w + (r() < 0.15 ? 7 : 0.4);
     }
   }
+  // lanes behind the rows: the second and third rows face a cobbled lane (they stood in a lawn with no way to their doors)
+  for (const sd of [-1, 1]) for (const o of [C.half + 41.75, C.half + 71]) {
+    let run = [];
+    const flush = () => { if (run.length > 2) groundRibbon(B, run, 6, '#cbc2ae', 'cobble', 0.07); run = []; };
+    for (let s = 8; s < C.path.len - 8; s += 4) {
+      const [x, z] = off(s, sd * o);
+      const ok = shapeDist(keep, x, z) < -3 && !Object.values(PLAN.roads).some(rd => pathDist(rd.path, x, z, 40).d < rd.width / 2 + 3) && H.clearOf(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0);
+      if (ok) run.push([x, z]); else flush();
+    }
+    flush();
+  }
   // bollards, trees and lamps along the quays
   for (let s = 12; s < C.path.len - 8; s += 14) for (const sd of [-1, 1]) {
     const [x, z] = off(s, sd * (C.half + 1.6));

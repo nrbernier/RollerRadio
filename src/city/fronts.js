@@ -32,7 +32,14 @@ function bizPodium(H, x0, z0, x1, z1, h, col, style, sr, faces, land) {
   const glass = '#34465a', trimC = '#3a3550', pale = '#e6dfd0';
   const body = (a0, c0, a1, c1, y0, y1, kind = 'building', c = col) => K.box(a0, y0, c0, a1, y1, c1, c, kind, { roofColor: c, outlineT: 0.16 });
   // the band of shop windows sits at each side's own pavement level (the lots slope)
-  const band = (a0, c0, a1, c1, y0 = null, y1 = null) => { for (const [ax, az, bx, bz] of [[a0 - 0.06, c0 + 1, a0 + 0.1, c1 - 1], [a1 - 0.1, c0 + 1, a1 + 0.06, c1 - 1], [a0 + 1, c0 - 0.06, a1 - 1, c0 + 0.1], [a0 + 1, c1 - 0.1, a1 - 1, c1 + 0.06]]) { const g = y0 ?? Math.max(terrainAt(ax, az), terrainAt(bx, bz)) + 0.2; B.box(ax, g, az, bx, Math.min(top - 1, y1 ?? g + 3.2), bz, glass, 'plain', { outlineT: 0, edges: false }); } };
+  // (glass from the side's lowest pavement point, with mullions and a fascia: a plain dark slab read as a blank panel)
+  const band = (a0, c0, a1, c1, y0 = null, y1 = null) => { for (const [ax, az, bx, bz] of [[a0 - 0.06, c0 + 1, a0 + 0.1, c1 - 1], [a1 - 0.1, c0 + 1, a1 + 0.06, c1 - 1], [a0 + 1, c0 - 0.06, a1 - 1, c0 + 0.1], [a0 + 1, c1 - 0.1, a1 - 1, c1 + 0.06]]) {
+    const lo = Math.min(terrainAt(ax, az), terrainAt(bx, bz)), hi2 = Math.max(terrainAt(ax, az), terrainAt(bx, bz)), g = y0 ?? lo - 0.1, gt = Math.min(top - 1, y1 ?? hi2 + 3.4);
+    B.box(ax, g, az, bx, gt, bz, glass, 'plain', { outlineT: 0, edges: false });
+    const alongX = bx - ax > bz - az, L = alongX ? bx - ax : bz - az, n = Math.max(1, Math.round(L / 2.6)), out = 0.06;
+    for (let k = 0; k <= n; k++) { const t = k / n, mx = alongX ? U.lerp(ax, bx, t) : (ax + bx) / 2, mz = alongX ? (az + bz) / 2 : U.lerp(az, bz, t);
+      B.box(mx - (alongX ? 0.07 : 0.12 + out), g, mz - (alongX ? 0.12 + out : 0.07), mx + (alongX ? 0.07 : 0.12 + out), gt, mz + (alongX ? 0.12 + out : 0.07), '#d8d2c4', 'plain', { outlineT: 0, edges: false }); }
+    B.box(ax - (alongX ? 0 : out), gt - 0.35, az - (alongX ? out : 0), bx + (alongX ? 0 : out), gt, bz + (alongX ? out : 0), trimC, 'plain', { outlineT: 0.02, edges: false }); } };
   const cap = (a0, c0, a1, c1, y) => B.box(a0 - 0.2, y - 0.7, c0 - 0.2, a1 + 0.2, y - 0.05, c1 + 0.2, trimC, 'plain', { outlineT: 0, edges: false });
   const post = (x, z, y1, w = 0.45, c = pale) => { const g = terrainAt(x, z); K.box(x - w, g - 1, z - w, x + w, y1, z + w, c, 'paving', { outlineT: 0.05 }); };
   const w = x1 - x0, d = z1 - z0;

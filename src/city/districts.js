@@ -380,10 +380,12 @@ function buildBusiness(H) {
     const lots = [];
     if (r() < 0.35) lots.push([bx0, bz0, bx1, bz1]);
     else { const mx = U.lerp(bx0, bx1, 0.4 + r() * 0.2), mz = U.lerp(bz0, bz1, 0.4 + r() * 0.2); lots.push([bx0, bz0, mx - 4, mz - 4], [mx + 4, bz0, bx1, mz - 4], [bx0, mz + 4, mx - 4, bz1], [mx + 4, mz + 4, bx1, bz1]); }
-    for (const [x0, z0, x1, z1] of lots) {
+    for (let [x0, z0, x1, z1] of lots) {
       if (x1 - x0 < 12 || z1 - z0 < 12) continue;
+      // a lot that brushes a street's or the line's clearance first gives up a few metres along its edges
+      if (!H.clearOf(x0, z0, x1, z1, 4)) for (const ins of [2, 4, 6, 8]) { if (x1 - x0 - 2 * ins < 14 || z1 - z0 - 2 * ins < 14) break; if (H.clearOf(x0 + ins, z0 + ins, x1 - ins, z1 - ins, 4)) { x0 += ins; z0 += ins; x1 -= ins; z1 -= ins; break; } }
       if (inPlace(x0, z0, x1, z1)) continue;
-      if (!xfInside(x0, z0, x1, z1, 10)) continue;       // (clear of the ring street round downtown)
+      if (!xfInside(x0, z0, x1, z1, 4)) continue;       // (clear of the ring street round downtown: the shape already stops at its sidewalk)
       const faces = []; if (x0 === bx0 && i > 0) faces.push('w'); if (x1 === bx1 && i < xs.length - 2) faces.push('e'); if (z0 === bz0 && j > 0) faces.push('n'); if (z1 === bz1 && j < zs.length - 2) faces.push('s');
       if (underSkyRail(x0, z0, x1, z1)) { for (let k = 0; k < 3; k++) { const tx = U.lerp(x0, x1, r()), tz = U.lerp(z0, z1, r()); if (H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) H.tree(tx, tz, { s: 0.8, color: '#4f9a52' }); } continue; }
       if (!H.clearOf(x0, z0, x1, z1, 4)) {
