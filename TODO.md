@@ -160,7 +160,7 @@ Found and fixed: every pitched roof in the city was drawn inside out and turned 
 - [ ] Market stalls: the goods are single big coloured blocks; the hall's roof underside is very dark.
 - [ ] Old Town station: at the top end of each stairway there is a small kerb where the street slopes across it (acceptable, but could be a proper step).
 - [ ] Wide empty lawn south of the old town between the roads (about x 100–160, z −250).
-- [ ] Not yet played through: the deck lift now drops you facing north (check the camera turns the right way).
+- [x] Lift checked in play: you come out on the deck behind your skater, looking down the stripe at the RAMP sign (the camera used to face you at both ends).
 
 ## Compact city: still to place
 - Docks and lakeshore along the new shore (they still follow the old one; the lakeshore's pier things sit in

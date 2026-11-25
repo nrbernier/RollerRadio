@@ -12115,7 +12115,7 @@ function updateWorld(dt, bi) {
     const da = Math.hypot(L.ax - pos.x, L.az - pos.z) + Math.abs(L.ay - pos.y) * 0.5, db = Math.hypot(L.bx - pos.x, L.bz - pos.z) + Math.abs(L.by - pos.y) * 0.5;
     if (L.t > 0) {
       const t0 = L.t; L.t -= dt;
-      if (t0 > 0.45 && L.t <= 0.45) { const up = L.to === 'b', f = (up ? L.bf : L.af) || 1; p.pos.set(up ? L.bx : L.ax, (up ? L.by : L.ay) + 0.05, (up ? L.bz : L.az) + 1.2 * f); p.vel.set(0, 0, 0); p.mode = 'ground'; p.yaw = f > 0 ? 0 : Math.PI; Game.cam.snap(p); Game.cam.yaw = f > 0 ? Math.PI : 0; W.updateCells(p.pos.x, p.pos.z, 360); Sound.sfx.touch('chime'); }
+      if (t0 > 0.45 && L.t <= 0.45) { const up = L.to === 'b', f = (up ? L.bf : L.af) || 1; p.pos.set(up ? L.bx : L.ax, (up ? L.by : L.ay) + 0.05, (up ? L.bz : L.az) + 1.2 * f); p.vel.set(0, 0, 0); p.mode = 'ground'; p.yaw = f > 0 ? 0 : Math.PI; Game.cam.snap(p); Game.cam.yaw = p.yaw; W.updateCells(p.pos.x, p.pos.z, 360); Sound.sfx.touch('chime'); }
       liftFade(L.t > 0.45 ? (0.9 - L.t) / 0.4 : L.t / 0.45);
       if (L.t <= 0) liftFade(0);
     } else if (!L.armed) { if (da > 3.2 && db > 3.2) L.armed = true; }
