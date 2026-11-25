@@ -1,5 +1,13 @@
 # Downtone — to do
 
+## Feedback 25 Nov 2026 (playing `main`)
+- [ ] **The Twist must be the tallest tower in the city.** Some downtown towers are now taller. The point of the deck is to look all round from above everything: cap downtown towers below the deck, or raise the deck.
+- [ ] **Old Town station entrances:** a stone wall blocks the stairs. Check that the parapet pieces don't cross the stair band, especially at the top end where you walk in.
+- [ ] **Crate staircase up the market hall roof:** very hard to climb. Make the steps lower and deeper, with a steady rhythm and no gaps, and test it in play.
+- [ ] **Walkway near the lido is blocked:** lots of pedestrians are stuck there. Find what blocks the walk line and either clear it or reroute the walkers.
+- [ ] **Glasshouse near the top of the cable car:** totally buggy. Review it closely and check whether the cable-car station and the glasshouse overlap.
+- [ ] **Docks:** lots of signs float at random near the containers. These are probably signs that became visible after the sign fix and were placed for the old layout, or yard signs now off their posts and walls.
+
 ## Compact city: clean up every street and bridge (branch `compact-city`)
 The street network is decided (PLAN.roads in plan.js); how it looks on the ground is still buggy. Ride every
 street end to end on a phone, then fix:
