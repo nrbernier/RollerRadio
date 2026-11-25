@@ -159,6 +159,9 @@ Found and fixed: every pitched roof in the city was drawn inside out and turned 
 - [ ] Docks containers read a bit like toy blocks (checker colours on the end faces): doors on the ends, fewer white boxes.
 - [ ] Market stalls: the goods are single big coloured blocks; the hall's roof underside is very dark.
 - [ ] Old Town station: at the top end of each stairway there is a small kerb where the street slopes across it (acceptable, but could be a proper step).
+- [ ] Lakeshore lawn between the road and the canal quarter is still mostly bare west of the ferris wheel (the canal quarter's new tree clumps only reach its north edge): paths and trees there.
+- [ ] Downtown: the block north of the tower plaza and the sky-rail block are still empty paving.
+- [ ] Not yet reviewed in round 2: park/forest, observatory hill and vineyards, the suburbs outside the old wall.
 - [ ] Wide empty lawn south of the old town between the roads (about x 100–160, z −250).
 - [x] Lift checked in play: you come out on the deck behind your skater, looking down the stripe at the RAMP sign (the camera used to face you at both ends).
 

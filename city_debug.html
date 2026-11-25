@@ -7472,6 +7472,13 @@ function buildCanals(H) {
     }
     flush();
   }
+  // beyond the back lane: gardens and a strip of park (clumps of trees, not an empty lawn)
+  for (let i = 0, n = 0; i < 900 && n < 70; i++) {
+    const s0 = 10 + r() * (C.path.len - 20), sd = r() < 0.5 ? -1 : 1, [cx, cz] = off(s0, sd * (C.half + 96 + r() * 60));
+    if (shapeDist(keep, cx, cz) > -6) continue;
+    for (let k = 0, m = 2 + Math.floor(r() * 4); k < m; k++) { const tx = cx + (r() - 0.5) * 14, tz = cz + (r() - 0.5) * 14; if (shapeDist(keep, tx, tz) < -4 && H.clearOf(tx - 2, tz - 2, tx + 2, tz + 2, 1)) { H.tree(tx, tz, { s: 0.9 + r() * 0.5, color: pick(r, ['#5a8a4a', '#4f7f45', '#6f9a55']) }); H.reserve([tx - 1.5, tz - 1.5, tx + 1.5, tz + 1.5]); } }
+    n++;
+  }
   // bollards, trees and lamps along the quays
   for (let s = 12; s < C.path.len - 8; s += 14) for (const sd of [-1, 1]) {
     const [x, z] = off(s, sd * (C.half + 1.6));
