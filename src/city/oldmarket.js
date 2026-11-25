@@ -144,9 +144,9 @@ function buildWalledTown(H, r) {
   // cobbles: one paved oval over the whole town inside the wall, following the ground
   // (the open tops of the station's stairways: no cobbles over them)
   const opens = []; for (const st of (W.metro ? W.metro.stations : [])) for (const e of (st.exits || [])) if (e.open) opens.push(e);
-  const openAt = (x, z) => opens.some(e => { const dx = x - e.x0, dz = z - e.z0, al = dx * e.nx + dz * e.nz, ac = Math.abs(-dx * e.nz + dz * e.nx); return al > e.L - e.open - 0.8 && al < e.L + 1.2 && ac < e.w + 0.8; });
-  { const pos = [], NR = 26, NA = 128, pt = (i, k) => { const f = i / NR, a = k / NA * Math.PI * 2, x = cx0 + Math.cos(a) * (OW.rx - 0.5) * f, z = cz0 + Math.sin(a) * (OW.rz - 0.5) * f; return [x, terrainAt(x, z) + 0.1, z]; };
-    for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); if (inHole((a[0] + c[0]) / 2, (a[2] + c[2]) / 2) || [a, b, c, d].some(p => openAt(p[0], p[2]))) continue; pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
+  const openAt = (x, z) => opens.some(e => { const dx = x - e.x0, dz = z - e.z0, al = dx * e.nx + dz * e.nz, ac = Math.abs(-dx * e.nz + dz * e.nx); return al > e.L - e.open - 0.2 && al < e.L + 0.4 && ac < e.w + 0.3; });
+  { const pos = [], NR = 60, NA = 288, pt = (i, k) => { const f = i / NR, a = k / NA * Math.PI * 2, x = cx0 + Math.cos(a) * (OW.rx - 0.5) * f, z = cz0 + Math.sin(a) * (OW.rz - 0.5) * f; return [x, terrainAt(x, z) + 0.1, z]; };
+    for (let i = 0; i < NR; i++) for (let k = 0; k < NA; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i + 1, k + 1), d = pt(i, k + 1); if ([a, b, c, d].every(p => inHole(p[0], p[2])) || [a, b, c, d].some(p => openAt(p[0], p[2]))) continue; pos.push(...a, ...c, ...b, ...a, ...d, ...c); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
     if (g.attributes.normal.array[1] < 0) { const p2 = g.attributes.position.array; for (let i = 0; i < p2.length; i += 9) for (let k = 0; k < 3; k++) { const t = p2[i + 3 + k]; p2[i + 3 + k] = p2[i + 6 + k]; p2[i + 6 + k] = t; } g.computeVertexNormals(); }
     B.add(g, null, '#d8d0c4', 'cobble', { outlineT: 0, edges: false }); }
